@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://orbiquefms.com/sitemap.xml
