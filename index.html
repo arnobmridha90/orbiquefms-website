@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta property="og:title" content="Orbique FMS">
-<meta property="og:description" content="Fleet management for car rental companies: bookings, payments, deposits, summons and tracking on one screen.">
+<meta property="og:description" content="Fleet management for car rental companies: bookings, invoices, payments, deposits, schedules, expenses and reports on one screen.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%27-50 -50 100 100%27%3E%3Ccircle r=%2746%27 fill=%27%23264061%27/%3E%3Ccircle r=%2712%27 fill=%27%23c8a545%27/%3E%3C/svg%3E">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Orbique FMS</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Orbique FMS runs a car rental fleet from one screen: bookings, payments, deposits, summons, tracking and reports.">
+<meta name="description" content="Orbique FMS runs a car rental fleet from one screen: bookings, invoices, payments, deposits, schedules, expenses, staff access and reports.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -69,8 +69,8 @@ header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; b
 .brand-name { font-family: var(--f-display); font-size: 22px; letter-spacing: .22em; }
 .brand-name small { font-family: var(--f-body); font-size: 11px; letter-spacing: .3em; color: var(--teal); font-weight: 600; margin-left: 4px; }
 nav.links { display: flex; align-items: center; gap: 28px; font-size: 15px; }
-nav.links a { color: var(--muted); text-decoration: none; }
-nav.links a:hover { color: var(--ink); }
+nav.links a:not(.btn) { color: var(--muted); text-decoration: none; }
+nav.links a:not(.btn):hover { color: var(--ink); }
 .btn { display: inline-flex; align-items: center; gap: 8px; font: 600 15px/1 var(--f-body); padding: 12px 18px; border-radius: 999px; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: transform .16s ease, background-color .16s ease; }
 .btn:active { transform: scale(.97); }
 .btn-primary { background: var(--teal); color: var(--surface); }
@@ -97,7 +97,7 @@ nav.links a:hover { color: var(--ink); }
 .window-bar .dots { display: flex; gap: 6px; }
 .window-bar .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--rule); }
 .window-bar .addr { flex: 1; min-width: 0; text-align: center; font-family: var(--f-mono); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.window-bar .sample { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+.window-bar .sample { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--gold) 55%, var(--ink)); font-weight: 600; }
 .window-body { padding: 18px; }
 
 /* hero calendar */
@@ -163,27 +163,44 @@ section.feature { padding-block: 72px; border-top: 1px solid var(--rule); }
 .caret::after { content: "|"; color: var(--teal); margin-left: 1px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* summons */
-.sum-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.sum-table th { text-align: left; font-weight: 500; font-size: 11.5px; color: var(--muted); padding: 0 8px 8px; border-bottom: 1px solid var(--rule); }
-.sum-table td { padding: 11px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
-.sum-table td.num { text-align: right; }
-.plate { font-family: var(--f-mono); font-weight: 600; letter-spacing: .06em; background: var(--ink); color: var(--paper); padding: 2px 7px; border-radius: 4px; font-size: 12px; }
+/* schedules */
+.sch-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.sch-head b { font-size: 15px; }
+.sch-scroll { overflow-x: auto; }
+.sch { display: grid; grid-template-columns: 104px minmax(0, 1fr); font-size: 13px; border-top: 1px solid var(--rule); }
+.sch .times { grid-column: 2; display: flex; justify-content: space-between; font: 500 11px var(--f-mono); color: var(--muted); padding: 0 0 6px; border-bottom: 1px solid var(--rule); }
+.sch .who { padding: 12px 8px 12px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 1px; align-content: center; }
+.sch .who b { font-weight: 600; font-size: 13px; } .sch .who span { font-size: 11.5px; color: var(--muted); }
+.sch .lane { border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: 6px; padding: 9px 0; align-items: center; min-width: 0; }
+.job { position: relative; border-radius: 7px; padding: 5px 26px 5px 8px; display: grid; align-content: center; gap: 1px; font-size: 11.5px; line-height: 1.25; overflow: hidden; white-space: nowrap; border: 1px solid; }
+.job small { font: 500 10.5px var(--f-mono); opacity: .85; }
+.job b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.job.out { background: var(--teal-soft); color: var(--teal); border-color: color-mix(in srgb, var(--teal) 35%, transparent); }
+.job.ret { background: var(--gold-soft); color: color-mix(in srgb, var(--gold) 55%, var(--ink)); border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
+.job.task { background: var(--surface); color: var(--muted); border-color: var(--hatch); background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--hatch) 45%, transparent) 6px 7px); }
+.job.done::after { content: "✓"; position: absolute; right: 6px; top: 5px; width: 16px; height: 16px; border-radius: 50%; background: var(--teal); color: var(--surface); font-size: 10px; display: grid; place-items: center; }
+.sch-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+.sch-key { display: flex; gap: 14px; flex-wrap: wrap; }
+.sch-key span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.sch-key .k-out::before { background: var(--teal-soft); border: 1px solid var(--teal); }
+.sch-key .k-ret::before { background: var(--gold-soft); border: 1px solid var(--gold); }
+.sch-key .k-task::before { background: var(--surface); border: 1px solid var(--hatch); }
 .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--rule); border-top-color: var(--teal); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* tracking */
-.map { position: relative; aspect-ratio: 16 / 10; max-width: 100%; border-radius: 10px; overflow: hidden; background: var(--paper); border: 1px solid var(--rule); }
-.map svg { width: 100%; height: 100%; display: block; }
-.map .road { fill: none; stroke: var(--rule); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
-.map .road.main { stroke-width: 16; }
-.map .river { fill: none; stroke: color-mix(in srgb, var(--teal) 18%, transparent); stroke-width: 22; }
-.map .park { fill: color-mix(in srgb, var(--teal) 9%, transparent); }
-.map .route { fill: none; stroke: var(--teal); stroke-width: 3; stroke-dasharray: 2 7; stroke-linecap: round; }
-.map .label { font: 600 11px var(--f-body); fill: var(--muted); letter-spacing: .06em; }
-.map-side { position: absolute; left: 12px; top: 12px; display: grid; gap: 6px; }
-.map-side .chip { background: var(--surface); border: 1px solid var(--rule); color: var(--ink); box-shadow: var(--shadow); }
-.map-side .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+/* custom features */
+.custom { padding-block: 72px; border-top: 1px solid var(--rule); }
+.custom .wrap { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: center; }
+.custom .copy { display: grid; gap: 16px; max-width: 480px; }
+.custom h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.15; }
+.custom .copy > p { color: var(--muted); }
+.custom .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.custom-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: cs; }
+.custom-steps li { counter-increment: cs; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; align-items: start; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+.custom-steps li::before { content: counter(cs, decimal-leading-zero); width: 44px; height: 44px; border-radius: 50%; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; font: 600 14px var(--f-mono); }
+.custom-steps b { display: block; font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+.custom-steps span { color: var(--muted); font-size: 15px; }
+@media (max-width: 900px) { .custom .wrap { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
 
 /* deposit */
 .dep-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -251,67 +268,93 @@ footer b { color: var(--ink); font-weight: 600; }
 
 /* tour: a working copy of the staff dashboard, clicked through by a cursor (GSAP timelines in the script below) */
 .tour { padding-block: 72px 80px; border-top: 1px solid var(--rule); }
-.tour .wrap { display: grid; gap: 28px; }
-.tour-head { display: grid; gap: 12px; max-width: 720px; }
+.tour .wrap { display: grid; gap: 24px; }
+.tour-head { display: grid; gap: 12px; max-width: 760px; }
 .tour-head h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.15; }
 .tour-head p { color: var(--muted); }
 .tour-win .window-bar .addr span { color: var(--ink); }
 .tour-fit { position: relative; overflow: hidden; height: 560px; }
+.stage, .t-mini {
+  --b-soft: color-mix(in srgb, var(--b) 12%, var(--surface)); --b-ink: color-mix(in srgb, var(--b) 78%, var(--ink));
+}
 .stage {
-  --b: #2563eb; --b-soft: color-mix(in srgb, var(--b) 12%, var(--surface)); --b-ink: color-mix(in srgb, var(--b) 78%, var(--ink));
+  --b: #2563eb;
   position: absolute; left: 0; top: 0; width: 960px; height: 560px; transform-origin: 0 0;
   display: grid; grid-template-columns: 184px minmax(0, 1fr); background: var(--paper); color: var(--ink);
   font-size: 13px; line-height: 1.4; overflow: hidden; user-select: none; -webkit-user-select: none;
 }
 .stage .mono { font-size: .95em; }
 .t-side { background: var(--surface); border-right: 1px solid var(--rule); padding: 14px 10px; display: flex; flex-direction: column; gap: 1px; }
-.t-logo { display: flex; gap: 9px; align-items: center; padding: 2px 8px 12px; }
+.t-logo { display: flex; gap: 9px; align-items: center; padding: 2px 8px 10px; }
 .t-logo i { width: 30px; height: 30px; border-radius: 8px; background: var(--b); color: #fff; display: grid; place-items: center; font: 700 15px var(--f-body); flex: none; }
 .t-logo b { display: block; font-size: 13px; letter-spacing: .1em; font-weight: 700; }
 .t-logo small { display: block; font-size: 8.5px; letter-spacing: .24em; color: var(--b-ink); font-weight: 600; }
-.t-grp { font-size: 9.5px; letter-spacing: .14em; color: var(--muted); padding: 10px 10px 3px; text-transform: uppercase; }
-.t-nav { display: flex; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 8px; color: var(--ink); white-space: nowrap; }
+.t-grp { font-size: 9.5px; letter-spacing: .14em; color: var(--muted); padding: 9px 10px 3px; text-transform: uppercase; }
+.t-nav { display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; color: var(--ink); white-space: nowrap; }
 .t-nav svg, .t-ico { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .t-nav.on { background: var(--b); color: #fff; }
+.t-nav.gone, .t-grp.gone, .t-acts.gone { display: none; }
 .t-main { position: relative; display: grid; grid-template-rows: 48px minmax(0, 1fr); min-width: 0; }
 .t-top { display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--rule); background: var(--surface); }
 .t-search { flex: 1; max-width: 300px; margin: 0 auto; border: 1px solid var(--rule); border-radius: 999px; padding: 6px 12px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; }
 .t-search kbd { font: 10px var(--f-mono); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+.t-as { font-size: 11px; font-weight: 600; color: var(--b-ink); background: var(--b-soft); border-radius: 999px; padding: 2px 10px; display: none; white-space: nowrap; }
+.t-as.show { display: inline-block; }
 .t-livechip { font-size: 11px; font-weight: 600; color: var(--red); background: var(--red-soft); border-radius: 999px; padding: 2px 9px; }
-.t-av { width: 30px; height: 30px; border-radius: 50%; background: var(--paper); border: 1px solid var(--rule); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--muted); }
+.t-av { width: 30px; height: 30px; border-radius: 50%; background: var(--paper); border: 1px solid var(--rule); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--muted); flex: none; }
 .t-views { position: relative; overflow: hidden; }
 .t-view { position: absolute; inset: 0; padding: 16px 20px; visibility: hidden; }
 .t-view.on { visibility: visible; }
 .t-hrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.t-acts { display: flex; gap: 8px; flex: none; }
 .t-h1 { font-size: 19px; font-weight: 600; }
 .t-sub { font-size: 12px; color: var(--muted); }
 .t-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--b); color: #fff; border-radius: 8px; padding: 7px 12px; font-weight: 600; font-size: 12px; white-space: nowrap; }
 .t-btn.ghost { background: var(--surface); color: var(--b-ink); border: 1px solid color-mix(in srgb, var(--b) 45%, var(--rule)); }
+.t-btn.wa { background: #1f9d55; }
 .t-card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; }
 .tc { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 6px; border: 1px solid; white-space: nowrap; }
 .tc.ok { color: var(--teal); background: var(--teal-soft); border-color: color-mix(in srgb, var(--teal) 30%, transparent); }
 .tc.bad { color: var(--red); background: var(--red-soft); border-color: color-mix(in srgb, var(--red) 30%, transparent); }
-.tc.warn { color: color-mix(in srgb, var(--gold) 65%, var(--ink)); background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 40%, transparent); }
+.tc.warn { color: color-mix(in srgb, var(--gold) 55%, var(--ink)); background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 40%, transparent); }
 .tc.b { color: var(--b-ink); background: var(--b-soft); border-color: color-mix(in srgb, var(--b) 30%, transparent); }
+.tc.grey { color: var(--muted); background: var(--paper); border-color: var(--rule); }
+.t-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.t-stat { padding: 9px 12px; display: grid; gap: 1px; border-left: 3px solid var(--b); }
+.t-stat b { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.t-stat span { font-size: 10.5px; color: var(--muted); }
+.t-stat.sel { background: var(--b-soft); box-shadow: 0 0 0 1px var(--b); }
+.t-spin { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--rule); border-top-color: var(--b); animation: spin .8s linear infinite; vertical-align: -1px; }
 
 /* dashboard view */
 .t-pills { display: flex; gap: 6px; margin-top: 10px; }
-.t-pills span { border: 1px solid var(--rule); border-radius: 999px; padding: 3px 10px; font-size: 11px; color: var(--muted); background: var(--surface); }
-.t-dash { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 14px; margin-top: 12px; }
-.t-income { background: #111a2e; color: #e9edf3; border-radius: 12px; padding: 14px 16px 10px; height: 292px; display: grid; grid-template-rows: auto auto auto 1fr; gap: 6px; }
-.t-income .lbl { font-size: 10px; font-weight: 700; letter-spacing: .16em; color: color-mix(in srgb, var(--b) 55%, #fff); }
+.t-pills span { border: 1px solid var(--rule); border-radius: 999px; padding: 3px 10px; font-size: 11px; color: var(--muted); background: var(--surface); transition: opacity .2s; }
+.editing .t-pills span { border-style: dashed; border-color: color-mix(in srgb, var(--b) 55%, var(--rule)); color: var(--ink); }
+.t-pills span.off { opacity: .45; text-decoration: line-through; }
+.t-blocks { display: grid; gap: 14px; margin-top: 12px; }
+.t-blk { position: relative; border-radius: 12px; }
+.editing .t-blk { outline: 2px dashed color-mix(in srgb, var(--b) 55%, transparent); outline-offset: 4px; }
+.t-tag { position: absolute; top: -11px; left: 12px; z-index: 2; background: var(--b); color: #fff; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; display: none; }
+.editing .t-tag { display: block; }
+.t-blk.lift { box-shadow: 0 18px 40px -12px rgba(12, 20, 34, .45); z-index: 3; }
+.t-dash { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 14px; }
+.t-income { position: relative; background: #111a2e; color: #e9edf3; border-radius: 12px; padding: 14px 16px 10px; height: 290px; display: grid; grid-template-rows: auto auto auto 1fr; gap: 6px; overflow: hidden; }
+.t-income .lbl { font-size: 10px; font-weight: 700; letter-spacing: .16em; color: color-mix(in srgb, var(--b) 45%, #fff); }
+.t-lock { position: absolute; inset: 0; display: none; place-items: center; align-content: center; gap: 6px; background: #111a2e; color: #c9d3e3; text-align: center; font-size: 13px; padding: 24px; }
+.t-lock b { color: #fff; font-size: 15px; }
+.nomoney .t-lock { display: grid; }
 .t-seg { display: inline-flex; background: rgba(255,255,255,.07); border-radius: 8px; padding: 3px; gap: 2px; width: max-content; }
 .t-seg span { padding: 3px 10px; border-radius: 6px; font-size: 11px; color: #b8c2d3; }
 .t-seg span.on { background: #fff; color: #111a2e; font-weight: 600; }
 .t-big { white-space: nowrap; font-size: 34px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.t-big small { font-size: 12px; font-weight: 500; color: #9fb0c8; margin-left: 8px; letter-spacing: 0; }
+.t-big small { font-size: 12px; font-weight: 500; color: #a9b6cb; margin-left: 8px; letter-spacing: 0; }
 .t-big .up { font-size: 11px; font-weight: 600; color: #5fd3a0; background: rgba(95,211,160,.12); padding: 2px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 6px; }
 .t-chart { width: 100%; height: 100%; min-height: 0; overflow: visible; }
-.t-chart .ln { fill: none; stroke: var(--b); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; filter: brightness(1.35); }
+.t-chart .ln { fill: none; stroke: color-mix(in srgb, var(--b) 75%, #fff); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .t-chart .cmp { fill: none; stroke: #6b7a92; stroke-width: 1.4; stroke-dasharray: 4 4; }
 .t-chart .ar { fill: color-mix(in srgb, var(--b) 22%, transparent); }
 .t-chart .gl { stroke: rgba(255,255,255,.07); }
-.t-now { padding: 12px 14px; height: 292px; display: grid; align-content: start; gap: 5px; }
+.t-now { padding: 12px 14px; height: 290px; display: grid; align-content: start; gap: 5px; }
 .t-now h4 { margin: 0; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
 .t-now h4::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
 .t-tile { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
@@ -322,18 +365,19 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-need.red { border-color: color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red-soft) 50%, transparent); }
 .t-need.hov { border-color: var(--b); background: var(--b-soft); }
 .t-need i { font-style: normal; font-size: 10px; font-weight: 700; background: var(--ink); color: var(--surface); border-radius: 999px; padding: 1px 7px; }
-.t-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.t-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .t-kpi { padding: 10px 12px; display: grid; gap: 2px; }
 .t-kpi span { font-size: 10.5px; color: var(--muted); }
 .t-kpi b { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .t-kpi svg { width: 100%; height: 18px; } .t-kpi path { fill: none; stroke: var(--b); stroke-width: 1.6; }
 
-/* bookings view */
+/* lists and tables */
 .t-quick { display: flex; gap: 6px; margin: 10px 0 12px; font-size: 11px; align-items: center; }
 .t-quick span { border: 1px solid var(--rule); border-radius: 999px; padding: 2px 9px; background: var(--surface); }
 .t-quick span.on { background: var(--b); border-color: var(--b); color: #fff; }
 .t-table { overflow: hidden; }
 .t-tr { display: grid; grid-template-columns: 96px minmax(0, 1.15fr) minmax(0, 1.35fr) minmax(0, 1.1fr) 112px; gap: 10px; align-items: center; padding: 0 14px; border-bottom: 1px solid var(--rule); height: 50px; overflow: hidden; }
+.t-tr:last-child { border-bottom: 0; }
 .t-tr.th { height: 32px; font-size: 10px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; font-weight: 600; }
 .t-tr > div { min-width: 0; }
 .t-tr b { font-weight: 600; font-size: 12.5px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -343,11 +387,21 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-tr .amt b { font-variant-numeric: tabular-nums; }
 .t-tr .amt small { color: var(--red); font-weight: 500; }
 .t-tr .amt small.paid { color: var(--teal); }
+.t-tr.hov { background: var(--b-soft); }
+.t-tr.ex { grid-template-columns: 84px 92px minmax(0, 1fr) minmax(0, 1.2fr) 96px; height: 42px; }
+.t-tr.sm { grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1.3fr) 112px 80px; }
+.t-tr.cu { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) 120px 130px; height: 48px; }
+.t-tr .ctr { text-align: center; justify-self: center; }
 .t-paybar { width: 84px; height: 3px; border-radius: 3px; background: var(--rule); overflow: hidden; }
 .t-paybar i { display: block; height: 100%; background: var(--gold); border-radius: 3px; }
+.t-paybar i.full { background: var(--teal); }
 .t-tr.new { background: var(--b-soft); }
+.t-plate { font-family: var(--f-mono); font-weight: 600; letter-spacing: .05em; background: var(--ink); color: var(--paper); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+
+/* drawers, dialogs, fields, toasts */
 .t-scrim { position: absolute; inset: 0; background: rgba(12, 20, 34, .28); opacity: 0; visibility: hidden; }
 .t-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 340px; background: var(--surface); border-left: 1px solid var(--rule); box-shadow: var(--shadow); padding: 16px 18px; display: grid; align-content: start; gap: 10px; }
+.t-drawer.wide { width: 400px; }
 .t-drawer h5, .t-dlg h5 { margin: 0; font-size: 15px; font-weight: 600; }
 .t-f { display: grid; gap: 3px; position: relative; }
 .t-f label { font-size: 10.5px; color: var(--muted); font-weight: 500; }
@@ -371,27 +425,109 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-slip .sc { position: absolute; left: 0; right: 0; top: 0; height: 26px; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--b) 25%, transparent)); border-bottom: 2px solid var(--b); opacity: 0; }
 .t-items { display: grid; gap: 6px; }
 .t-item { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 8px; overflow: hidden; }
+.t-item.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 84px; }
 .t-add { font-size: 11.5px; color: var(--b-ink); font-weight: 600; width: max-content; }
-.t-toast { position: absolute; right: 16px; top: 12px; display: flex; gap: 9px; align-items: center; background: var(--ink); color: var(--paper); font-size: 12px; padding: 9px 13px; border-radius: 10px; box-shadow: var(--shadow); opacity: 0; visibility: hidden; max-width: 360px; z-index: 5; }
+.t-toast { position: absolute; right: 16px; top: 12px; display: flex; gap: 9px; align-items: center; background: var(--ink); color: var(--paper); font-size: 12px; padding: 9px 13px; border-radius: 10px; box-shadow: var(--shadow); opacity: 0; visibility: hidden; max-width: 380px; z-index: 5; }
 .t-toast i { width: 18px; height: 18px; border-radius: 50%; background: var(--teal); color: #fff; display: grid; place-items: center; font-style: normal; font-size: 10px; flex: none; }
+
+/* booking drawer: documents and invoice */
+.t-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--rule); font-size: 12px; color: var(--muted); }
+.t-tabs span { padding: 6px 0 8px; border-bottom: 2px solid transparent; }
+.t-tabs span.on { color: var(--b-ink); border-color: var(--b); font-weight: 600; }
+.t-pane { display: none; gap: 8px; }
+.t-pane.on { display: grid; }
+.t-kv { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--rule); }
+.t-kv span { color: var(--muted); }
+.t-doc { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px solid var(--rule); border-radius: 10px; padding: 8px 10px; }
+.t-doc .ic { width: 30px; height: 30px; border-radius: 8px; background: var(--b-soft); color: var(--b-ink); display: grid; place-items: center; }
+.t-doc b { font-size: 12.5px; font-weight: 600; display: block; } .t-doc small { font-size: 10.5px; color: var(--muted); display: block; }
+.t-doc .t-btn { padding: 5px 9px; font-size: 11px; }
+.t-doc.new { border-color: var(--b); background: var(--b-soft); }
+.t-inv { position: absolute; right: 418px; top: 18px; width: 300px; background: #fff; color: #18263a; border-radius: 6px; box-shadow: 0 20px 50px -14px rgba(12, 20, 34, .55); padding: 16px 18px; font-size: 10px; display: grid; gap: 8px; opacity: 0; visibility: hidden; }
+.t-inv .hd { display: flex; justify-content: space-between; align-items: flex-start; }
+.t-inv .lg { display: flex; gap: 6px; align-items: center; font-weight: 700; letter-spacing: .08em; font-size: 10px; }
+.t-inv .lg i { width: 20px; height: 20px; border-radius: 5px; background: var(--b); color: #fff; display: grid; place-items: center; font-style: normal; }
+.t-inv h6 { margin: 0; font-size: 15px; font-weight: 700; color: #18263a; text-align: right; }
+.t-inv h6 small { display: block; font-size: 9.5px; font-weight: 500; color: #5d6b7e; }
+.t-inv .rw { display: grid; grid-template-columns: 1fr 50px 70px; gap: 6px; padding: 4px 0; border-bottom: 1px solid #e3e7ee; }
+.t-inv .rw span:nth-child(n+2) { text-align: center; font-variant-numeric: tabular-nums; }
+.t-inv .rw.h { font-weight: 700; color: #5d6b7e; font-size: 9px; letter-spacing: .06em; }
+.t-inv .tt { display: flex; justify-content: space-between; font-weight: 700; font-size: 12px; padding-top: 4px; }
+.t-inv .bk { background: #f3f5f8; border-radius: 4px; padding: 6px 8px; color: #5d6b7e; }
 
 /* reports view */
 .t-rgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
-.t-rc { padding: 9px 12px; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: center; height: 60px; transition: border-color .2s, background-color .2s; }
+.t-rc { padding: 9px 12px; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: center; height: 58px; transition: border-color .2s, background-color .2s; }
 .t-rc .ic { width: 30px; height: 30px; border-radius: 8px; background: var(--b-soft); color: var(--b-ink); display: grid; place-items: center; }
 .t-rc b { font-size: 12.5px; font-weight: 600; display: block; } .t-rc small { font-size: 10.5px; color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .t-rc.sel { border-color: var(--b); background: var(--b-soft); box-shadow: 0 0 0 1px var(--b); }
-.t-prev { margin-top: 14px; padding: 14px 16px; border-top: 3px solid var(--b); }
+.t-prev { margin-top: 12px; padding: 14px 16px; border-top: 3px solid var(--b); }
 .t-prev .t-hrow { align-items: center; }
-.t-prev .acts { display: flex; gap: 8px; }
-.t-bars { display: grid; gap: 8px; margin-top: 12px; }
+.t-bars { display: grid; gap: 7px; margin-top: 10px; min-height: 126px; align-content: start; }
 .t-bar { display: grid; grid-template-columns: 150px minmax(0, 1fr) 84px; gap: 10px; align-items: center; font-size: 11.5px; }
 .t-bar .tr { height: 14px; background: var(--paper); border-radius: 4px; overflow: hidden; }
 .t-bar .tr i { display: block; height: 100%; background: var(--b); border-radius: 4px; transform-origin: left center; }
 .t-bar .v { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
 .t-bar small { color: var(--muted); font-family: var(--f-mono); font-size: 10px; margin-left: 4px; }
-.t-sum { display: flex; justify-content: center; gap: 28px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 11px; color: var(--muted); text-align: center; }
+.t-sum { display: flex; justify-content: center; gap: 28px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 11px; color: var(--muted); text-align: center; }
 .t-sum b { display: block; font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* expenses */
+.t-receipt { position: relative; border: 1px solid var(--rule); border-radius: 8px; background: #fff; color: #18263a; padding: 8px; display: grid; gap: 4px; align-content: start; overflow: hidden; font: 9.5px var(--f-mono); height: 150px; }
+.t-receipt b { font: 700 11px var(--f-body); text-align: center; }
+.t-receipt .rr { display: flex; justify-content: space-between; }
+.t-receipt .sc { position: absolute; left: 0; right: 0; top: 0; height: 26px; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--b) 25%, transparent)); border-bottom: 2px solid var(--b); opacity: 0; }
+
+/* summons */
+.t-notice { position: absolute; width: 112px; height: 138px; background: #fff7e0; border: 1px solid #e6cf8a; border-radius: 6px; box-shadow: var(--shadow); padding: 8px; font: 8.5px var(--f-mono); color: #4d3d10; display: grid; gap: 4px; align-content: start; left: 0; top: 0; opacity: 0; z-index: 4; }
+.t-notice b { font: 700 10px var(--f-body); }
+.t-wa { background: #e7f6ec; border: 1px solid #b9e2c6; color: #14532d; border-radius: 10px; padding: 9px 11px; font-size: 12px; min-height: 76px; white-space: pre-line; }
+
+/* customers */
+.t-flags { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.t-flag { padding: 8px 10px; display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; transition: background-color .2s, box-shadow .2s; }
+.t-flag em { font-style: normal; font-size: 18px; font-weight: 600; grid-row: span 2; }
+.t-flag b { font-size: 12px; font-weight: 600; } .t-flag span { font-size: 10px; color: var(--muted); }
+.t-flag.sel { background: var(--b-soft); box-shadow: 0 0 0 1px var(--b); }
+.t-flag.vip em { color: #0e7490; } .t-flag.care em { color: color-mix(in srgb, var(--gold) 60%, var(--ink)); } .t-flag.black em { color: var(--red); } .t-flag.rep em { color: var(--teal); }
+.t-sbox { border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px; width: 300px; margin-bottom: 10px; font-size: 12.5px; }
+.t-sbox .ph { color: var(--muted); }
+.t-sbox.focus { border-color: var(--b); box-shadow: 0 0 0 3px var(--b-soft); }
+
+/* whatsapp assistant */
+.t-wagrid { display: grid; grid-template-columns: 210px minmax(0, 1fr) 210px; gap: 12px; margin-top: 12px; height: 440px; }
+.t-chats { padding: 6px; display: grid; align-content: start; gap: 2px; }
+.t-chat { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 7px; border-radius: 8px; align-items: center; }
+.t-chat .av { width: 30px; height: 30px; border-radius: 50%; background: var(--paper); border: 1px solid var(--rule); display: grid; place-items: center; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+.t-chat b { font-size: 12px; display: flex; justify-content: space-between; font-weight: 600; } .t-chat b i { font-style: normal; background: #1f9d55; color: #fff; font-size: 9.5px; border-radius: 999px; padding: 0 6px; }
+.t-chat small { font-size: 10.5px; color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-chat.on { background: var(--b-soft); }
+.t-convo { padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; background: color-mix(in srgb, #1f9d55 5%, var(--surface)); }
+.t-msg { max-width: 82%; padding: 7px 10px; border-radius: 10px; font-size: 12px; line-height: 1.4; }
+.t-msg.in { background: var(--surface); border: 1px solid var(--rule); align-self: flex-start; }
+.t-msg.out { background: #dcf3e4; color: #10361f; align-self: flex-end; }
+.t-msg.out small { display: block; font-size: 9.5px; color: #2f6b45; margin-top: 3px; font-weight: 600; }
+.t-msg.typing { color: var(--muted); }
+.t-cat { display: flex; gap: 6px; margin-top: 6px; }
+.t-cat span { width: 72px; border-radius: 6px; background: #fff; border: 1px solid #b9dcc6; font-size: 9.5px; color: #10361f; padding: 4px; text-align: center; }
+.t-cat span i { display: block; height: 30px; border-radius: 4px; margin-bottom: 3px; background: linear-gradient(135deg, #cfd8e3, #9fb0c4); }
+.t-lead { padding: 12px; display: grid; gap: 8px; align-content: start; }
+.t-lead .t-kv { font-size: 11.5px; }
+
+/* team and access */
+.t-tgrid { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; margin-top: 12px; }
+.t-people { padding: 6px; display: grid; gap: 2px; align-content: start; }
+.t-person { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px; border-radius: 8px; }
+.t-person .av { width: 30px; height: 30px; border-radius: 50%; background: var(--b-soft); color: var(--b-ink); display: grid; place-items: center; font-size: 10.5px; font-weight: 700; }
+.t-person b { font-size: 12.5px; font-weight: 600; display: block; } .t-person small { font-size: 10.5px; color: var(--muted); }
+.t-person.on { background: var(--b-soft); }
+.t-perms { padding: 12px 14px; display: grid; gap: 2px; align-content: start; }
+.t-perm { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: 12px; }
+.t-perm span { color: var(--muted); font-size: 10.5px; display: block; }
+.t-sw2 { width: 34px; height: 20px; border-radius: 999px; background: var(--rule); position: relative; flex: none; transition: background-color .2s; }
+.t-sw2::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .2s; }
+.t-sw2.on { background: var(--b); }
+.t-sw2.on::after { transform: translateX(14px); }
 
 /* brand view */
 .t-brand { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; margin-top: 14px; }
@@ -403,36 +539,45 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-swrow { display: flex; gap: 10px; margin: 8px 0 14px; }
 .t-sw { width: 54px; display: grid; gap: 4px; font: 500 9.5px var(--f-mono); color: var(--muted); text-align: center; }
 .t-sw i { height: 42px; border-radius: 10px; background: var(--rule); border: 1px solid var(--rule); }
-.t-mini { --b-soft: color-mix(in srgb, var(--b) 12%, var(--surface)); --b-ink: color-mix(in srgb, var(--b) 78%, var(--ink)); padding: 12px 14px; display: grid; gap: 10px; }
-.t-paybar i.full { background: var(--teal); }
+.t-mini { padding: 12px 14px; display: grid; gap: 10px; }
 .t-mini .t-hrow { align-items: center; }
 .t-reading { font-size: 11px; color: var(--muted); height: 16px; }
 
 /* chapter picker under the window */
-.t-chaps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: 10px; align-items: stretch; }
-.t-chap { text-align: left; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px 14px; font: inherit; color: var(--ink); cursor: pointer; display: grid; gap: 4px; position: relative; overflow: hidden; transition: border-color .2s; }
+.t-pick { display: grid; gap: 12px; }
+.t-caprow { display: flex; align-items: center; gap: 14px; justify-content: space-between; }
+.t-cap { font-size: 15.5px; color: var(--muted); max-width: 70ch; min-height: 2.9em; }
+.t-cap b { color: var(--ink); font-weight: 600; }
+.t-chaps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.t-chap { text-align: left; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 9px 12px 11px; font: inherit; color: var(--ink); cursor: pointer; display: grid; gap: 1px; position: relative; overflow: hidden; transition: border-color .2s, background-color .2s; }
 .t-chap:hover { border-color: var(--navy); }
-.t-chap b { font-size: 14.5px; font-weight: 600; } .t-chap span { font-size: 13px; color: var(--muted); line-height: 1.45; }
-.t-chap .n { font: 600 11px var(--f-mono); color: var(--teal); letter-spacing: .08em; }
+.t-chap b { font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.t-chap .n { font: 600 10.5px var(--f-mono); color: var(--teal); letter-spacing: .08em; }
 .t-chap .pg { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--teal); transform: scaleX(0); transform-origin: left center; }
-.t-chap[aria-selected="true"] { border-color: var(--teal); }
-.t-pause { align-self: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--surface); color: var(--navy); cursor: pointer; display: grid; place-items: center; }
+.t-chap[aria-selected="true"] { border-color: var(--teal); background: color-mix(in srgb, var(--teal-soft) 55%, var(--surface)); }
+.t-pause { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--surface); color: var(--navy); cursor: pointer; display: grid; place-items: center; }
 .t-pause svg { width: 16px; height: 16px; fill: currentColor; }
-@media (max-width: 900px) {
-  .t-chaps { grid-template-columns: repeat(5, minmax(150px, 1fr)) auto; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
+@media (max-width: 960px) { .t-chaps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .t-chaps { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 132px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
   .t-chap { scroll-snap-align: start; }
-  .t-chap span { display: none; }
+  .t-cap { font-size: 14.5px; }
 }
 
 /* narrow screens: a smaller copy of the dashboard with an icon rail, so text stays readable when scaled */
 .stage.compact { width: 640px; height: 600px; grid-template-columns: 56px minmax(0, 1fr); }
-.compact .t-logo div, .compact .t-nav span, .compact .t-grp, .compact .t-search, .compact .c-car, .compact .t-now, .compact .t-pills { display: none; }
-.compact .t-logo { padding: 2px 3px 12px; } .compact .t-nav { justify-content: center; padding: 8px 0; } .compact .t-grp + .t-nav { margin-top: 10px; }
+.compact .t-logo div, .compact .t-nav span, .compact .t-grp, .compact .t-search, .compact .c-car, .compact .t-now, .compact .t-pills span:nth-child(n+5), .compact .c-hide { display: none; }
+.compact .t-logo { padding: 2px 3px 12px; } .compact .t-nav { justify-content: center; padding: 8px 0; } .compact .t-grp + .t-nav { margin-top: 8px; }
 .compact .t-top { justify-content: flex-end; }
 .compact .t-dash { grid-template-columns: minmax(0, 1fr); }
+.compact .t-income { height: 250px; }
 .compact .t-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .compact .t-tr { grid-template-columns: 88px minmax(0, 1fr) minmax(0, 1fr) 104px; }
-.compact .t-drawer { width: 300px; }
+.compact .t-tr.ex { grid-template-columns: 76px 86px minmax(0, 1fr) 88px; }
+.compact .t-tr.sm { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 104px 74px; }
+.compact .t-tr.cu { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 118px; }
+.compact .t-drawer { width: 300px; } .compact .t-drawer.wide { width: 340px; }
+.compact .t-inv { right: auto; left: 12px; top: 64px; width: 220px; }
 .compact .t-dlg { width: 380px; margin-left: -190px; }
 .compact .t-rgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .compact .t-rgrid .t-rc:nth-child(n+5) { display: none; }
@@ -440,6 +585,11 @@ footer b { color: var(--ink); font-weight: 600; }
 .compact .t-brand { grid-template-columns: 200px minmax(0, 1fr); }
 .compact .t-swrow { gap: 6px; } .compact .t-sw { width: 44px; }
 .compact .t-quick span:nth-child(n+5) { display: none; }
+.compact .t-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.compact .t-flags { grid-template-columns: repeat(3, minmax(0, 1fr)); } .compact .t-flag.rep, .compact .t-flag.all { display: none; }
+.compact .t-wagrid { grid-template-columns: minmax(0, 1fr) 180px; height: 480px; } .compact .t-chats { display: none; }
+.compact .t-tgrid { grid-template-columns: 200px minmax(0, 1fr); }
+.compact .t-acts .c-hide { display: none; }
 
 /* motion: every snippet sits complete at rest; the loops only replay it */
 .play .grow { animation: grow .7s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 90ms + 150ms); }
@@ -467,10 +617,10 @@ footer b { color: var(--ink); font-weight: 600; }
     </a>
     <nav class="links" aria-label="Main">
       <a href="#tour">Tour</a>
-      <a href="#bookings">Bookings</a>
       <a href="#payments">Payments</a>
-      <a href="#summons">Summons</a>
-      <a href="#tracking">Tracking</a>
+      <a href="#schedules">Schedules</a>
+      <a href="#custom">Custom features</a>
+      <a href="#deposits">Deposits</a>
       <a class="btn btn-primary" href="#demo">Book a demo</a>
     </nav>
   </div>
@@ -483,12 +633,12 @@ footer b { color: var(--ink); font-weight: 600; }
       <div class="hero-copy">
         <span class="eyebrow">Fleet management for car rental companies</span>
         <h1>Every car, booking and ringgit, on <em>one screen</em>.</h1>
-        <p class="lede">Orbique FMS runs a rental fleet from the first enquiry to the deposit refund: who has which car, what has been paid, which summons came in, and where every car is right now.</p>
+        <p class="lede">Orbique FMS runs a rental fleet from the first enquiry to the deposit refund: who has which car, what has been paid and spent, which summons came in, and what every car earns.</p>
         <div class="ctas">
           <a class="btn btn-primary" href="#demo">Book a demo</a>
           <a class="btn btn-quiet" href="#tour">See it work</a>
         </div>
-        <div class="facts"><span>Made in Kuala Lumpur</span><span>Prices in RM</span><span>JPJ and PDRM summons checks</span><span>Runs Ventura Car Rental every day</span></div>
+        <div class="facts"><span>Made in Kuala Lumpur</span><span>Prices in RM</span><span>Custom features on request</span><span>Runs Ventura Car Rental every day</span></div>
       </div>
 
       <div class="window" data-loop="calendar">
@@ -526,8 +676,8 @@ footer b { color: var(--ink); font-weight: 600; }
     <div class="wrap">
       <div class="tour-head">
         <span class="eyebrow">See it work</span>
-        <h2 id="tour-h">Watch a day in Orbique FMS, one click at a time.</h2>
-        <p>This is the staff dashboard every subscriber gets, clicked through for you: the morning figures, a new booking, a payment with two items, a report ready for the accountant, and the whole app taking on a company's own colours.</p>
+        <h2 id="tour-h">Twelve things Orbique FMS does for you, one click at a time.</h2>
+        <p>This is the staff dashboard every subscriber gets, clicked through for you with sample data. Pick any feature below, or let it play through.</p>
       </div>
 
       <div class="window tour-win">
@@ -541,44 +691,52 @@ footer b { color: var(--ink); font-weight: 600; }
               <div class="t-nav" data-nav="bookings"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg><span>Bookings</span></div>
               <div class="t-nav" data-nav="customers"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2 .8 3 2.8 3 6"/></svg><span>Customers</span></div>
               <div class="t-nav" data-nav="invoices"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>Invoices</span></div>
+              <div class="t-nav" data-nav="expenses"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span>Expenses</span></div>
               <div class="t-nav" data-nav="reports"><svg viewBox="0 0 24 24"><path d="M5 20V11M11 20V5M17 20v-7M3 20h18"/></svg><span>Reports</span></div>
-              <div class="t-grp">Fleet</div>
-              <div class="t-nav" data-nav="cars"><svg viewBox="0 0 24 24"><path d="M3 16v-4l2-5h14l2 5v4H3z"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/></svg><span>Cars</span></div>
-              <div class="t-nav" data-nav="tracking"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span>Tracking</span></div>
               <div class="t-nav" data-nav="summons"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span>Summons</span></div>
-              <div class="t-grp">System</div>
+              <div class="t-grp">Operations</div>
+              <div class="t-nav" data-nav="whatsapp"><svg viewBox="0 0 24 24"><path d="M4 20l1.5-4A8 8 0 1 1 9 19.5z"/></svg><span>WhatsApp assistant</span></div>
+              <div class="t-grp" id="t-grp-team">Team and system</div>
+              <div class="t-nav" data-nav="team"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20c0-3 2.7-5 6-5s6 2 6 5M15 15c3.3 0 7 1 7 5"/></svg><span>Team and access</span></div>
               <div class="t-nav" data-nav="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg><span>Settings</span></div>
             </aside>
             <div class="t-main">
-              <div class="t-top"><div class="t-search"><span>Search</span><kbd>Ctrl K</kbd></div><span class="t-livechip">● Live</span><span class="t-av">IH</span></div>
+              <div class="t-top"><div class="t-search"><span>Search</span><kbd>Ctrl K</kbd></div><span class="t-as" id="t-as">Seeing it as Zulkifli · Field agent</span><span class="t-livechip">● Live</span><span class="t-av" id="t-av">IH</span></div>
               <div class="t-views">
 
                 <div class="t-view on" data-view="dashboard">
-                  <div class="t-hrow"><div><div class="t-h1">Good morning, Irfan</div><div class="t-sub">Thursday 29 October 2026 · refreshes every minute</div></div><span class="t-btn ghost">Upload payment slip</span></div>
-                  <div class="t-pills"><span>Today</span><span>This period</span><span>Month by month</span><span>Car by car</span><span>Fleet and papers</span><span>Cash</span></div>
-                  <div class="t-dash">
-                    <div class="t-income">
-                      <span class="lbl">INCOME</span>
-                      <div class="t-seg" id="t-seg"><span>Today</span><span data-seg="7">7 days</span><span class="on" data-seg="m">This month</span><span>This year</span></div>
-                      <div class="t-big"><span id="t-inc">RM 15,200.36</span><span class="up" id="t-up">↗ +3.4%</span><small id="t-vs">vs last month</small></div>
-                      <svg class="t-chart" viewBox="0 0 520 120" preserveAspectRatio="none"><path class="gl" d="M0 30H520M0 60H520M0 90H520"/><path class="cmp" id="t-cmp"/><path class="ar" id="t-ar"/><path class="ln" id="t-ln"/></svg>
+                  <div class="t-hrow"><div><div class="t-h1" id="d-hi">Good morning, Irfan</div><div class="t-sub">Thursday 29 October 2026 · refreshes every minute</div></div><div class="t-acts"><span class="t-btn ghost c-hide">Upload payment slip</span><span class="t-btn ghost" id="d-cust">Arrange sections</span></div></div>
+                  <div class="t-pills" id="d-pills"><span>Today</span><span>This period</span><span>Month by month</span><span>Car by car</span><span>Fleet and papers</span><span id="d-cash">Cash</span></div>
+                  <div class="t-blocks" id="d-blocks">
+                    <div class="t-blk" id="d-a"><span class="t-tag" id="d-taga">⠿ Income and right now</span>
+                      <div class="t-dash">
+                        <div class="t-income">
+                          <span class="lbl">INCOME</span>
+                          <div class="t-seg" id="t-seg"><span>Today</span><span data-seg="7">7 days</span><span class="on" data-seg="m">This month</span><span>This year</span></div>
+                          <div class="t-big"><span id="t-inc">RM 15,200.36</span><span class="up" id="t-up">↗ +3.4%</span><small id="t-vs">vs last month</small></div>
+                          <svg class="t-chart" viewBox="0 0 520 120" preserveAspectRatio="none"><path class="gl" d="M0 30H520M0 60H520M0 90H520"/><path class="cmp" id="t-cmp"/><path class="ar" id="t-ar"/><path class="ln" id="t-ln"/></svg>
+                          <div class="t-lock"><b>Money is hidden for your role</b>Bookings, cars out and returns are still shown. Ask the owner if you need more.</div>
+                        </div>
+                        <div class="t-card t-now">
+                          <h4>Right now</h4>
+                          <div class="t-tile"><div><b>Cars out now</b><span>3 free, 1 in the workshop</span></div><em>8</em></div>
+                          <div class="t-tile"><div><b>Going out today</b><span>2 pick-ups, 1 delivery</span></div><em>3</em></div>
+                          <div class="t-tile"><div><b>Coming back today</b><span>2 returns in all</span></div><em>2</em></div>
+                          <div class="t-needs">NEEDS YOU</div>
+                          <div class="t-need" id="t-need1">Agreement sent, not signed yet <i>4</i></div>
+                          <div class="t-need">Deposits waiting to go back <i>3</i></div>
+                          <div class="t-need red">Summons with no booking <i>1</i></div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="t-card t-now">
-                      <h4>Right now</h4>
-                      <div class="t-tile"><div><b>Cars out now</b><span>3 free, 1 in the workshop</span></div><em>8</em></div>
-                      <div class="t-tile"><div><b>Going out today</b><span>2 pick-ups, 1 delivery</span></div><em>3</em></div>
-                      <div class="t-tile"><div><b>Coming back today</b><span>2 returns in all</span></div><em>2</em></div>
-                      <div class="t-needs">NEEDS YOU</div>
-                      <div class="t-need" id="t-need1">Agreement sent, not signed yet <i>4</i></div>
-                      <div class="t-need">Deposits waiting to go back <i>3</i></div>
-                      <div class="t-need red">Summons with no booking <i>1</i></div>
+                    <div class="t-blk" id="d-b"><span class="t-tag" id="d-tagb">⠿ Key figures</span>
+                      <div class="t-kpis">
+                        <div class="t-card t-kpi"><span>Bookings this month</span><b data-n="46">46</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 14 L14 12 L28 13 L42 9 L56 10 L70 6 L84 7 L100 3"/></svg></div>
+                        <div class="t-card t-kpi"><span>Days rented</span><b data-n="168">168</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 12 L14 13 L28 9 L42 11 L56 7 L70 8 L84 5 L100 6"/></svg></div>
+                        <div class="t-card t-kpi"><span>Fleet in use</span><b data-n="74" data-s="%">74%</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 10 L14 9 L28 11 L42 8 L56 9 L70 6 L84 7 L100 5"/></svg></div>
+                        <div class="t-card t-kpi" id="d-avg"><span>Average booking</span><b data-n="330" data-p="RM ">RM 330</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 9 L14 11 L28 8 L42 10 L56 7 L70 9 L84 6 L100 7"/></svg></div>
+                      </div>
                     </div>
-                  </div>
-                  <div class="t-kpis">
-                    <div class="t-card t-kpi"><span>Bookings this month</span><b data-n="46">46</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 14 L14 12 L28 13 L42 9 L56 10 L70 6 L84 7 L100 3"/></svg></div>
-                    <div class="t-card t-kpi"><span>Days rented</span><b data-n="168">168</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 12 L14 13 L28 9 L42 11 L56 7 L70 8 L84 5 L100 6"/></svg></div>
-                    <div class="t-card t-kpi"><span>Fleet in use</span><b data-n="74" data-s="%">74%</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 10 L14 9 L28 11 L42 8 L56 9 L70 6 L84 7 L100 5"/></svg></div>
-                    <div class="t-card t-kpi"><span>Average booking</span><b data-n="330" data-p="RM ">RM 330</b><svg viewBox="0 0 100 18" preserveAspectRatio="none"><path d="M0 9 L14 11 L28 8 L42 10 L56 7 L70 9 L84 6 L100 7"/></svg></div>
                   </div>
                 </div>
 
@@ -598,10 +756,35 @@ footer b { color: var(--ink); font-weight: 600; }
                     <div class="t-total"><span class="t-sub">2 days · RM 180 a day</span><b class="mono" id="f-total">RM 0.00</b></div>
                     <div style="display:flex;justify-content:space-between;align-items:center"><span class="tc b">Must-know rules attached</span><span class="t-btn" id="f-save">Save and send link</span></div>
                   </div>
+                  <div class="t-drawer wide" id="t-bk">
+                    <div class="t-hrow"><div><h5>KLT-00488 · Nur Aisyah</h5><div class="t-sub">Honda City <span class="mono">VFR 2207</span> · 3 to 5 Nov</div></div><span class="tc warn">Agreement Sent</span></div>
+                    <div class="t-tabs"><span class="on" id="bk-t1">Details</span><span>Payments</span><span id="bk-t3">Documents</span></div>
+                    <div class="t-pane on" id="bk-p1">
+                      <div class="t-kv"><span>Pick-up</span>3 Nov, 10:00 AM · KLIA Terminal 1</div>
+                      <div class="t-kv"><span>Return</span>5 Nov, 10:00 AM</div>
+                      <div class="t-kv"><span>Rent</span>RM 360.00</div>
+                      <div class="t-kv"><span>Deposit</span>RM 200.00</div>
+                      <div class="t-kv"><span>Handover agent</span>Zulkifli</div>
+                    </div>
+                    <div class="t-pane" id="bk-p3">
+                      <div class="t-doc"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M4 18c3-6 6 2 9-4s4 2 7-1"/></svg></span><div><b>Rental agreement</b><small>Sent on WhatsApp · waiting for signature</small></div><span class="t-btn ghost">Copy link</span></div>
+                      <div class="t-doc" id="bk-inv"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h6"/></svg></span><div><b id="bk-invt">Invoice</b><small id="bk-invs">Not made yet</small></div><span class="t-btn" id="bk-gen">Generate invoice</span></div>
+                      <div class="t-doc"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/></svg></span><div><b>Receipts</b><small>Made when a payment is recorded</small></div><span class="t-btn ghost">Copy link</span></div>
+                    </div>
+                  </div>
+                  <div class="t-inv" id="t-inv">
+                    <div class="hd"><span class="lg"><i id="inv-mk">K</i><span id="inv-nm">KILAT WHEELS</span></span><h6>INVOICE<small>INV-2026-00081 · 29 Oct 2026</small></h6></div>
+                    <div class="bk"><b style="color:#18263a">Bill to</b> Nur Aisyah · +60 00-345 6789<br>Booking KLT-00488 · Honda City VFR 2207</div>
+                    <div class="rw h"><span>ITEM</span><span>QTY</span><span>AMOUNT</span></div>
+                    <div class="rw"><span>Rent, 3 to 5 Nov</span><span>2 days</span><span>RM 360.00</span></div>
+                    <div class="rw"><span>Deposit (returned after the car is back)</span><span>1</span><span>RM 200.00</span></div>
+                    <div class="tt"><span>Total</span><span>RM 560.00</span></div>
+                    <div style="color:#5d6b7e">Pay by online transfer to Kilat Wheels Sdn Bhd. Terms and bank details come from the company's settings.</div>
+                  </div>
                   <div class="t-dlg" id="t-dlg">
                     <div class="t-hrow"><h5>Record payment</h5><span class="t-sub">KLT-00488 · Nur Aisyah</span></div>
                     <div class="t-dgrid">
-                      <div class="t-slip"><span class="sc" id="p-scan"></span><b>MAYBANK2u</b><span>Transfer successful</span><span class="s">RM 560.00</span><span class="ln2" style="width:90%"></span><span class="ln2" style="width:70%"></span><span class="ln2" style="width:80%"></span><span style="color:var(--muted)">29 Oct, 10:12</span></div>
+                      <div class="t-slip"><span class="sc" id="p-scan"></span><b>BANK TRANSFER</b><span>Transfer successful</span><span class="s">RM 560.00</span><span class="ln2" style="width:90%"></span><span class="ln2" style="width:70%"></span><span class="ln2" style="width:80%"></span><span style="color:var(--muted)">29 Oct, 10:12</span></div>
                       <div class="t-items">
                         <div class="t-item"><div class="t-f"><label>Item</label><div class="t-in" id="p-k1"><span class="v">Rent</span><span class="cv">▾</span></div></div><div class="t-f"><label>Amount (RM)</label><div class="t-in" id="p-a1"><span class="v mono"></span></div></div></div>
                         <div class="t-item" id="p-row2"><div class="t-f"><label>Item</label><div class="t-in" id="p-k2"><span class="v">Deposit</span><span class="cv">▾</span></div></div><div class="t-f"><label>Amount (RM)</label><div class="t-in" id="p-a2"><span class="v mono"></span></div></div></div>
@@ -614,20 +797,120 @@ footer b { color: var(--ink); font-weight: 600; }
                   </div>
                 </div>
 
+                <div class="t-view" data-view="customers">
+                  <div class="t-hrow"><div><div class="t-h1">Customers</div><div class="t-sub">Everyone who has booked, with their notes, ID check and rentals.</div></div></div>
+                  <div class="t-flags">
+                    <div class="t-card t-flag all" id="c-all"><em>16</em><b>Everyone</b><span>Has rented</span></div>
+                    <div class="t-card t-flag black" id="c-black"><em>1</em><b>Blacklisted</b><span>Never again</span></div>
+                    <div class="t-card t-flag care" id="c-care"><em>1</em><b>Be careful</b><span>Check twice</span></div>
+                    <div class="t-card t-flag vip" id="c-vip"><em>2</em><b>VIP</b><span>Look after them</span></div>
+                    <div class="t-card t-flag rep"><em>9</em><b>Repeat</b><span>Two times or more</span></div>
+                  </div>
+                  <div class="t-sbox" id="c-search"><svg class="t-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><span class="v"><span class="ph">Search: name, IC or phone number</span></span></div>
+                  <div class="t-card t-table" id="c-table"></div>
+                </div>
+
+                <div class="t-view" data-view="expenses">
+                  <div class="t-hrow"><div><div class="t-h1">Expenses</div><div class="t-sub">What the team spent, by kind, car and month, with the receipt kept.</div></div><span class="t-btn" id="e-add">+ Add expense</span></div>
+                  <div class="t-stats">
+                    <div class="t-card t-stat"><b id="e-tot">RM 4,625</b><span>Spent this month</span></div>
+                    <div class="t-card t-stat"><b id="e-fuel">RM 1,240</b><span>Fuel</span></div>
+                    <div class="t-card t-stat"><b>RM 1,860</b><span>Repairs and service</span></div>
+                    <div class="t-card t-stat"><b id="e-wash">RM 325</b><span>Car wash</span></div>
+                  </div>
+                  <div class="t-card t-table" id="e-table"></div>
+                  <div class="t-scrim" id="e-scrim"></div>
+                  <div class="t-dlg" id="e-dlg" style="width:460px;margin-left:-230px">
+                    <div class="t-hrow"><h5>Add expense</h5><span class="t-sub">Paid by Harith · cash</span></div>
+                    <div class="t-dgrid" style="grid-template-columns:110px minmax(0,1fr)">
+                      <div class="t-receipt"><span class="sc" id="e-scan"></span><b>PETROL STATION</b><span style="text-align:center">29/10/2026 08:41</span><span class="rr"><span>RON95 41.3L</span><span>120.00</span></span><span class="rr"><span>CAR WASH</span><span>25.00</span></span><span class="rr" style="border-top:1px dashed #999;padding-top:3px"><b style="text-align:left">TOTAL</b><b>145.00</b></span><span style="text-align:center;color:#777">THANK YOU</span></div>
+                      <div class="t-items">
+                        <div class="t-item three"><div class="t-f"><label>Kind</label><div class="t-in" id="e-k1"><span class="v"></span></div></div><div class="t-f"><label>Car</label><div class="t-in" id="e-c1"><span class="v"></span></div></div><div class="t-f"><label>RM</label><div class="t-in" id="e-a1"><span class="v mono"></span></div></div></div>
+                        <div class="t-item three" id="e-row2"><div class="t-f"><label>Kind</label><div class="t-in" id="e-k2"><span class="v"></span></div></div><div class="t-f"><label>Car</label><div class="t-in" id="e-c2"><span class="v"></span></div></div><div class="t-f"><label>RM</label><div class="t-in" id="e-a2"><span class="v mono"></span></div></div></div>
+                        <span class="t-add" id="e-more">+ Add another kind</span>
+                        <span class="t-sub" id="e-read" style="font-size:11px">Add the receipt photo and the amounts fill in.</span>
+                      </div>
+                    </div>
+                    <div class="t-total"><span class="t-sub">One receipt, two kinds of spending</span><b class="mono" id="e-sum">RM 0.00</b></div>
+                    <div style="display:flex;justify-content:flex-end"><span class="t-btn" id="e-save">Save expense</span></div>
+                  </div>
+                </div>
+
                 <div class="t-view" data-view="reports">
                   <div class="t-hrow"><div><div class="t-h1">Reports</div><div class="t-sub">Every report shows a preview first, then Excel or PDF in your colours.</div></div></div>
-                  <div class="t-rgrid">
-                    <div class="t-card t-rc"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h6"/></svg></span><div><b>Bookings and income</b><small>One row per booking</small></div></div>
-                    <div class="t-card t-rc"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><div><b>Money in</b><small>Every payment received</small></div></div>
-                    <div class="t-card t-rc" id="r-profit"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M5 20V11M11 20V5M17 20v-7M3 20h18"/></svg></span><div><b>Profit by car</b><small>Income against what each car cost</small></div></div>
-                    <div class="t-card t-rc"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/></svg></span><div><b>Expenses</b><small>By kind, month and car</small></div></div>
+                  <div class="t-rgrid" id="r-grid">
+                    <div class="t-card t-rc" id="r-0"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h6"/></svg></span><div><b>Bookings and income</b><small>One row per booking</small></div></div>
+                    <div class="t-card t-rc" id="r-1"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><div><b>Money in</b><small>Every payment received</small></div></div>
+                    <div class="t-card t-rc" id="r-2"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M5 20V11M11 20V5M17 20v-7M3 20h18"/></svg></span><div><b>Profit by car</b><small>Income against what each car cost</small></div></div>
+                    <div class="t-card t-rc" id="r-3"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/></svg></span><div><b>Expenses</b><small>By kind, month and car</small></div></div>
                     <div class="t-card t-rc"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M14 6l6 6-6 6M4 12h16"/></svg></span><div><b>Deposit refunds</b><small>Kept, returned, still held</small></div></div>
                     <div class="t-card t-rc"><span class="ic"><svg class="t-ico" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span><div><b>Summons</b><small>Charged, paid, disputed</small></div></div>
                   </div>
                   <div class="t-card t-prev">
-                    <div class="t-hrow"><div><b id="r-title" style="font-size:14px">Profit by car</b><div class="t-sub">October 2026 · all cars</div></div><div class="acts"><span class="t-btn ghost" id="r-xls">Excel</span><span class="t-btn ghost">PDF</span></div></div>
+                    <div class="t-hrow"><div><b id="r-title" style="font-size:14px">Profit by car</b><div class="t-sub" id="r-sub">October 2026 · all cars</div></div><div class="t-acts"><span class="t-btn ghost" id="r-xls">Excel</span><span class="t-btn ghost">PDF</span></div></div>
                     <div class="t-bars" id="r-bars"></div>
-                    <div class="t-sum"><div>Income<b id="r-inc">RM 14,280</b></div><div>Car costs<b id="r-cost">RM 4,770</b></div><div>Profit<b id="r-pro">RM 9,510</b></div></div>
+                    <div class="t-sum"><div><span id="r-l1">Income</span><b id="r-v1">RM 14,280</b></div><div><span id="r-l2">Car costs</span><b id="r-v2">RM 4,770</b></div><div><span id="r-l3">Profit</span><b id="r-v3">RM 9,510</b></div></div>
+                  </div>
+                </div>
+
+                <div class="t-view" data-view="summons">
+                  <div class="t-hrow"><div><div class="t-h1">Summons</div><div class="t-sub">Read from the picture, matched to the booking that had the car that day.</div></div><span class="t-btn" id="s-up">Upload pictures</span></div>
+                  <div class="t-stats">
+                    <div class="t-card t-stat"><b>1</b><span>No booking</span></div>
+                    <div class="t-card t-stat"><b id="s-rev">2</b><span>Needs review</span></div>
+                    <div class="t-card t-stat"><b id="s-ready">1</b><span>Ready to charge</span></div>
+                    <div class="t-card t-stat"><b>6</b><span>Paid this month</span></div>
+                  </div>
+                  <div class="t-card t-table" id="s-table"></div>
+                  <div class="t-notice" id="s-pic"><b>NOTIS SAMAN</b><span>No: JPJ/2026/88412</span><span>Kenderaan: WXK 8823</span><span>Tarikh: 14/10/2026</span><span>Masa: 21:42</span><span>Kesalahan: Laju</span><span>Kompaun: RM 150</span></div>
+                  <div class="t-scrim" id="s-scrim"></div>
+                  <div class="t-dlg" id="s-dlg">
+                    <div class="t-hrow"><h5>Charge the renter</h5><span class="t-sub">Hafiz R. · KLT-00452</span></div>
+                    <div class="t-row2"><div class="t-f"><label>Fine</label><div class="t-in"><span class="v mono">RM 150.00</span></div></div><div class="t-f"><label>Handling fee</label><div class="t-in"><span class="v mono">RM 20.00</span></div></div></div>
+                    <div class="t-f"><label>WhatsApp message</label><div class="t-wa" id="s-msg"></div></div>
+                    <div style="display:flex;justify-content:flex-end;gap:8px"><span class="t-btn ghost">Copy</span><span class="t-btn wa" id="s-send">Send on WhatsApp</span></div>
+                  </div>
+                </div>
+
+                <div class="t-view" data-view="whatsapp">
+                  <div class="t-hrow"><div><div class="t-h1">WhatsApp booking assistant</div><div class="t-sub">Answers enquiries with your free cars and prices, then hands the lead to your team.</div></div></div>
+                  <div class="t-wagrid">
+                    <div class="t-card t-chats">
+                      <div class="t-chat" id="w-new"><span class="av">AF</span><div><b>Amir F. <i id="w-badge">New</i></b><small id="w-prev">Hi, any car 3 to 5 Nov?</small></div></div>
+                      <div class="t-chat"><span class="av">LW</span><div><b>Lee Wei Jie</b><small>Thank you, see you Friday</small></div></div>
+                      <div class="t-chat"><span class="av">SR</span><div><b>Sara R.</b><small>Assistant: the Myvi is free</small></div></div>
+                    </div>
+                    <div class="t-card t-convo" id="w-convo"></div>
+                    <div class="t-card t-lead" id="w-lead">
+                      <b style="font-size:13px">Lead</b>
+                      <div class="t-kv"><span>Car</span><b id="w-car">…</b></div>
+                      <div class="t-kv"><span>Dates</span>3 to 5 Nov</div>
+                      <div class="t-kv"><span>Pick-up</span>KLIA</div>
+                      <div class="t-kv"><span>Assigned to</span><b id="w-to">…</b></div>
+                      <span class="tc grey" id="w-task">Task: waiting</span>
+                      <span class="t-btn" id="w-book" style="justify-self:start">Make the booking</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="t-view" data-view="team">
+                  <div class="t-hrow"><div><div class="t-h1">Team and access</div><div class="t-sub">Each person sees only what their role allows. Every change is logged.</div></div></div>
+                  <div class="t-tgrid">
+                    <div class="t-card t-people">
+                      <div class="t-person"><span class="av">IH</span><div><b>Irfan H.</b><small>Owner</small></div><span class="tc b">All</span></div>
+                      <div class="t-person"><span class="av">HA</span><div><b>Harith A.</b><small>Manager</small></div></div>
+                      <div class="t-person" id="m-zul"><span class="av">ZK</span><div><b>Zulkifli K.</b><small>Field agent</small></div></div>
+                      <div class="t-person"><span class="av">MY</span><div><b>Mei Yee C.</b><small>Accounts</small></div></div>
+                    </div>
+                    <div class="t-card t-perms" id="m-perms">
+                      <div class="t-hrow" style="align-items:center;margin-bottom:4px"><div><b style="font-size:13.5px" id="m-who">Harith A. · Manager</b><div class="t-sub">What this person can see and do</div></div><span class="t-btn ghost" id="m-as">See the dashboard as them</span></div>
+                      <div class="t-perm"><div>Bookings<span>See, add and change bookings</span></div><i class="t-sw2 on"></i></div>
+                      <div class="t-perm"><div>Money and income<span>Amounts, income figures, cash held</span></div><i class="t-sw2 on" id="m-money"></i></div>
+                      <div class="t-perm"><div>Record payments<span>Add payments and make receipts</span></div><i class="t-sw2 on" id="m-pay"></i></div>
+                      <div class="t-perm"><div>Reports and Excel<span>Preview and download reports</span></div><i class="t-sw2 on" id="m-rep"></i></div>
+                      <div class="t-perm"><div>Handover and inspections<span>Photos, keys, fuel and mileage</span></div><i class="t-sw2 on"></i></div>
+                      <div class="t-perm"><div>Settings<span>Company details, terms, rates</span></div><i class="t-sw2" id="m-set"></i></div>
+                    </div>
                   </div>
                 </div>
 
@@ -657,13 +940,9 @@ footer b { color: var(--ink); font-weight: 600; }
         </div>
       </div>
 
-      <div class="t-chaps" role="tablist" aria-label="Choose what to watch" id="t-chaps">
-        <button class="t-chap" role="tab" aria-selected="true"><span class="n">01</span><b>Dashboard</b><span>Income, cars out and what needs you, the moment you sign in.</span><i class="pg"></i></button>
-        <button class="t-chap" role="tab" aria-selected="false"><span class="n">02</span><b>New booking</b><span>The phone number tidies itself, the car is checked free, the link goes out.</span><i class="pg"></i></button>
-        <button class="t-chap" role="tab" aria-selected="false"><span class="n">03</span><b>Record payment</b><span>One slip, several items, a receipt for each.</span><i class="pg"></i></button>
-        <button class="t-chap" role="tab" aria-selected="false"><span class="n">04</span><b>Reports</b><span>Preview the figures, then Excel or PDF for your accountant.</span><i class="pg"></i></button>
-        <button class="t-chap" role="tab" aria-selected="false"><span class="n">05</span><b>Your colours</b><span>Drop in your logo and the whole app takes its colours.</span><i class="pg"></i></button>
-        <button class="t-pause" id="t-pause" aria-label="Pause the tour"><svg viewBox="0 0 16 16" id="t-pause-ic"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+      <div class="t-pick">
+        <div class="t-caprow"><p class="t-cap" id="t-cap"></p><button class="t-pause" id="t-pause" aria-label="Pause the tour"><svg viewBox="0 0 16 16" id="t-pause-ic"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button></div>
+        <div class="t-chaps" role="tablist" aria-label="Choose a feature to watch" id="t-chaps"></div>
       </div>
     </div>
   </section>
@@ -706,84 +985,37 @@ footer b { color: var(--ink); font-weight: 600; }
     </div>
   </section>
 
-  <section class="feature flip band" id="summons">
+  <section class="feature flip band" id="schedules">
     <div class="wrap">
       <div class="copy">
-        <span class="eyebrow">Summons</span>
-        <h2>Know about a summons before the customer has left the country.</h2>
-        <p>Orbique checks every plate with JPJ and PDRM twice a day and matches each summons to the booking that had the car on that date.</p>
+        <span class="eyebrow">Schedules</span>
+        <h2>Tomorrow's handovers and returns, planned and sent to each driver.</h2>
+        <p>Every delivery, pick-up, return and car wash lands on one schedule, by staff member and by hour. The night before, each person gets their own list on WhatsApp.</p>
         <ul class="ticks">
-          <li>The renter who had the car is named on the summons automatically</li>
-          <li>Photos of the notice stay private, seen only by signed-in staff</li>
-          <li>Paid, disputed and passed-on summons tracked to the end</li>
+          <li>Pick the dates you want and only those days load, so it stays quick</li>
+          <li>Reminders go out before each job, with the booking and the place</li>
+          <li>Handover fees counted per staff member for their income page</li>
         </ul>
       </div>
-      <div class="window" data-loop="summons">
-        <div class="window-bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr">ventura.orbiquefms.com/summons</span><span class="sample">Sample data</span></div>
-        <div class="window-body" style="overflow-x:auto">
-          <table class="sum-table">
-            <thead><tr><th>Plate</th><th>JPJ</th><th>PDRM</th><th>Renter on that date</th><th style="text-align:right">Fine</th></tr></thead>
-            <tbody id="sumrows">
-              <tr><td><span class="plate">VEB 4120</span></td><td data-r="ok"></td><td data-r="ok"></td><td style="color:var(--muted)">None</td><td class="num mono">—</td></tr>
-              <tr><td><span class="plate">WXK 8823</span></td><td data-r="ok"></td><td data-r="hit"></td><td>Hafiz R. · VEN-00608</td><td class="num mono">RM 150</td></tr>
-              <tr><td><span class="plate">VFR 2207</span></td><td data-r="ok"></td><td data-r="ok"></td><td style="color:var(--muted)">None</td><td class="num mono">—</td></tr>
-              <tr><td><span class="plate">PNA 6631</span></td><td data-r="hit"></td><td data-r="ok"></td><td>Siti H. · VEN-00597</td><td class="num mono">RM 300</td></tr>
-              <tr><td><span class="plate">BRT 1094</span></td><td data-r="ok"></td><td data-r="ok"></td><td style="color:var(--muted)">None</td><td class="num mono">—</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="feature band" id="tracking">
-    <div class="wrap">
-      <div class="copy">
-        <span class="eyebrow">Tracking</span>
-        <h2>See where every car is, and which ones are standing still.</h2>
-        <p>GPS trackers report into the same screen as the bookings, so a car that is out has a renter's name next to its dot.</p>
-        <ul class="ticks">
-          <li>Live position, speed and last report for each car</li>
-          <li>A car that should be home but is not stands out at once</li>
-          <li>Trips kept per booking for disputes over mileage</li>
-        </ul>
-      </div>
-      <div class="window">
-        <div class="window-bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr">ventura.orbiquefms.com/tracking</span><span class="sample">Sample data</span></div>
+      <div class="window" data-loop="sched">
+        <div class="window-bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr">ventura.orbiquefms.com/schedules</span><span class="sample">Sample data</span></div>
         <div class="window-body">
-          <div class="map">
-            <svg viewBox="0 0 640 400" role="img" aria-label="Map with three cars moving and one parked">
-              <rect class="park" x="400" y="40" width="150" height="90" rx="14"/>
-              <path class="river" d="M-20 300 C 120 260, 220 360, 360 320 S 560 250, 680 290"/>
-              <path class="road main" d="M40 70 H600"/>
-              <path class="road main" d="M120 20 V380"/>
-              <path class="road" d="M120 200 H520 V380"/>
-              <path class="road" d="M300 70 V200"/>
-              <path class="road" d="M520 70 V200"/>
-              <path class="road" d="M40 340 H300"/>
-              <text class="label" x="420" y="92">TAMAN TASIK</text>
-              <text class="label" x="134" y="58">JALAN IMBI</text>
-              <text class="label" x="310" y="190">JALAN BUKIT</text>
-              <path class="route" id="r1" d="M120 380 V70 H300 V200 H520"/>
-              <path id="r2" d="M600 70 H120 V340 H300" fill="none"/>
-              <path id="r3" d="M520 380 V200 H120 V70" fill="none"/>
-              <g id="carA"><circle r="11" fill="var(--teal)" opacity=".2"/><circle r="6.5" fill="var(--teal)" stroke="var(--surface)" stroke-width="2"/><animateMotion dur="16s" repeatCount="indefinite" rotate="auto"><mpath href="#r1"/></animateMotion></g>
-              <g id="carB"><circle r="11" fill="var(--gold)" opacity=".25"/><circle r="6.5" fill="var(--gold)" stroke="var(--surface)" stroke-width="2"/><animateMotion dur="20s" repeatCount="indefinite"><mpath href="#r2"/></animateMotion></g>
-              <g id="carC"><circle r="11" fill="var(--teal)" opacity=".2"/><circle r="6.5" fill="var(--teal)" stroke="var(--surface)" stroke-width="2"/><animateMotion dur="18s" begin="-6s" repeatCount="indefinite"><mpath href="#r3"/></animateMotion></g>
-              <g transform="translate(470 92)"><circle r="6.5" fill="var(--red)" stroke="var(--surface)" stroke-width="2"/></g>
-            </svg>
-            <div class="map-side">
-              <span class="chip"><i style="background:var(--teal)"></i><span class="mono">WXK 8823</span> 54 km/h</span>
-              <span class="chip"><i style="background:var(--gold)"></i><span class="mono">VEB 4120</span> 38 km/h</span>
-              <span class="chip"><i style="background:var(--red)"></i><span class="mono">PNA 6631</span> parked 3 h</span>
+          <div class="sch-head"><b>Tomorrow, Friday 30 Oct</b><span class="chip grey">3 staff · 7 jobs</span></div>
+          <div class="sch-scroll">
+            <div class="sch">
+              
+              <div class="who"><b>Zulkifli K.</b><span>Field agent</span></div><div class="lane"><div class="job out" data-j="0"><small>9:00 AM</small><b>Deliver · KLIA T1</b></div><div class="job ret" data-j="1"><small>1:00 PM</small><b>Collect · Bangsar</b></div><div class="job task" data-j="2"><small>4:00 PM</small><b>Inspect X50</b></div></div>
+              <div class="who"><b>Harith A.</b><span>Manager</span></div><div class="lane"><div class="job out" data-j="3"><small>10:00 AM</small><b>Hand over · Office</b></div><div class="job ret" data-j="4"><small>2:30 PM</small><b>Return · KL Sentral</b></div></div>
+              <div class="who"><b>Aiman H.</b><span>Driver</span></div><div class="lane"><div class="job task" data-j="5"><small>8:30 AM</small><b>Car wash · City</b></div><div class="job out" data-j="6"><small>11:30 AM</small><b>Deliver · Mont Kiara</b></div></div>
             </div>
           </div>
+          <div class="sch-foot"><span class="sch-key"><span class="k-out">Going out</span><span class="k-ret">Coming back</span><span class="k-task">Task</span></span><span class="chip teal" id="schsent">Sent on WhatsApp to 3 staff · 9:00 PM</span></div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="feature flip band" id="deposits">
+  <section class="feature band" id="deposits">
     <div class="wrap">
       <div class="copy">
         <span class="eyebrow">Deposits</span>
@@ -810,7 +1042,7 @@ footer b { color: var(--ink); font-weight: 600; }
     </div>
   </section>
 
-  <section class="feature band" id="agreements">
+  <section class="feature flip band" id="agreements">
     <div class="wrap">
       <div class="copy">
         <span class="eyebrow">Agreements</span>
@@ -837,17 +1069,37 @@ footer b { color: var(--ink); font-weight: 600; }
 
   <section class="more band">
     <div class="wrap">
-      <div style="display:grid;gap:12px"><span class="eyebrow">Also in Orbique FMS</span><h2>The rest of the rental business, in the same place.</h2></div>
+      <div style="display:grid;gap:12px"><span class="eyebrow">Also in Orbique FMS</span><h2>And the rest of the rental business, in the same place.</h2></div>
       <div class="more-grid">
-        <div><b>Invoices and receipts</b><span>Numbered PDFs with your logo, drawn fresh from the booking each time.</span></div>
-        <div><b>Car availability</b><span>Which car is free for the dates a customer asks about, in one search.</span></div>
-        <div><b>Maintenance</b><span>Services, repairs and road tax per car, with the next one due.</span></div>
-        <div><b>Expenses</b><span>Fuel, parking, repairs and salaries, with the receipt photo attached.</span></div>
-        <div><b>Reports</b><span>Money in, earnings per car and per month, exported to Excel.</span></div>
-        <div><b>ID checks</b><span>Check a customer's IC or passport before handing over the keys.</span></div>
-        <div><b>Customer notes</b><span>Who returned late, who was a pleasure, who not to rent to again.</span></div>
-        <div><b>Staff and access</b><span>Each staff member sees only what their role allows; every change is logged.</span></div>
+        <div><b>Calendar and availability</b><span>Every car's bookings on one calendar, and which cars are free for the dates a customer asks about.</span></div>
+        <div><b>Maintenance and car papers</b><span>Services, repairs, road tax and insurance per car, with reminders before anything runs out.</span></div>
+        <div><b>Car instalments</b><span>Monthly loan or hire-purchase payments per car: due, paid and overdue.</span></div>
+        <div><b>Signatures and damage packages</b><span>Signed agreements in one place, and the damage cover options you offer at the counter.</span></div>
+        <div><b>Handover and inspections</b><span>Photos, fuel and mileage at pick-up and return, saved on the phone even with a weak signal.</span></div>
+        <div><b>Tasks for staff</b><span>Car washes, repairs and errands given to staff on WhatsApp, with voice notes and photos.</span></div>
+        <div><b>Staff income and fees</b><span>Handover fees with a rate per staff member, and what each person collected and spent.</span></div>
+        <div><b>Delivery and airport fees</b><span>Pick-up, delivery and KLIA fees, charged with or without a booking.</span></div>
+        <div><b>Activity log</b><span>Who changed what and when, with the old and new value, ready to export.</span></div>
+        <div><b>Website templates</b><span>Pick a website design, filled from your own cars, prices, logo and colours.</span></div>
+        <div><b>Customer link</b><span>One link with the car photo, pick-up time and place, and the must-know rules, animated.</span></div>
+        <div><b>Your own address</b><span>Your team signs in at yourcompany.orbiquefms.com, in your colours.</span></div>
       </div>
+    </div>
+  </section>
+
+  <section class="custom band" id="custom">
+    <div class="wrap">
+      <div class="copy">
+        <span class="eyebrow">Custom features</span>
+        <h2>Need something only your company does? We'll build it for you.</h2>
+        <p>Every subscriber gets the full Orbique FMS. If your team works in a way it does not cover yet, we can build the feature for a one-off fee.</p>
+        <div class="ctas"><a class="btn btn-primary" id="custom-wa" href="https://wa.me/60174698759?text=Hello%20Orbique%2C%20we%20would%20like%20a%20custom%20feature%20in%20Orbique%20FMS%3A%20" target="_blank" rel="noopener">Ask for a custom feature</a><a class="btn btn-quiet" href="#demo">Mention it in your demo</a></div>
+      </div>
+      <ol class="custom-steps">
+        <li><div><b>Tell us what you need</b><span>A form, a report, a fee rule, a document or a link to another system you already use.</span></div></li>
+        <li><div><b>Get a fixed quote</b><span>We agree the scope and one price for the feature before any work starts.</span></div></li>
+        <li><div><b>Use it in your Orbique FMS</b><span>Delivered into your app, in your colours, and kept working through every update.</span></div></li>
+      </ol>
     </div>
   </section>
 
@@ -866,7 +1118,7 @@ footer b { color: var(--ink); font-weight: 600; }
       <div class="copy">
         <span class="eyebrow">Book a demo</span>
         <h2>Bring your fleet list. We'll show you your first week in Orbique.</h2>
-        <p>A 30-minute call: we load a few of your cars, take a booking, record a payment slip and check them for summons, live.</p>
+        <p>A 30-minute call: we load a few of your cars, take a booking, record a payment slip and plan tomorrow's schedule, live.</p>
         <p style="font-size:14.5px">Or message us straight away on WhatsApp: <a href="https://wa.me/60174698759" target="_blank" rel="noopener"><span class="mono">+60 17-469 8759</span></a></p>
         <p style="font-size:14.5px">Orbique Global Sdn. Bhd. · No 215, Jalan Imbi, 55100 Kuala Lumpur</p>
       </div>
@@ -876,6 +1128,7 @@ footer b { color: var(--ink); font-weight: 600; }
         <label for="f-fleet">Cars in your fleet<select id="f-fleet" name="fleet"><option>1 to 10</option><option selected>11 to 30</option><option>31 to 100</option><option>More than 100</option></select></label>
         <label for="f-phone">WhatsApp number<input id="f-phone" name="phone" type="tel" autocomplete="tel" placeholder="+60 12 345 6789" required></label>
         <label for="f-email">Email<input id="f-email" name="email" type="email" autocomplete="email" required></label>
+        <label class="full" for="f-custom">A custom feature you would like (optional)<input id="f-custom" name="custom" placeholder="For example: a monthly report for our investors"></label>
         <div class="full" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between"><span class="note">This opens WhatsApp with your details filled in.</span><button class="btn btn-primary" type="submit">Request a demo on WhatsApp</button></div>
         <div class="done" id="reqdone" hidden></div>
       </form>
@@ -981,14 +1234,16 @@ footer b { color: var(--ink); font-weight: 600; }
       ok.style.visibility = ''; ok.classList.remove('pop'); void ok.offsetWidth; ok.classList.add('pop');
       await sleep(4200);
     },
-    async summons(el) {
-      const cells = [...el.querySelectorAll('td[data-r]')];
-      cells.forEach(c => c.innerHTML = '<span class="spin" aria-hidden="true"></span>');
+    async sched(el) {
+      const jobs = [...el.querySelectorAll('.job')], sent = el.querySelector('#schsent');
+      jobs.forEach(j => { j.style.visibility = 'hidden'; j.classList.remove('done', 'pop'); });
+      sent.style.visibility = 'hidden';
+      await sleep(500);
+      for (const j of jobs) { await sleep(220); j.style.visibility = ''; void j.offsetWidth; j.classList.add('pop'); }
       await sleep(700);
-      for (const c of cells) {
-        await sleep(260);
-        c.innerHTML = c.dataset.r === 'hit' ? '<span class="chip red pop">1 summons</span>' : '<span class="chip teal pop">Clear</span>';
-      }
+      sent.style.visibility = ''; sent.classList.remove('pop'); void sent.offsetWidth; sent.classList.add('pop');
+      await sleep(1400);
+      el.querySelector('.job[data-j="5"]').classList.add('done');
       await sleep(4500);
     },
     async deposit(el) {
@@ -1038,7 +1293,7 @@ footer b { color: var(--ink); font-weight: 600; }
       `Cars in our fleet: ${f.fleet.value}`,
       `WhatsApp: ${f.phone.value.trim()}`,
       `Email: ${f.email.value.trim()}`
-    ].join('\n');
+    ].concat(f.custom.value.trim() ? [`Custom feature we would like a quote for: ${f.custom.value.trim()}`] : []).join('\n');
     const url = 'https://wa.me/60174698759?text=' + encodeURIComponent(text);
     done.hidden = false;
     done.innerHTML = '';
@@ -1050,7 +1305,7 @@ footer b { color: var(--ink); font-weight: 600; }
 })();
 </script>
 <script>
-// the tour: five GSAP timelines that click through a copy of the staff dashboard, one chapter after another
+// the tour: one GSAP timeline per feature, clicking through a copy of the staff dashboard, one after another
 (() => {
   if (!window.gsap || !window.ScrollTrigger) return;
   gsap.registerPlugin(ScrollTrigger);
@@ -1075,9 +1330,38 @@ footer b { color: var(--ink); font-weight: 600; }
     ['KLT-00484', '1 day', 'Chong Kah Wai', '+60 00-267 6019', 'VLB 7130 · City', '1 Nov → 2 Nov', 'warn:Agreement Sent', 'bad:Deposit due', 'RM 360.00', 0, 'RM 360 due']
   ];
   const NEW = ['KLT-00488', '2 days', 'Nur Aisyah', '+60 00-345 6789', 'VFR 2207 · City', '3 Nov → 5 Nov', 'warn:Agreement Sent', 'bad:Deposit due', 'RM 360.00', 0, 'RM 360 due'];
-  const CARS = [['Honda City', 'VFR 2207', 2840], ['Perodua Myvi', 'VKP 4418', 2310], ['Proton X50', 'WXK 8823', 1960], ['Toyota Vios', 'VLC 5512', 1420], ['Perodua Bezza', 'VEB 4120', 980]];
-  const chip = s => { const [k, t] = s.split(':'); return `<span class="tc ${k}">${t}</span>`; };
+  const CUST = [
+    ['Emily Clarke', '4 rentals · last 19 Oct', 'rep', '53XXX499', '+60 00-115 4179'],
+    ['Nur Aisyah Rahman', '11 rentals · last 16 Oct', 'vip rep', '930XXX-XX-X431', '+60 00-837 5791'],
+    ['Farid Zainal', 'Returned 2 days late, twice', 'care', '880XXX-XX-X207', '+60 00-410 2290'],
+    ['Ravi Kumar', '5 rentals · last 18 Oct', 'rep', '960XXX-XX-X319', '+60 00-132 8949'],
+    ['Daniel Tan', 'Car damaged, RM 1,200 unpaid', 'black', '910XXX-XX-X118', '+60 00-655 0193'],
+    ['Lee Wei Jie', '7 rentals · last 17 Oct', 'rep', '900XXX-XX-X988', '+60 00-969 2986']
+  ];
+  const FLAG = { rep: 'ok:Repeat', vip: 'b:VIP', care: 'warn:Be careful', black: 'bad:Blacklisted' };
+  const EXP = [
+    ['28 Oct', 'Repairs', 'VMB 6604', 'Brake pads, Bengkel Jaya', 'RM 380.00'],
+    ['27 Oct', 'Salaries', '—', 'Driver, half month', 'RM 900.00'],
+    ['27 Oct', 'Fuel', 'VKP 4418', 'Before handover', 'RM 85.00'],
+    ['26 Oct', 'Parking', 'VLB 7130', 'KLIA, 2 days', 'RM 46.00'],
+    ['25 Oct', 'Insurance', 'VMA 3326', 'Yearly cover', 'RM 1,120.00']
+  ];
+  const EXP_NEW = [['29 Oct', 'Fuel', 'VFR 2207', 'Petrol station receipt', 'RM 120.00'], ['29 Oct', 'Car wash', 'VFR 2207', 'Same receipt', 'RM 25.00']];
+  const SUMS = [
+    ['JPJ speeding', 'JPJ/2026/86120 · 2 Oct', 'VMA 3326', 'KLT-00431 · Kenji T.', 'ok:Paid', 'RM 300'],
+    ['PDRM parking', 'PDRM/2026/40215 · 9 Oct', 'VLB 7130', 'No booking that day', 'bad:No booking', 'RM 30'],
+    ['JPJ red light', 'JPJ/2026/87004 · 11 Oct', 'VKP 4418', 'KLT-00447 · Emily C.', 'warn:Charged', 'RM 300']
+  ];
+  const REPORTS = [
+    { t: 'Bookings and income', s: 'October 2026 · one row per booking in the Excel', rows: [['1 to 7 Oct', '12 bookings', 3120], ['8 to 14 Oct', '11 bookings', 3460], ['15 to 21 Oct', '13 bookings', 4180], ['22 to 28 Oct', '10 bookings', 3520]], sum: [['Bookings', '46'], ['Days rented', '168'], ['Income', 'RM 14,280']] },
+    { t: 'Money in', s: 'October 2026 · every payment, with booking and plate', rows: [['Bank transfer', '62 payments', 9840], ['Card (Stripe)', '21 payments', 3310], ['Cash', '14 payments', 1130]], sum: [['Payments', '97'], ['Receipts made', '97'], ['Total', 'RM 14,280']] },
+    { t: 'Profit by car', s: 'October 2026 · all cars', rows: [['Honda City', 'VFR 2207', 2840], ['Perodua Myvi', 'VKP 4418', 2310], ['Proton X50', 'WXK 8823', 1960], ['Toyota Vios', 'VLC 5512', 1420], ['Perodua Bezza', 'VEB 4120', 980]], sum: [['Income', 'RM 14,280'], ['Car costs', 'RM 4,770'], ['Profit', 'RM 9,510']] },
+    { t: 'Expenses', s: 'October 2026 · by kind, with receipts', rows: [['Repairs and service', '8 jobs', 1860], ['Fuel', '23 fills', 1360], ['Insurance', '1 car', 1120], ['Car wash', '14 washes', 350], ['Parking', '6 times', 80]], sum: [['Spent', 'RM 4,770'], ['Kinds', '5'], ['Receipts kept', '52']] }
+  ];
+
+  const chip = s => { const i = s.indexOf(':'); return `<span class="tc ${s.slice(0, i)}">${s.slice(i + 1)}</span>`; };
   const row = (r, id) => `<div class="t-tr"${id ? ` id="${id}"` : ''}><div><b>${r[0]}</b><small>${r[1]}</small></div><div><b>${r[2]}</b><small class="mono">${r[3]}</small></div><div class="c-car"><b>${r[4]}</b><small>${r[5]}</small></div><div class="st">${chip(r[6])}${chip(r[7])}</div><div class="amt"><b>${r[8]}</b><span class="t-paybar"><i style="width:${r[9]}%"></i></span><small>${r[10]}</small></div></div>`;
+  const exRow = (r, id) => `<div class="t-tr ex"${id ? ` id="${id}"` : ''}><div><small>${r[0]}</small></div><div><span class="tc grey">${r[1]}</span></div><div class="c-hide"><b class="mono" style="font-weight:500">${r[2]}</b></div><div><small style="color:var(--ink)">${r[3]}</small></div><div style="text-align:center"><b>${r[4]}</b></div></div>`;
   const rm = (v, d = 2) => 'RM ' + v.toLocaleString('en-MY', { minimumFractionDigits: d, maximumFractionDigits: d });
 
   function setView(name) {
@@ -1093,12 +1377,37 @@ footer b { color: var(--ink); font-weight: 600; }
     $('#t-nm2').textContent = padi ? 'RENTALS' : 'WHEELS';
     $('#t-co').textContent = padi ? 'padiemas' : 'kilat';
   }
+  function asAgent(on) {
+    $('[data-view="dashboard"]').classList.toggle('nomoney', on);
+    ['invoices', 'expenses', 'reports', 'team', 'settings'].forEach(n => $(`[data-nav="${n}"]`).classList.toggle('gone', on));
+    $('#t-as').classList.toggle('show', on);
+    $('#t-grp-team').classList.toggle('gone', on); $('[data-view="dashboard"] .t-acts').classList.toggle('gone', on);
+    $('#t-av').textContent = on ? 'ZK' : 'IH';
+    $('#d-hi').textContent = on ? 'Good morning, Zulkifli' : 'Good morning, Irfan';
+    $('#d-avg b').textContent = on ? 'Hidden' : 'RM 330';
+  }
+  function showReport(k) {
+    const r = REPORTS[k], max = Math.max(...r.rows.map(x => x[2]));
+    $('#r-title').textContent = r.t; $('#r-sub').textContent = r.s;
+    $$('.t-rc').forEach(c => c.classList.toggle('sel', c.id === 'r-' + k));
+    $$('#r-bars .t-bar').forEach((b, i) => {
+      const d = r.rows[i]; b.style.display = d ? '' : 'none'; if (!d) return;
+      b.querySelector('.nm').innerHTML = `${d[0]}<small>${d[1]}</small>`;
+      b.querySelector('i').style.width = (d[2] / max * 100).toFixed(1) + '%';
+      b.querySelector('.v').textContent = rm(d[2], 0);
+    });
+    r.sum.forEach((s, i) => { $('#r-l' + (i + 1)).textContent = s[0]; $('#r-v' + (i + 1)).textContent = s[1]; });
+  }
 
   // put every screen back to where a chapter starts
-  function reset(view, newRow = 'hidden') {
-    setBrand(false);
+  function reset(view, o = {}) {
+    setBrand(false); asAgent(false);
     setView(view);
     // dashboard
+    const dv = $('[data-view="dashboard"]'); dv.classList.remove('editing');
+    const blocks = $('#d-blocks'); blocks.insertBefore($('#d-a'), blocks.firstChild);
+    gsap.set('#d-a, #d-b', { clearProps: 'all' }); $$('.t-blk').forEach(b => b.classList.remove('lift'));
+    $('#d-cash').classList.remove('off'); $('#d-cust').textContent = 'Arrange sections';
     $$('#t-seg span').forEach(s => s.classList.toggle('on', s.dataset.seg === 'm'));
     $('#t-ln').setAttribute('d', line(MONTH)); $('#t-ar').setAttribute('d', area(MONTH)); $('#t-cmp').setAttribute('d', line(MONTH_BEFORE));
     gsap.set('#t-ln, #t-ar, #t-cmp, .t-kpi, .t-now .t-tile, .t-now .t-need', { clearProps: 'all' });
@@ -1106,20 +1415,43 @@ footer b { color: var(--ink); font-weight: 600; }
     $('#t-need1').classList.remove('hov');
     // bookings
     $('#t-table').innerHTML = '<div class="t-tr th"><div>Booking</div><div>Customer</div><div class="c-car">Car and dates</div><div>Status</div><div style="text-align:right">Amount</div></div>' + row(NEW, 't-newrow') + ROWS.map(r => row(r)).join('');
-    const nr = $('#t-newrow');
-    if (newRow === 'hidden') gsap.set(nr, { height: 0, opacity: 0 });
-    if (newRow === 'paid') payNewRow();
-    $('#t-bcount').textContent = newRow === 'hidden' ? '102 bookings' : '103 bookings';
-    gsap.set('#t-scrim', { autoAlpha: 0 }); gsap.set('#t-drawer', { xPercent: 105 }); gsap.set('#f-menu, #t-dlg, #t-toast', { autoAlpha: 0 });
+    if (!o.newRow) gsap.set('#t-newrow', { height: 0, opacity: 0 });
+    if (o.newRow === 'paid') payNewRow();
+    $('#t-bcount').textContent = o.newRow ? '103 bookings' : '102 bookings';
+    gsap.set('.t-scrim', { autoAlpha: 0 }); gsap.set('#t-drawer, #t-bk', { xPercent: 105 }); gsap.set('#f-menu, .t-dlg, #t-toast, #t-inv', { autoAlpha: 0 });
     $$('.t-in').forEach(f => f.classList.remove('focus', 'flash'));
-    ['#f-name', '#f-phone', '#f-from', '#f-to', '#f-place', '#p-a1', '#p-a2'].forEach(s => { $(s).querySelector('.v').textContent = ''; });
+    ['#f-name', '#f-phone', '#f-from', '#f-to', '#f-place', '#p-a1', '#p-a2', '#e-k1', '#e-c1', '#e-a1', '#e-k2', '#e-c2', '#e-a2'].forEach(s => { $(s).querySelector('.v').textContent = ''; });
     $('#f-car .v').innerHTML = '<span class="ph">Pick a car</span>'; $('#f-opt').classList.remove('hov');
     $('#f-total').textContent = 'RM 0.00'; $('#p-total').textContent = 'RM 0.00';
-    gsap.set('#p-row2', { height: 0, opacity: 0 }); gsap.set('#p-scan', { opacity: 0 });
+    gsap.set('#p-row2, #e-row2', { height: 0, opacity: 0 }); gsap.set('#p-scan, #e-scan', { opacity: 0 });
+    // booking drawer
+    $('#bk-t1').classList.add('on'); $('#bk-t3').classList.remove('on'); $('#bk-p1').classList.add('on'); $('#bk-p3').classList.remove('on');
+    $('#bk-inv').classList.remove('new'); $('#bk-invt').textContent = 'Invoice'; $('#bk-invs').textContent = 'Not made yet'; $('#bk-gen').textContent = 'Generate invoice';
+    // customers
+    $('#c-table').innerHTML = '<div class="t-tr cu th"><div>Name</div><div>Flags</div><div class="c-hide">IC / passport</div><div>Phone</div></div>' + CUST.map(c => `<div class="t-tr cu" data-f="${c[2]}" data-ph="${c[4]}"><div><b>${c[0]}</b><small>${c[1]}</small></div><div style="display:flex;gap:4px">${c[2].split(' ').map(f => chip(FLAG[f])).join('')}</div><div class="c-hide"><small class="mono" style="color:var(--ink)">${c[3]}</small></div><div><small class="mono" style="color:var(--ink);font-size:11.5px">${c[4]}</small></div></div>`).join('');
+    $('#c-search .v').innerHTML = '<span class="ph">Search: name, IC or phone number</span>'; $('#c-search').classList.remove('focus');
+    $$('.t-flag').forEach(f => f.classList.remove('sel')); $('#c-all').classList.add('sel');
+    // expenses
+    $('#e-table').innerHTML = '<div class="t-tr ex th"><div>Date</div><div>Kind</div><div class="c-hide">Car</div><div>Note</div><div style="text-align:center">Amount</div></div>' + EXP_NEW.map((r, i) => exRow(r, 'e-new' + i)).join('') + EXP.map(r => exRow(r)).join('');
+    gsap.set('#e-new0, #e-new1', { height: 0, opacity: 0 });
+    $('#e-tot').textContent = 'RM 4,625'; $('#e-fuel').textContent = 'RM 1,240'; $('#e-wash').textContent = 'RM 325'; $('#e-sum').textContent = 'RM 0.00';
+    $('#e-read').textContent = 'Add the receipt photo and the amounts fill in.';
     // reports
-    $('#r-profit').classList.remove('sel');
-    $('#r-bars').innerHTML = CARS.map(c => `<div class="t-bar"><span>${c[0]}<small>${c[1]}</small></span><span class="tr"><i style="width:${(c[2] / CARS[0][2] * 100).toFixed(1)}%"></i></span><span class="v">${rm(c[2], 0)}</span></div>`).join('');
-    gsap.set('.t-prev', { opacity: 1, y: 0 }); gsap.set('.t-rc', { clearProps: 'all' });
+    $('#r-bars').innerHTML = '<div class="t-bar"><span class="nm"></span><span class="tr"><i></i></span><span class="v"></span></div>'.repeat(5);
+    showReport(2); gsap.set('.t-prev', { opacity: 1, y: 0 }); gsap.set('.t-rc', { clearProps: 'all' });
+    // summons
+    $('#s-table').innerHTML = '<div class="t-tr sm th"><div>Summons</div><div class="c-hide">Car</div><div>Booking that had the car</div><div>Status</div><div style="text-align:center">Fine</div></div>' +
+      `<div class="t-tr sm" id="s-new"><div id="s-n1"><b><span class="t-spin"></span> Reading the picture…</b><small>WXK 8823 notice</small></div><div class="c-hide" id="s-n2"><small>—</small></div><div id="s-n3"><small>—</small></div><div id="s-n4"><span class="tc grey">Reading</span></div><div id="s-n5" style="text-align:center"><small>—</small></div></div>` +
+      SUMS.map(s => `<div class="t-tr sm"><div><b>${s[0]}</b><small>${s[1]}</small></div><div class="c-hide"><span class="t-plate">${s[2]}</span></div><div><small style="color:var(--ink)">${s[3]}</small></div><div>${chip(s[4])}</div><div style="text-align:center"><b>${s[5]}</b></div></div>`).join('');
+    gsap.set('#s-new', { height: 0, opacity: 0 }); gsap.set('#s-pic', { autoAlpha: 0 });
+    $('#s-ready').textContent = '1'; $('#s-msg').textContent = '';
+    // whatsapp
+    $('#w-convo').innerHTML = ''; $('#w-new').classList.remove('on'); $('#w-badge').style.display = '';
+    $('#w-car').textContent = '…'; $('#w-to').textContent = '…'; $('#w-task').className = 'tc grey'; $('#w-task').textContent = 'Task: waiting';
+    // team
+    $$('.t-person').forEach(p => p.classList.remove('on')); $$('.t-person')[1].classList.add('on');
+    $('#m-who').textContent = 'Harith A. · Manager';
+    ['#m-money', '#m-pay', '#m-rep'].forEach(s => $(s).classList.add('on')); $('#m-set').classList.remove('on');
     // brand
     gsap.set('#b-file', { autoAlpha: 0 }); gsap.set('#b-logo', { opacity: 0 }); $('#b-hint').style.visibility = '';
     gsap.set('#b-sw .t-sw i', { clearProps: 'all' }); gsap.set('.t-mini', { '--b': KILAT });
@@ -1142,14 +1474,15 @@ footer b { color: var(--ink); font-weight: 600; }
     tl.to(cur, { scale: .82, duration: .09, transformOrigin: '3px 2px' }, pos).to(cur, { scale: 1, duration: .14 });
     tl.fromTo(rip, { x: () => gsap.getProperty(cur, 'x') + 3, y: () => gsap.getProperty(cur, 'y') + 2, scale: .2, opacity: .45 }, { scale: 1.6, opacity: 0, duration: .45, ease: 'power1.out' }, '<-0.1');
   };
+  const tap = (tl, s, pos, d) => { move(tl, s, pos, d); click(tl); };
   const type = (tl, s, text, pos = '+=0.05', cps = 18) => {
     const f = $(s), v = f.querySelector('.v'), o = { n: 0 };
     tl.to(o, { n: text.length, duration: text.length / cps, ease: 'none', onStart: () => f.classList.add('focus'), onUpdate: () => { v.textContent = text.slice(0, Math.round(o.n)); }, onComplete: () => f.classList.remove('focus') }, pos);
   };
   const count = (tl, el, from, to, d, f, pos) => { const o = { v: from }; tl.to(o, { v: to, duration: d, ease: 'power2.out', onUpdate: () => { el.textContent = f(o.v); } }, pos); };
   const fill = (tl, s, html, pos = '+=0.05') => {
-    tl.call(() => { const f = $(s); f.querySelector('.v').innerHTML = html; f.classList.add('flash'); }, null, pos);
-    tl.call(() => $(s).classList.remove('flash'), null, '+=0.5');
+    tl.call(() => { const f = $(s); (f.querySelector('.v') || f).innerHTML = html; f.classList.add('flash'); }, null, pos);
+    tl.call(() => $(s).classList.remove('flash'), null, '+=0.45');
   };
   const toast = (tl, text, pos = '+=0.1') => {
     tl.call(() => { $('#t-toast-tx').textContent = text; }, null, pos);
@@ -1159,7 +1492,10 @@ footer b { color: var(--ink); font-weight: 600; }
     tl.call(() => setView(name), null, pos);
     tl.fromTo(`[data-view="${name}"]`, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .35 }, '<');
   };
+  const pop = el => { if (!reduce) gsap.fromTo(el, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .35, ease: 'power2.out' }); };
   const hold = (tl, d) => tl.to({}, { duration: d });
+  const open = (tl, scrim, panel, pos = '+=0.05') => tl.to(scrim, { autoAlpha: 1, duration: .3 }, pos).fromTo(panel, { autoAlpha: 0, scale: .96 }, { autoAlpha: 1, scale: 1, duration: .35, ease: 'back.out(1.4)' }, '<');
+  const close = (tl, scrim, panel, pos = '+=0.1') => tl.to(panel, { autoAlpha: 0, scale: .97, duration: .25 }, pos).to(scrim, { autoAlpha: 0, duration: .25 }, '<');
 
   function drawChart(tl, pos) {
     const ln = $('#t-ln'), L = Math.ceil(ln.getTotalLength());
@@ -1170,7 +1506,7 @@ footer b { color: var(--ink); font-weight: 600; }
   }
 
   const chapters = [
-    function dashboard() {
+    { t: 'Dashboard', c: 'The morning view: income against last month, cars out and back today, and what needs you.', f() {
       reset('dashboard');
       const tl = gsap.timeline();
       drawChart(tl, .2);
@@ -1178,7 +1514,7 @@ footer b { color: var(--ink); font-weight: 600; }
       tl.fromTo('.t-kpi', { y: 14, opacity: 0 }, { y: 0, opacity: 1, stagger: .08, duration: .5 }, .3);
       $$('.t-kpi b').forEach(b => count(tl, b, 0, +b.dataset.n, 1.2, v => (b.dataset.p || '') + Math.round(v) + (b.dataset.s || ''), .4));
       tl.fromTo('.t-now .t-tile, .t-now .t-need', { x: 12, opacity: 0 }, { x: 0, opacity: 1, stagger: .07, duration: .4 }, .5);
-      move(tl, '[data-seg="7"]', '+=0.3', .9); click(tl);
+      tap(tl, '[data-seg="7"]', '+=0.3', .9);
       tl.call(() => { $$('#t-seg span').forEach(s => s.classList.toggle('on', s.dataset.seg === '7')); $('#t-vs').textContent = 'vs the 7 days before'; $('#t-up').textContent = '↗ +8.1%'; });
       tl.to('#t-ln', { attr: { d: line(WEEK) }, duration: .8, ease: 'power2.inOut' })
         .to('#t-ar', { attr: { d: area(WEEK) }, duration: .8, ease: 'power2.inOut' }, '<')
@@ -1187,83 +1523,243 @@ footer b { color: var(--ink); font-weight: 600; }
       move(tl, '#t-need1', '+=0.5', .8);
       tl.call(() => $('#t-need1').classList.add('hov'));
       return hold(tl, 2);
-    },
-    function booking() {
+    } },
+    { t: 'Arrange the dashboard', c: 'Switch sections on or off and drag them into the order your team wants to see first.', f() {
+      reset('dashboard');
+      const tl = gsap.timeline();
+      tap(tl, '#d-cust', .3, .9);
+      tl.call(() => { $('[data-view="dashboard"]').classList.add('editing'); $('#d-cust').textContent = 'Save layout'; });
+      tap(tl, '#d-cash', '+=0.4', .7);
+      tl.call(() => $('#d-cash').classList.add('off'));
+      move(tl, '#d-tagb', '+=0.4', .8);
+      tl.to(cur, { scale: .85, duration: .12 }).call(() => $('#d-b').classList.add('lift'), null, '<');
+      tl.addLabel('drag');
+      tl.to('#d-b', { y: () => -($('#d-a').offsetHeight + 14), duration: .9, ease: 'power2.inOut' }, 'drag')
+        .to('#d-a', { y: () => $('#d-b').offsetHeight + 14, duration: .9, ease: 'power2.inOut' }, 'drag')
+        .to(cur, { y: () => gsap.getProperty(cur, 'y') - $('#d-a').offsetHeight - 14, duration: .9, ease: 'power2.inOut' }, 'drag');
+      tl.call(() => { const b = $('#d-blocks'); b.insertBefore($('#d-b'), $('#d-a')); gsap.set('#d-a, #d-b', { y: 0 }); $('#d-b').classList.remove('lift'); });
+      tl.to(cur, { scale: 1, duration: .12 });
+      tap(tl, '#d-cust', '+=0.4', .8);
+      tl.call(() => { $('[data-view="dashboard"]').classList.remove('editing'); $('#d-cust').textContent = 'Arrange sections'; });
+      toast(tl, 'Layout saved: key figures first, the Cash section switched off.');
+      return hold(tl, 2.4);
+    } },
+    { t: 'New booking', c: 'The phone number tidies itself, only free cars are offered, and the agreement link goes out on WhatsApp.', f() {
       reset('bookings');
       const tl = gsap.timeline();
       tl.fromTo('#t-table .t-tr:not(#t-newrow)', { opacity: 0, y: 8 }, { opacity: 1, y: 0, stagger: .05, duration: .35 }, 0);
-      move(tl, '#t-newbk', .3, .9); click(tl);
+      tap(tl, '#t-newbk', .3, .9);
       tl.to('#t-scrim', { autoAlpha: 1, duration: .3 }).to('#t-drawer', { xPercent: 0, duration: .5, ease: 'power3.out' }, '<');
-      move(tl, '#f-name', '+=0.1', .6); click(tl); type(tl, '#f-name', 'Nur Aisyah');
-      move(tl, '#f-phone', '+=0.15', .45); click(tl); type(tl, '#f-phone', '0003456789', '+=0.05', 14);
+      tap(tl, '#f-name', '+=0.1', .6); type(tl, '#f-name', 'Nur Aisyah');
+      tap(tl, '#f-phone', '+=0.15', .45); type(tl, '#f-phone', '0003456789', '+=0.05', 14);
       fill(tl, '#f-phone', '+60 00-345 6789', '+=0.25');
-      move(tl, '#f-car', '+=0.1', .45); click(tl);
+      tap(tl, '#f-car', '+=0.1', .45);
       tl.fromTo('#f-menu', { autoAlpha: 0, y: -4 }, { autoAlpha: 1, y: 0, duration: .25 });
       move(tl, '#f-opt', '+=0.15', .45);
       tl.call(() => $('#f-opt').classList.add('hov'));
       click(tl, '+=0.15');
       tl.to('#f-menu', { autoAlpha: 0, duration: .2 });
       fill(tl, '#f-car', 'Honda City · <span class="mono">VFR 2207</span>', '<');
-      move(tl, '#f-from', '+=0.15', .5); click(tl);
+      tap(tl, '#f-from', '+=0.15', .5);
       fill(tl, '#f-from', '3 Nov, 10:00 AM');
       fill(tl, '#f-to', '5 Nov, 10:00 AM', '+=0.05');
       count(tl, $('#f-total'), 0, 360, .6, rm, '<');
-      move(tl, '#f-place', '+=0.2', .45); click(tl); type(tl, '#f-place', 'KLIA Terminal 1, arrival hall', '+=0.05', 26);
-      move(tl, '#f-save', '+=0.2', .6); click(tl);
+      tap(tl, '#f-place', '+=0.2', .45); type(tl, '#f-place', 'KLIA Terminal 1, arrival hall', '+=0.05', 26);
+      tap(tl, '#f-save', '+=0.2', .6);
       tl.to('#t-drawer', { xPercent: 105, duration: .45, ease: 'power3.in' }, '+=0.1').to('#t-scrim', { autoAlpha: 0, duration: .3 }, '<');
       tl.fromTo('#t-newrow', { height: 0, opacity: 0 }, { height: 50, opacity: 1, duration: .5, ease: 'power2.out' });
       tl.call(() => { $('#t-bcount').textContent = '103 bookings'; }, null, '<');
       toast(tl, 'KLT-00488 saved. The agreement link went to Nur Aisyah on WhatsApp.');
       return hold(tl, 2.4);
-    },
-    function payment() {
-      reset('bookings', 'shown');
+    } },
+    { t: 'Invoice and documents', c: 'Each booking keeps its agreement, invoice and receipts. Generate the invoice and copy a link to send.', f() {
+      reset('bookings', { newRow: 'shown' });
       const tl = gsap.timeline();
-      move(tl, '#t-newrow .amt', .2, 1); click(tl);
-      tl.to('#t-scrim', { autoAlpha: 1, duration: .3 }).fromTo('#t-dlg', { autoAlpha: 0, scale: .96 }, { autoAlpha: 1, scale: 1, duration: .35, ease: 'back.out(1.4)' }, '<');
+      move(tl, '#t-newrow', .3, .9);
+      tl.call(() => $('#t-newrow').classList.add('hov'));
+      click(tl, '+=0.1');
+      tl.to('#t-scrim', { autoAlpha: 1, duration: .3 }).to('#t-bk', { xPercent: 0, duration: .5, ease: 'power3.out' }, '<');
+      tl.call(() => $('#t-newrow').classList.remove('hov'));
+      tap(tl, '#bk-t3', '+=0.4', .7);
+      tl.call(() => { $('#bk-t1').classList.remove('on'); $('#bk-t3').classList.add('on'); $('#bk-p1').classList.remove('on'); $('#bk-p3').classList.add('on'); });
+      tl.fromTo('#bk-p3 .t-doc', { opacity: 0, x: 10 }, { opacity: 1, x: 0, stagger: .08, duration: .3 });
+      tap(tl, '#bk-gen', '+=0.3', .7);
+      tl.call(() => { $('#bk-gen').innerHTML = '<span class="t-spin" style="border-top-color:#fff"></span>'; });
+      tl.call(() => { $('#bk-inv').classList.add('new'); $('#bk-invt').textContent = 'Invoice INV-2026-00081'; $('#bk-invs').textContent = 'RM 560.00 · made just now'; $('#bk-gen').textContent = 'Copy link'; }, null, '+=0.7');
+      tl.fromTo('#t-inv', { autoAlpha: 0, scale: .92, y: 10 }, { autoAlpha: 1, scale: 1, y: 0, duration: .45, ease: 'back.out(1.4)' });
+      tl.fromTo('#t-inv .rw, #t-inv .tt', { opacity: 0 }, { opacity: 1, stagger: .1, duration: .25 });
+      tap(tl, '#bk-gen', '+=0.6', .6);
+      toast(tl, 'Invoice link copied. It opens the PDF for 14 days.');
+      return hold(tl, 2.4);
+    } },
+    { t: 'Record payment', c: 'One bank slip, several items. Each item gets its own receipt and the booking shows what is still due.', f() {
+      reset('bookings', { newRow: 'shown' });
+      const tl = gsap.timeline();
+      tap(tl, '#t-newrow .amt', .2, 1);
+      open(tl, '#t-scrim', '#t-dlg');
       tl.fromTo('#p-scan', { top: -26, opacity: 1 }, { top: 128, duration: 1.1, ease: 'power1.inOut' }, '+=0.1').to('#p-scan', { opacity: 0, duration: .2 });
       type(tl, '#p-a1', '360.00', '-=0.4', 12);
-      move(tl, '#p-add', '+=0.2', .6); click(tl);
+      tap(tl, '#p-add', '+=0.2', .6);
       tl.fromTo('#p-row2', { height: 0, opacity: 0 }, { height: 'auto', opacity: 1, duration: .35 });
-      move(tl, '#p-a2', '+=0.1', .5); click(tl); type(tl, '#p-a2', '200.00', '+=0.05', 12);
+      tap(tl, '#p-a2', '+=0.1', .5); type(tl, '#p-a2', '200.00', '+=0.05', 12);
       count(tl, $('#p-total'), 0, 560, .6, rm);
-      move(tl, '#p-save', '+=0.2', .6); click(tl);
-      tl.to('#t-dlg', { autoAlpha: 0, scale: .97, duration: .25 }, '+=0.1').to('#t-scrim', { autoAlpha: 0, duration: .25 }, '<');
+      tap(tl, '#p-save', '+=0.2', .6);
+      close(tl, '#t-scrim', '#t-dlg');
       tl.call(() => {
         const nr = $('#t-newrow');
         nr.querySelector('.st .tc:last-child').outerHTML = chip('ok:Deposit Received');
         const due = nr.querySelector('.amt small'); due.textContent = 'Paid in full'; due.classList.add('paid');
         nr.querySelector('.t-paybar i').classList.add('full');
-        gsap.fromTo(nr.querySelector('.st .tc:last-child'), { scale: .7 }, { scale: 1, duration: .4, ease: 'back.out(2)' });
+        if (!reduce) gsap.fromTo(nr.querySelector('.st .tc:last-child'), { scale: .7 }, { scale: 1, duration: .4, ease: 'back.out(2)' });
       });
       tl.to('#t-newrow .t-paybar i', { width: '100%', duration: .6, ease: 'power2.out' });
       toast(tl, 'Receipts RCP-2026-00232 and 00233 are ready. Link copied for WhatsApp.');
       return hold(tl, 2.4);
-    },
-    function reports() {
-      reset('bookings', 'paid');
-      gsap.set('.t-prev', { opacity: 0 }); gsap.set('#r-bars i', { scaleX: 0 });
-      const tl = gsap.timeline();
-      move(tl, '[data-nav="reports"]', .2, 1); click(tl);
-      goView(tl, 'reports');
-      tl.fromTo('.t-rc', { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: .05, duration: .3 }, '<');
-      move(tl, '#r-profit', '+=0.2', .8); click(tl);
-      tl.call(() => $('#r-profit').classList.add('sel'));
-      tl.fromTo('.t-prev', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: .4 });
-      tl.addLabel('bars');
-      tl.to('#r-bars i', { scaleX: 1, stagger: .1, duration: .7, ease: 'power3.out' }, 'bars');
-      $$('#r-bars .v').forEach((v, i) => count(tl, v, 0, CARS[i][2], .7, x => rm(x, 0), 'bars+=' + i * .1));
-      count(tl, $('#r-inc'), 0, 14280, 1, x => rm(x, 0), 'bars');
-      count(tl, $('#r-cost'), 0, 4770, 1, x => rm(x, 0), 'bars');
-      count(tl, $('#r-pro'), 0, 9510, 1, x => rm(x, 0), 'bars');
-      move(tl, '#r-xls', '+=0.3', .7); click(tl);
-      toast(tl, 'profit-by-car-2026-10.xlsx is ready: centred columns, in the Kilat colours.');
-      return hold(tl, 2.4);
-    },
-    function colours() {
+    } },
+    { t: 'Expenses tracker', c: 'Add the receipt photo, split it into kinds and cars, and the month adds up by itself.', f() {
       reset('dashboard');
       const tl = gsap.timeline();
-      move(tl, '[data-nav="settings"]', .2, 1); click(tl);
+      tap(tl, '[data-nav="expenses"]', .2, 1);
+      goView(tl, 'expenses');
+      tl.fromTo('#e-table .t-tr:not([id])', { opacity: 0, y: 8 }, { opacity: 1, y: 0, stagger: .05, duration: .3 }, '<');
+      tap(tl, '#e-add', '+=0.3', .8);
+      open(tl, '#e-scrim', '#e-dlg');
+      tl.fromTo('#e-scan', { top: -26, opacity: 1 }, { top: 150, duration: 1.1, ease: 'power1.inOut' }, '+=0.1').to('#e-scan', { opacity: 0, duration: .2 });
+      tl.call(() => { $('#e-read').textContent = 'Read from the receipt: RON95 RM 120.00, car wash RM 25.00'; }, null, '-=0.3');
+      fill(tl, '#e-k1', 'Fuel'); fill(tl, '#e-a1', '120.00', '<');
+      tap(tl, '#e-c1', '+=0.2', .5); fill(tl, '#e-c1', '<span class="mono">VFR 2207</span>');
+      tap(tl, '#e-more', '+=0.2', .6);
+      tl.fromTo('#e-row2', { height: 0, opacity: 0 }, { height: 'auto', opacity: 1, duration: .35 });
+      fill(tl, '#e-k2', 'Car wash'); fill(tl, '#e-a2', '25.00', '<'); fill(tl, '#e-c2', '<span class="mono">VFR 2207</span>', '<');
+      count(tl, $('#e-sum'), 0, 145, .6, rm);
+      tap(tl, '#e-save', '+=0.3', .6);
+      close(tl, '#e-scrim', '#e-dlg');
+      tl.to('#e-new0, #e-new1', { height: 42, opacity: 1, stagger: .12, duration: .4, ease: 'power2.out' });
+      count(tl, $('#e-tot'), 4625, 4770, .8, v => rm(v, 0), '<');
+      count(tl, $('#e-fuel'), 1240, 1360, .8, v => rm(v, 0), '<');
+      count(tl, $('#e-wash'), 325, 350, .8, v => rm(v, 0), '<');
+      toast(tl, 'Saved with the receipt photo: RM 145.00 across Fuel and Car wash.');
+      return hold(tl, 2.4);
+    } },
+    { t: 'Reports', c: 'Bookings and income, money in, profit by car, expenses and more. Preview first, then Excel or PDF.', f() {
+      reset('dashboard');
+      gsap.set('.t-prev', { opacity: 0 });
+      const tl = gsap.timeline();
+      const bars = $$('#r-bars i'), vals = $$('#r-bars .v');
+      const show = k => {
+        tl.call(() => { showReport(k); gsap.set(bars, { scaleX: 0 }); });
+        tl.fromTo('.t-prev', { opacity: .4 }, { opacity: 1, duration: .3 });
+        tl.to(bars, { scaleX: 1, stagger: .08, duration: .6, ease: 'power3.out' }, '<');
+        REPORTS[k].rows.forEach((d, i) => count(tl, vals[i], 0, d[2], .6, x => rm(x, 0), '<' + (i ? .08 : 0)));
+      };
+      tap(tl, '[data-nav="reports"]', .2, 1);
+      goView(tl, 'reports');
+      tl.fromTo('.t-rc', { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: .05, duration: .3 }, '<');
+      [0, 1, 3, 2].forEach((k, i) => { tap(tl, '#r-' + k, i ? '+=0.9' : '+=0.2', .7); show(k); });
+      tap(tl, '#r-xls', '+=0.6', .7);
+      toast(tl, 'profit-by-car-2026-10.xlsx is ready: centred columns, in the Kilat colours.');
+      return hold(tl, 2.4);
+    } },
+    { t: 'Staff access', c: 'Switch money off for a field agent, then see the dashboard exactly as they will.', f() {
+      reset('dashboard');
+      const tl = gsap.timeline();
+      tap(tl, '[data-nav="team"]', .2, 1);
+      goView(tl, 'team');
+      tap(tl, '#m-zul', '+=0.3', .8);
+      tl.call(() => { $$('.t-person').forEach(p => p.classList.toggle('on', p.id === 'm-zul')); $('#m-who').textContent = 'Zulkifli K. · Field agent'; ['#m-pay', '#m-rep'].forEach(s => $(s).classList.remove('on')); });
+      tl.fromTo('#m-perms .t-perm', { opacity: .3 }, { opacity: 1, stagger: .05, duration: .25, immediateRender: false });
+      tap(tl, '#m-money', '+=0.5', .7);
+      tl.call(() => $('#m-money').classList.remove('on'));
+      toast(tl, 'Saved. The change is written to the activity log.', '+=0.2');
+      tap(tl, '#m-as', '+=0.8', .7);
+      tl.to('#t-toast', { autoAlpha: 0, duration: .2 });
+      tl.call(() => asAgent(true));
+      goView(tl, 'dashboard', '<');
+      move(tl, '.t-lock b', '+=0.6', .9);
+      return hold(tl, 2.6);
+    } },
+    { t: 'Summons', c: 'Upload the notice. It is read, matched to the renter who had the car that day, and charged on WhatsApp.', f() {
+      reset('dashboard');
+      const tl = gsap.timeline();
+      const msg = 'Hi Hafiz, a JPJ speeding summons came in for WXK 8823 on 14 Oct at 9:42 PM, while the car was booked to you (KLT-00452). Amount with handling: RM 170.00. Pay here: kilat.orbiquefms.com/pay/s88412';
+      tap(tl, '[data-nav="summons"]', .2, 1);
+      goView(tl, 'summons');
+      tap(tl, '#s-up', '+=0.3', .8);
+      tl.set('#s-pic', { x: () => stage.offsetWidth + 10, y: 120, rotation: 10, autoAlpha: 1 }, '+=0.1');
+      tl.to('#s-pic', { x: () => P('#s-table').x - 56, y: () => P('#s-table').y - 80, rotation: -3, duration: 1, ease: 'power2.out' });
+      tl.to('#s-pic', { scale: .5, autoAlpha: 0, duration: .3 }, '+=0.3');
+      tl.to('#s-new', { height: 50, opacity: 1, duration: .4 }, '<');
+      fill(tl, '#s-n1', '<b>JPJ speeding</b><small>JPJ/2026/88412 · 14 Oct, 9:42 PM</small>', '+=0.9');
+      fill(tl, '#s-n2', '<span class="t-plate">WXK 8823</span>', '+=0.15');
+      fill(tl, '#s-n3', '<small style="color:var(--ink)">KLT-00452 · Hafiz R.</small><small>Had the car 13 to 15 Oct</small>', '+=0.15');
+      fill(tl, '#s-n5', '<b>RM 150</b>', '+=0.15');
+      fill(tl, '#s-n4', chip('b:Ready to charge'), '+=0.15');
+      count(tl, $('#s-ready'), 1, 2, .3, v => String(Math.round(v)), '<');
+      tap(tl, '#s-n4', '+=0.4', .7);
+      open(tl, '#s-scrim', '#s-dlg');
+      const o = { n: 0 };
+      tl.to(o, { n: msg.length, duration: 1.6, ease: 'none', onUpdate: () => { $('#s-msg').textContent = msg.slice(0, Math.round(o.n)); } });
+      tap(tl, '#s-send', '+=0.3', .6);
+      close(tl, '#s-scrim', '#s-dlg');
+      fill(tl, '#s-n4', chip('warn:Charged'));
+      toast(tl, 'Sent to Hafiz with the notice picture and a payment link.');
+      return hold(tl, 2.4);
+    } },
+    { t: 'Customers', c: 'Find anyone by phone number. VIP, be careful and blacklist flags stay with the customer.', f() {
+      reset('dashboard');
+      const tl = gsap.timeline();
+      const rows = $$('#c-table .t-tr:not(.th)');
+      const only = (test, pos = '+=0.1') => {
+        tl.to(rows.filter(r => !test(r)), { height: 0, opacity: 0, duration: .35, ease: 'power2.inOut' }, pos);
+        tl.to(rows.filter(test), { height: 48, opacity: 1, duration: .35, ease: 'power2.inOut' }, '<');
+      };
+      tap(tl, '[data-nav="customers"]', .2, 1);
+      goView(tl, 'customers');
+      tl.fromTo(rows, { opacity: 0, y: 6 }, { opacity: 1, y: 0, stagger: .05, duration: .3 }, '<');
+      tap(tl, '#c-search', '+=0.3', .8);
+      tl.call(() => { $('#c-search').classList.add('focus'); $('#c-search .v').textContent = ''; });
+      const o = { n: 0 }, q = '00-837';
+      tl.to(o, { n: q.length, duration: .6, ease: 'none', onUpdate: () => { $('#c-search .v').textContent = q.slice(0, Math.round(o.n)); } });
+      only(r => r.dataset.ph.includes('837'));
+      tl.call(() => $('#c-search').classList.remove('focus'), null, '+=0.6');
+      tap(tl, '#c-care', '+=0.6', .8);
+      tl.call(() => { $$('.t-flag').forEach(f => f.classList.toggle('sel', f.id === 'c-care')); $('#c-search .v').innerHTML = '<span class="ph">Search: name, IC or phone number</span>'; });
+      only(r => r.dataset.f.includes('care'));
+      tap(tl, '#c-black', '+=0.9', .6);
+      tl.call(() => $$('.t-flag').forEach(f => f.classList.toggle('sel', f.id === 'c-black')));
+      only(r => r.dataset.f.includes('black'));
+      tap(tl, '#c-vip', '+=0.9', .6);
+      tl.call(() => $$('.t-flag').forEach(f => f.classList.toggle('sel', f.id === 'c-vip')));
+      only(r => r.dataset.f.includes('vip'));
+      return hold(tl, 2.2);
+    } },
+    { t: 'WhatsApp assistant', c: 'Enquiries are answered with your free cars and prices, then handed to staff as a lead with a task.', f() {
+      reset('dashboard');
+      const tl = gsap.timeline();
+      const say = (cls, html, pos = '+=0.5') => tl.call(() => { const m = document.createElement('div'); m.className = 't-msg ' + cls; m.innerHTML = html; $('#w-convo').append(m); pop(m); }, null, pos);
+      const think = (html, pos) => {
+        tl.call(() => { const m = document.createElement('div'); m.className = 't-msg out typing'; m.id = 'w-typing'; m.textContent = 'Typing…'; $('#w-convo').append(m); }, null, pos);
+        tl.call(() => { const m = $('#w-typing'); m.className = 't-msg out'; m.removeAttribute('id'); m.innerHTML = html; pop(m); }, null, '+=0.9');
+      };
+      tap(tl, '[data-nav="whatsapp"]', .2, 1);
+      goView(tl, 'whatsapp');
+      tl.fromTo('#w-new', { x: -8 }, { x: 0, duration: .4, ease: 'elastic.out(1.2, .4)' }, '+=0.2');
+      tap(tl, '#w-new', '+=0.2', .8);
+      tl.call(() => { $('#w-new').classList.add('on'); $('#w-badge').style.display = 'none'; });
+      say('in', 'Hi, do you have a car 3 to 5 Nov? Pick-up at KLIA.', '+=0.1');
+      think('Hi Amir! These are free for 3 to 5 Nov: Honda City RM 180 a day, Perodua Myvi RM 140, Proton X50 RM 220. KLIA pick-up is RM 60.<div class="t-cat"><span><i></i>Honda City</span><span><i></i>Myvi</span><span><i></i>X50</span></div><small>Booking assistant</small>', '+=0.4');
+      say('in', 'The City please 🙏', '+=1');
+      tl.call(() => { $('#w-car').textContent = 'Honda City'; $('#w-to').textContent = 'Harith A.'; const t = $('#w-task'); t.className = 'tc ok'; t.textContent = 'Task: confirm and send link'; });
+      tl.fromTo('#w-lead .t-kv', { backgroundColor: 'rgba(37,99,235,.15)' }, { backgroundColor: 'rgba(37,99,235,0)', duration: .8, stagger: .05, immediateRender: false });
+      think('Great choice. Harith from our team will confirm and send your booking link shortly.<small>Booking assistant</small>', '+=0.3');
+      tap(tl, '#w-book', '+=0.6', .8);
+      toast(tl, "The booking form opened with Amir's car, dates and KLIA pick-up filled in.");
+      return hold(tl, 2.4);
+    } },
+    { t: 'Your colours', c: "Drop in a logo. Its colours are read and the whole app, booking form and invoices take them on.", f() {
+      reset('dashboard');
+      const tl = gsap.timeline();
+      tap(tl, '[data-nav="settings"]', .2, 1);
       goView(tl, 'settings');
       tl.set('#b-file', { x: () => stage.offsetWidth + 10, y: 150, rotation: 14, autoAlpha: 1 }, '+=0.2');
       tl.set(cur, { x: () => stage.offsetWidth + 40, y: 190 }, '<');
@@ -1276,32 +1772,40 @@ footer b { color: var(--ink); font-weight: 600; }
       tl.to('#b-sw .t-sw i', { backgroundColor: i => SWATCH[i], borderColor: i => SWATCH[i], stagger: .15, duration: .35 }, '+=0.5');
       tl.call(() => { $('#b-read').textContent = '4 colours found in your logo'; $$('#b-sw .t-sw span').forEach((s, i) => { s.textContent = SWATCH[i].toUpperCase(); }); });
       tl.to('.t-mini', { '--b': PADI, duration: .6 }, '<');
-      move(tl, '#b-apply', '+=0.4', .7); click(tl);
+      tap(tl, '#b-apply', '+=0.4', .7);
       tl.to(stage, { '--b': PADI, duration: 1.2, ease: 'power2.inOut' });
       tl.call(() => setBrand(true), null, '<0.4');
       toast(tl, 'Padi Emas colours are on the app, booking form, agreement and invoices.', '<0.3');
-      move(tl, '[data-nav="dashboard"]', '+=0.8', .9); click(tl);
+      tap(tl, '[data-nav="dashboard"]', '+=0.8', .9);
       goView(tl, 'dashboard');
       drawChart(tl, '+=0.05');
       return hold(tl, 2.2);
-    }
+    } }
   ];
 
-  // chapter picker, pause, and playing only while the window is on screen
+  // chapter picker, caption, pause, and playing only while the window is on screen
+  $('#t-chaps').innerHTML = chapters.map((c, i) => `<button class="t-chap" role="tab" aria-selected="false"><span class="n">${String(i + 1).padStart(2, '0')}</span><b>${c.t}</b><i class="pg"></i></button>`).join('');
   const tabs = $$('.t-chap'), bars = tabs.map(t => t.querySelector('.pg'));
   let tl = null, idx = 0, playing = !reduce, inView = false, started = false;
+  function select(i) {
+    tabs.forEach((t, k) => t.setAttribute('aria-selected', String(k === i)));
+    $('#t-cap').innerHTML = `<b>${chapters[i].t}.</b> ${chapters[i].c}`;
+  }
   function play(i) {
     if (tl) tl.kill();
-    idx = i;
-    tabs.forEach((t, k) => t.setAttribute('aria-selected', String(k === i)));
+    idx = i; select(i);
     gsap.set(bars, { scaleX: 0 });
-    tl = chapters[i]().timeScale(1.25);
+    tl = chapters[i].f().timeScale(1.2);
     if (reduce) { tl.progress(1, false); gsap.set(bars[i], { scaleX: 1 }); return; }
     tl.eventCallback('onUpdate', () => gsap.set(bars[i], { scaleX: tl.progress() }));
     tl.eventCallback('onComplete', () => play((i + 1) % chapters.length));
     if (!playing || !inView) tl.pause();
   }
-  tabs.forEach((t, i) => t.addEventListener('click', () => { playing = !reduce; setPauseIcon(); started = true; play(i); }));
+  select(0);
+  tabs.forEach((t, i) => t.addEventListener('click', () => {
+    playing = !reduce; setPauseIcon(); started = true; play(i);
+    const r = fit.getBoundingClientRect(); if (r.top < 0 || r.bottom > innerHeight) fit.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  }));
   const pauseBtn = $('#t-pause');
   function setPauseIcon() {
     pauseBtn.setAttribute('aria-label', playing ? 'Pause the tour' : 'Play the tour');
@@ -1339,7 +1843,7 @@ footer b { color: var(--ink); font-weight: 600; }
 
   // the rest of the page settles in as it scrolls into view
   gsap.fromTo('.hero-copy > *', { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: .8, stagger: .08, ease: 'power3.out' });
-  gsap.utils.toArray('.tour-head, .feature .copy, .feature .window, .proof .wrap > *, .demo .copy, form.req').forEach(el => {
+  gsap.utils.toArray('.tour-head, .feature .copy, .feature .window, .custom .copy, .custom-steps li, .proof .wrap > *, .demo .copy, form.req').forEach(el => {
     gsap.fromTo(el, { y: 28, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 90%', once: true } });
   });
   gsap.set('.more-grid > div', { opacity: 0, y: 18 });
