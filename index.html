@@ -113,7 +113,7 @@ nav.links a:not(.btn):hover { color: var(--ink); }
 .bar { position: absolute; top: 9px; bottom: 9px; border-radius: 7px; display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; transform-origin: left center; }
 .bar small { font-family: var(--f-mono); font-weight: 400; opacity: .8; }
 .bar.booked { background: var(--teal-soft); color: var(--teal); border: 1px solid color-mix(in srgb, var(--teal) 35%, transparent); }
-.bar.out { background: var(--gold-soft); color: color-mix(in srgb, var(--gold) 70%, var(--ink)); border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); }
+.bar.out { background: var(--gold-soft); color: color-mix(in srgb, var(--gold) 55%, var(--ink)); border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); }
 .bar.service { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--hatch) 6px 7px); color: var(--muted); border: 1px solid var(--hatch); }
 .bar.new { background: var(--teal); color: var(--surface); }
 .today-line { position: absolute; top: 46px; bottom: 0; width: 2px; background: var(--gold); left: calc(168px + (100% - 168px) / 7 * 2.45); }
@@ -240,7 +240,7 @@ section.feature { padding-block: 72px; border-top: 1px solid var(--rule); }
 :root .proof { --pin: var(--paper); }
 .proof .wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center; }
 .proof h2 { color: var(--paper); font-size: clamp(26px, 3vw, 36px); max-width: 26ch; }
-.proof p { color: color-mix(in srgb, var(--paper) 78%, transparent); max-width: 60ch; margin-top: 12px; }
+.proof p { color: color-mix(in srgb, currentColor 80%, transparent); max-width: 60ch; margin-top: 12px; }
 .proof .btn-primary { background: var(--gold); color: #18263a; }
 @media (max-width: 760px) { .proof .wrap { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .proof { background: #1c2d45; color: var(--ink); } :root:not([data-theme="light"]) .proof h2 { color: var(--ink); } }
@@ -275,7 +275,7 @@ footer b { color: var(--ink); font-weight: 600; }
 .tour-win .window-bar .addr span { color: var(--ink); }
 .tour-fit { position: relative; overflow: hidden; height: 560px; }
 .stage, .t-mini {
-  --b-soft: color-mix(in srgb, var(--b) 12%, var(--surface)); --b-ink: color-mix(in srgb, var(--b) 78%, var(--ink));
+  --b-soft: color-mix(in srgb, var(--b) 12%, var(--surface)); --b-ink: color-mix(in srgb, var(--b) 62%, var(--ink));
 }
 .stage {
   --b: #2563eb;
@@ -311,7 +311,7 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-sub { font-size: 12px; color: var(--muted); }
 .t-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--b); color: #fff; border-radius: 8px; padding: 7px 12px; font-weight: 600; font-size: 12px; white-space: nowrap; }
 .t-btn.ghost { background: var(--surface); color: var(--b-ink); border: 1px solid color-mix(in srgb, var(--b) 45%, var(--rule)); }
-.t-btn.wa { background: #1f9d55; }
+.t-btn.wa { background: #15803d; }
 .t-card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; }
 .tc { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 6px; border: 1px solid; white-space: nowrap; }
 .tc.ok { color: var(--teal); background: var(--teal-soft); border-color: color-mix(in srgb, var(--teal) 30%, transparent); }
@@ -489,7 +489,7 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-flag em { font-style: normal; font-size: 18px; font-weight: 600; grid-row: span 2; }
 .t-flag b { font-size: 12px; font-weight: 600; } .t-flag span { font-size: 10px; color: var(--muted); }
 .t-flag.sel { background: var(--b-soft); box-shadow: 0 0 0 1px var(--b); }
-.t-flag.vip em { color: #0e7490; } .t-flag.care em { color: color-mix(in srgb, var(--gold) 60%, var(--ink)); } .t-flag.black em { color: var(--red); } .t-flag.rep em { color: var(--teal); }
+.t-flag.vip em { color: color-mix(in srgb, #0e7490 70%, var(--ink)); } .t-flag.care em { color: color-mix(in srgb, var(--gold) 60%, var(--ink)); } .t-flag.black em { color: var(--red); } .t-flag.rep em { color: var(--teal); }
 .t-sbox { border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px; width: 300px; margin-bottom: 10px; font-size: 12.5px; }
 .t-sbox .ph { color: var(--muted); }
 .t-sbox.focus { border-color: var(--b); box-shadow: 0 0 0 3px var(--b-soft); }
@@ -499,10 +499,10 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-chats { padding: 6px; display: grid; align-content: start; gap: 2px; }
 .t-chat { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 7px; border-radius: 8px; align-items: center; }
 .t-chat .av { width: 30px; height: 30px; border-radius: 50%; background: var(--paper); border: 1px solid var(--rule); display: grid; place-items: center; font-size: 10.5px; font-weight: 600; color: var(--muted); }
-.t-chat b { font-size: 12px; display: flex; justify-content: space-between; font-weight: 600; } .t-chat b i { font-style: normal; background: #1f9d55; color: #fff; font-size: 9.5px; border-radius: 999px; padding: 0 6px; }
+.t-chat b { font-size: 12px; display: flex; justify-content: space-between; font-weight: 600; } .t-chat b i { font-style: normal; background: #15803d; color: #fff; font-size: 9.5px; border-radius: 999px; padding: 0 6px; }
 .t-chat small { font-size: 10.5px; color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .t-chat.on { background: var(--b-soft); }
-.t-convo { padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; background: color-mix(in srgb, #1f9d55 5%, var(--surface)); }
+.t-convo { padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; background: color-mix(in srgb, #15803d 5%, var(--surface)); }
 .t-msg { max-width: 82%; padding: 7px 10px; border-radius: 10px; font-size: 12px; line-height: 1.4; }
 .t-msg.in { background: var(--surface); border: 1px solid var(--rule); align-self: flex-start; }
 .t-msg.out { background: #dcf3e4; color: #10361f; align-self: flex-end; }
@@ -534,7 +534,7 @@ footer b { color: var(--ink); font-weight: 600; }
 .t-drop { height: 210px; border: 2px dashed var(--rule); border-radius: 12px; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: 11.5px; position: relative; background: var(--surface); transition: border-color .2s; }
 .t-drop.over { border-color: var(--b); }
 .t-drop .newlogo { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 8px; opacity: 0; }
-.t-drop .newlogo b { font-size: 14px; letter-spacing: .14em; color: #1f5f3f; }
+.t-drop .newlogo b { font-size: 14px; letter-spacing: .14em; color: color-mix(in srgb, #1f5f3f 60%, var(--ink)); }
 .t-file { position: absolute; width: 74px; height: 88px; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: var(--shadow); display: grid; place-items: center; align-content: center; gap: 4px; font: 600 9px var(--f-mono); color: var(--muted); left: 0; top: 0; opacity: 0; z-index: 4; }
 .t-swrow { display: flex; gap: 10px; margin: 8px 0 14px; }
 .t-sw { width: 54px; display: grid; gap: 4px; font: 500 9.5px var(--f-mono); color: var(--muted); text-align: center; }
@@ -823,7 +823,7 @@ footer b { color: var(--ink); font-weight: 600; }
                   <div class="t-dlg" id="e-dlg" style="width:460px;margin-left:-230px">
                     <div class="t-hrow"><h5>Add expense</h5><span class="t-sub">Paid by Harith · cash</span></div>
                     <div class="t-dgrid" style="grid-template-columns:110px minmax(0,1fr)">
-                      <div class="t-receipt"><span class="sc" id="e-scan"></span><b>PETROL STATION</b><span style="text-align:center">29/10/2026 08:41</span><span class="rr"><span>RON95 41.3L</span><span>120.00</span></span><span class="rr"><span>CAR WASH</span><span>25.00</span></span><span class="rr" style="border-top:1px dashed #999;padding-top:3px"><b style="text-align:left">TOTAL</b><b>145.00</b></span><span style="text-align:center;color:#777">THANK YOU</span></div>
+                      <div class="t-receipt"><span class="sc" id="e-scan"></span><b>PETROL STATION</b><span style="text-align:center">29/10/2026 08:41</span><span class="rr"><span>RON95 41.3L</span><span>120.00</span></span><span class="rr"><span>CAR WASH</span><span>25.00</span></span><span class="rr" style="border-top:1px dashed #999;padding-top:3px"><b style="text-align:left">TOTAL</b><b>145.00</b></span><span style="text-align:center;color:#555">THANK YOU</span></div>
                       <div class="t-items">
                         <div class="t-item three"><div class="t-f"><label>Kind</label><div class="t-in" id="e-k1"><span class="v"></span></div></div><div class="t-f"><label>Car</label><div class="t-in" id="e-c1"><span class="v"></span></div></div><div class="t-f"><label>RM</label><div class="t-in" id="e-a1"><span class="v mono"></span></div></div></div>
                         <div class="t-item three" id="e-row2"><div class="t-f"><label>Kind</label><div class="t-in" id="e-k2"><span class="v"></span></div></div><div class="t-f"><label>Car</label><div class="t-in" id="e-c2"><span class="v"></span></div></div><div class="t-f"><label>RM</label><div class="t-in" id="e-a2"><span class="v mono"></span></div></div></div>
