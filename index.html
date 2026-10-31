@@ -69,31 +69,18 @@ nav.links a:not(.btn):hover { color: var(--ink); }
 @media (max-width: 860px) { nav.links a:not(.btn) { display: none; } }
 /* soundtrack: on by default, starts on the visitor's first tap or key press (browsers block sound before that) */
 .sndw { position: relative; display: inline-flex; }
-.snd, .snd-more { display: inline-flex; align-items: center; height: 40px; border: 1px solid var(--rule); background: var(--surface); color: var(--navy); font: 600 14px/1 var(--f-body); cursor: pointer; transition: border-color .16s, background-color .16s; }
-.snd { gap: 8px; padding: 0 12px 0 12px; border-radius: 999px 0 0 999px; border-right-width: 0; }
-.snd-more { padding: 0 11px 0 9px; border-radius: 0 999px 999px 0; border-left: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
-.snd-more svg { width: 12px; height: 12px; transition: transform .2s; }
-.snd-more[aria-expanded="true"] svg { transform: rotate(180deg); }
-.snd:hover, .snd-more:hover { background: color-mix(in srgb, var(--navy) 6%, var(--surface)); }
+.snd { display: inline-flex; align-items: center; height: 40px; border: 1px solid var(--rule); background: var(--surface); color: var(--navy); font: 600 14px/1 var(--f-body); cursor: pointer; transition: border-color .16s, background-color .16s; }
+.snd { gap: 8px; padding: 0 14px 0 12px; border-radius: 999px; }
+.snd:hover { background: color-mix(in srgb, var(--navy) 6%, var(--surface)); }
 .snd .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
 .snd .eq i { width: 3px; height: 6px; border-radius: 1px; background: currentColor; opacity: .5; }
 .snd .eq i:nth-child(2) { height: 11px; } .snd .eq i:nth-child(3) { height: 8px; } .snd .eq i:nth-child(4) { height: 13px; }
 .snd[aria-pressed="true"] .eq i { opacity: 1; }
-.sndw.live .snd, .sndw.live .snd-more { background: var(--navy); color: #fff; border-color: var(--navy); }
-.sndw.live .snd-more { border-left-color: rgba(255,255,255,.3); }
+.sndw.live .snd { background: var(--navy); color: #fff; border-color: var(--navy); }
 .sndw.live .eq i { animation: eq .5s ease-in-out infinite alternate; }
 .sndw.live .eq i:nth-child(2) { animation-delay: -.2s; } .sndw.live .eq i:nth-child(3) { animation-delay: -.35s; } .sndw.live .eq i:nth-child(4) { animation-delay: -.1s; }
 @keyframes eq { from { height: 3px; } to { height: 14px; } }
-.snd-menu { position: absolute; right: 0; top: calc(100% + 8px); width: 248px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; z-index: 20; }
-.snd-menu[hidden] { display: none; }
-.snd-menu p { font-size: 11.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 6px 10px 4px; }
-.snd-menu button { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 8px 10px; font: inherit; color: var(--ink); cursor: pointer; }
-.snd-menu button:hover { background: var(--paper); }
-.snd-menu button::before { content: ""; grid-row: span 2; width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--rule); }
-.snd-menu button[aria-checked="true"]::before { border: 4px solid var(--teal); }
-.snd-menu b { font-size: 14.5px; font-weight: 600; }
-.snd-menu span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
-@media (max-width: 520px) { .snd .lbl { display: none; } .snd { padding: 0 9px 0 11px; } .snd-more { padding: 0 9px 0 7px; } nav.links { gap: 8px; } nav.links .btn { padding: 11px 14px; font-size: 14px; white-space: nowrap; } .snd, .snd-more { height: 38px; } .brand { gap: 8px; } .brand svg { width: 28px; height: 28px; } .brand-name { font-size: 17px; letter-spacing: .14em; } .brand-name small { font-size: 9.5px; letter-spacing: .2em; margin-left: 2px; } }
+@media (max-width: 520px) { .snd .lbl { display: none; } .snd { padding: 0 12px; } nav.links { gap: 8px; } nav.links .btn { padding: 11px 14px; font-size: 14px; white-space: nowrap; } .snd { height: 38px; } .brand { gap: 8px; } .brand svg { width: 28px; height: 28px; } .brand-name { font-size: 17px; letter-spacing: .14em; } .brand-name small { font-size: 9.5px; letter-spacing: .2em; margin-left: 2px; } }
 @media (max-width: 400px) { .brand-name small { display: none; } nav.links .btn { padding: 10px 12px; font-size: 13.5px; } }
 @media (max-width: 350px) { .brand svg { display: none; } nav.links { gap: 6px; } }
 
@@ -638,8 +625,7 @@ footer b { color: var(--ink); font-weight: 600; }
       <a href="#custom">Custom features</a>
       <a href="#deposits">Deposits</a>
       <div class="sndw" id="sndw">
-        <button class="snd" id="snd" type="button" aria-pressed="true" title="Mute the soundtrack"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="lbl">Sound on</span></button><button class="snd-more" id="snd-more" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="snd-menu" aria-label="Choose music"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 3.5 5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <div class="snd-menu" id="snd-menu" role="menu" aria-label="Music" hidden><p>Music</p></div>
+        <button class="snd" id="snd" type="button" aria-pressed="true" title="Mute the soundtrack"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="lbl">Sound on</span></button>
       </div>
       <a class="btn btn-primary" href="#demo">Book a demo</a>
     </nav>
@@ -1872,11 +1858,11 @@ footer b { color: var(--ink); font-weight: 600; }
 </script>
 
 <script>
-/* Soundtrack: suspense loops made live with Web Audio (no audio files to download).
+/* Soundtrack ("Countdown"): a suspense loop made live with Web Audio (no audio files to download).
    On by default; browsers only allow sound after the visitor's first tap or key press, so it starts then. */
 (() => {
   const wrap = document.getElementById('sndw'); if (!wrap) return;
-  const btn = document.getElementById('snd'), more = document.getElementById('snd-more'), menu = document.getElementById('snd-menu');
+  const btn = document.getElementById('snd');
   const lbl = btn.querySelector('.lbl');
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) { wrap.hidden = true; return; }
@@ -1956,18 +1942,6 @@ footer b { color: var(--ink); font-weight: 600; }
   const tri = r => [r, r + 3, r + 7], maj = r => [r, r + 4, r + 7];
   /* tracks: each plays one 16th-note step; 8 bars then loops */
   const TRACKS = [
-    { id: 'pursuit', name: 'Pursuit', about: 'Racing bass and a ticking clock. D minor, 136 bpm.', bpm: 136,
-      roots: [38, 38, 34, 33, 38, 38, 36, 33], chords: { 38: tri(62), 34: maj(58), 36: maj(60), 33: maj(57) },
-      play(i, t, S) {
-        const bar = (i >> 4) % 8, s = i % 16, root = this.roots[bar], BP = [0, 0, 12, 0, 0, 0, 12, 0, 0, 0, 12, 0, 0, 12, 0, 1];
-        I.bass(t, root + (s === 15 && bar % 4 === 3 ? 0 : BP[s]), S, s % 4 === 0 ? 1400 : 700, s % 4 === 0 ? 0.5 : 0.32);
-        if (s % 4 === 0 || (s === 14 && bar % 2)) I.kick(t);
-        I.hat(t, s % 2 ? 0.09 : 0.04);
-        if (s % 4 === 2) I.tick(t, bar % 2 === 0);
-        if (s === 0) I.pad(t, this.chords[root], S * 16);
-        if (bar % 4 === 3 && (s === 10 || s === 13)) I.stab(t, this.chords[root].map(m => m + 12));
-        if (bar === 7 && s === 0) I.riser(t, S * 16);
-      } },
     { id: 'countdown', name: 'Countdown', about: 'Heartbeat, clock and a rising arpeggio. A minor, 120 bpm.', bpm: 120,
       roots: [45, 45, 41, 41, 38, 38, 40, 40],
       play(i, t, S) {
@@ -1981,39 +1955,9 @@ footer b { color: var(--ink); font-weight: 600; }
         if (s % 8 === 0) I.bass(t, r, S * 6, 500, 0.35);
         if (i % 128 === 0) I.braam(t, r - 12, S * 14);
         if (bar === 7 && s === 0) I.riser(t, S * 16, 0.1);
-      } },
-    { id: 'heist', name: 'Heist', about: 'Sneaky plucked strings and brushed snare. E minor, 126 bpm.', bpm: 126,
-      roots: [40, 40, 36, 36, 45, 45, 47, 47],
-      play(i, t, S) {
-        const bar = (i >> 4) % 8, s = i % 16, r = this.roots[bar];
-        const ch = r === 47 ? [71, 75, 78] : r === 36 ? [72, 76, 79] : r === 45 ? [69, 72, 76] : [64, 67, 71];
-        const pat = [0, null, 1, 0, null, 2, 1, null, 0, null, 1, 2, null, 1, 0, 2];
-        if (pat[s] !== null) I.pluck(t, ch[pat[s]] - 12, s % 4 === 0 ? 0.14 : 0.09);
-        if (s % 4 === 0) I.bass(t, r + (s === 8 ? 7 : 0), S * 3, 900, 0.36);
-        if (s === 14) I.bass(t, r + 10, S, 700, 0.25);
-        if (s === 0 || s === 10) I.kick(t, 0.7);
-        if (s === 4 || s === 12) I.snare(t, 0.22);
-        I.hat(t, s % 4 === 2 ? 0.07 : 0.025, 0.05, 6000);
-        if (bar % 4 === 3 && (s === 6 || s === 14)) I.stab(t, ch, 0.13);
-        if (s === 0 && bar % 2 === 0) I.pad(t, ch.map(m => m - 12), S * 32, 0.045, 400, 1000);
-      } },
-    { id: 'overdrive', name: 'Overdrive', about: 'Four-on-the-floor action chase. F minor, 150 bpm.', bpm: 150,
-      roots: [41, 41, 37, 39, 41, 41, 37, 36],
-      play(i, t, S) {
-        const bar = (i >> 4) % 8, s = i % 16, r = this.roots[bar];
-        const ch = r === 37 ? maj(61) : r === 39 ? maj(63) : r === 36 ? maj(60) : tri(65);
-        if (s % 2 === 0) I.bass(t, r + (s % 8 === 6 ? 12 : 0), S * 1.8, s % 4 === 0 ? 1100 : 1700, 0.42);
-        if (s % 4 === 0) I.kick(t, 0.95);
-        if (s % 4 === 2) I.hat(t, 0.12, 0.12, 5000);
-        if (s === 4 || s === 12) I.snare(t, 0.32);
-        if (s % 2) I.hat(t, 0.03);
-        if (s === 0) I.pad(t, ch, S * 16, 0.05, 800, 2200);
-        const riff = [0, null, null, 0, null, null, 1, null, 2, null, null, 1, null, 0, null, null];
-        if (riff[s] !== null && bar % 2 === 1) I.stab(t, [ch[riff[s]] + 12, ch[riff[s]]], 0.12);
-        if (bar === 7 && s === 0) I.riser(t, S * 16, 0.14);
       } }
   ];
-  track = TRACKS.find(x => x.id === get('orbique-track')) || TRACKS[0];
+  track = TRACKS[0];
 
   function loop() { while (next < ctx.currentTime + 0.12) { track.play(step++, next, S); next += S; } }
   function fade(to, dur) { const t = ctx.currentTime; bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(to, t + dur); }
@@ -2034,23 +1978,9 @@ footer b { color: var(--ink); font-weight: 600; }
   function paint() {
     btn.setAttribute('aria-pressed', String(on)); lbl.textContent = on ? 'Sound on' : 'Sound off';
     btn.title = on ? 'Mute the soundtrack' : 'Play the soundtrack';
-    menu.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === track.id)));
   }
   function set(v) { on = v; put('orbique-sound', v ? '1' : '0'); paint(); v ? run() : halt(); }
-  function pick(id) {
-    track = TRACKS.find(x => x.id === id); put('orbique-track', id); on = true; put('orbique-sound', '1'); paint();
-    if (ctx && wrap.classList.contains('live')) { fade(0, 0.15); clearInterval(timer); setTimeout(run, 180); } else run();
-  }
-  TRACKS.forEach(x => {
-    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.dataset.id = x.id;
-    b.innerHTML = '<b></b><span></span>'; b.querySelector('b').textContent = x.name; b.querySelector('span').textContent = x.about;
-    b.addEventListener('click', () => { pick(x.id); toggleMenu(false); }); menu.appendChild(b);
-  });
-  const toggleMenu = open => { menu.hidden = !open; more.setAttribute('aria-expanded', String(open)); };
   btn.addEventListener('click', () => set(!on));
-  more.addEventListener('click', () => toggleMenu(menu.hidden));
-  document.addEventListener('click', e => { if (!wrap.contains(e.target)) toggleMenu(false); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) { toggleMenu(false); more.focus(); } });
   paint();
   // on by default: begin with the first tap, click or key press anywhere on the page
   const first = e => {
