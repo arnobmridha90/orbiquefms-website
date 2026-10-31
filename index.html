@@ -17,6 +17,7 @@
 /* Layout: a calm navy-on-paper product page. One bold moment: the Orbique seed of dots (each dot a car) behind the hero.
    Below it, each feature is a working window from the software, played as a short loop. */
 :root {
+  --page: #ffffff;
   --paper: #f6f7f9;
   --surface: #ffffff;
   --ink: #18263a;
@@ -35,22 +36,10 @@
   --f-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --wrap: 1180px;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #0f1622; --surface: #162131; --ink: #e9edf3; --navy: #b9c9e0; --muted: #94a2b6; --rule: #273448;
-    --teal: #4fc2b8; --teal-soft: #11312f; --gold: #d9b95c; --gold-soft: #33301f; --red: #f08a80; --red-soft: #3a1f1f;
-    --hatch: #33425a; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 36px -14px rgba(0,0,0,.6); color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --paper: #0f1622; --surface: #162131; --ink: #e9edf3; --navy: #b9c9e0; --muted: #94a2b6; --rule: #273448;
-  --teal: #4fc2b8; --teal-soft: #11312f; --gold: #d9b95c; --gold-soft: #33301f; --red: #f08a80; --red-soft: #3a1f1f;
-  --hatch: #33425a; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 36px -14px rgba(0,0,0,.6); color-scheme: dark;
-}
-
 * { box-sizing: border-box; }
-body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+body { background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 .band { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .wrap { max-width: var(--wrap); margin: 0 auto; }
 h1, h2, h3 { font-family: var(--f-display); font-weight: 400; color: var(--navy); text-wrap: balance; margin: 0; letter-spacing: .01em; }
@@ -61,8 +50,8 @@ a { color: var(--teal); }
 .mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
 
 /* header */
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
-header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--page); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: color-mix(in srgb, var(--page) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
 .top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--navy); }
 .brand svg { width: 34px; height: 34px; flex: none; }
@@ -78,6 +67,20 @@ nav.links a:not(.btn):hover { color: var(--ink); }
 .btn-quiet { background: transparent; color: var(--navy); border-color: var(--rule); }
 .btn-quiet:hover { border-color: var(--navy); }
 @media (max-width: 860px) { nav.links a:not(.btn) { display: none; } }
+/* sound toggle: off until the visitor presses it (browsers block sound before a click) */
+.snd { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--navy); font: 600 14px/1 var(--f-body); cursor: pointer; transition: border-color .16s, background-color .16s; }
+.snd:hover { border-color: var(--navy); }
+.snd .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.snd .eq i { width: 3px; height: 6px; border-radius: 1px; background: currentColor; opacity: .55; }
+.snd .eq i:nth-child(2) { height: 11px; } .snd .eq i:nth-child(3) { height: 8px; } .snd .eq i:nth-child(4) { height: 13px; }
+.snd[aria-pressed="true"] .eq i { opacity: 1; }
+.snd[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.snd[aria-pressed="true"] .eq i { animation: eq .5s ease-in-out infinite alternate; }
+.snd[aria-pressed="true"] .eq i:nth-child(2) { animation-delay: -.2s; } .snd[aria-pressed="true"] .eq i:nth-child(3) { animation-delay: -.35s; } .snd[aria-pressed="true"] .eq i:nth-child(4) { animation-delay: -.1s; }
+@keyframes eq { from { height: 3px; } to { height: 14px; } }
+@media (max-width: 520px) { .snd .lbl { display: none; } .snd { padding: 0 12px; } nav.links { gap: 8px; } nav.links .btn { padding: 11px 14px; font-size: 14px; white-space: nowrap; } .snd { height: 38px; padding: 0 11px; } .brand { gap: 8px; } .brand svg { width: 28px; height: 28px; } .brand-name { font-size: 17px; letter-spacing: .14em; } .brand-name small { font-size: 9.5px; letter-spacing: .2em; margin-left: 2px; } }
+@media (max-width: 370px) { .brand-name small { display: none; } nav.links .btn { padding: 10px 12px; font-size: 13.5px; } }
+
 
 /* hero */
 .hero { position: relative; overflow: hidden; }
@@ -243,9 +246,6 @@ section.feature { padding-block: 72px; border-top: 1px solid var(--rule); }
 .proof p { color: color-mix(in srgb, currentColor 80%, transparent); max-width: 60ch; margin-top: 12px; }
 .proof .btn-primary { background: var(--gold); color: #18263a; }
 @media (max-width: 760px) { .proof .wrap { grid-template-columns: minmax(0, 1fr); } }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .proof { background: #1c2d45; color: var(--ink); } :root:not([data-theme="light"]) .proof h2 { color: var(--ink); } }
-:root[data-theme="dark"] .proof { background: #1c2d45; color: var(--ink); }
-:root[data-theme="dark"] .proof h2 { color: var(--ink); }
 
 .demo { padding-block: 80px; }
 .demo .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; }
@@ -621,6 +621,7 @@ footer b { color: var(--ink); font-weight: 600; }
       <a href="#schedules">Schedules</a>
       <a href="#custom">Custom features</a>
       <a href="#deposits">Deposits</a>
+      <button class="snd" id="snd" type="button" aria-pressed="false" title="Play the soundtrack"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="lbl">Sound off</span></button>
       <a class="btn btn-primary" href="#demo">Book a demo</a>
     </nav>
   </div>
@@ -1851,5 +1852,114 @@ footer b { color: var(--ink); font-weight: 600; }
 })();
 </script>
 
+<script>
+/* Soundtrack: a suspenseful, fast loop made live with Web Audio (no audio files).
+   D minor, 136 bpm: a driving 16th-note bass, ticking clock, kick, and a dark string pad over i-i-VI-V. */
+(() => {
+  const btn = document.getElementById('snd'); if (!btn) return;
+  const lbl = btn.querySelector('.lbl');
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) { btn.hidden = true; return; }
+  let ctx, master, comp, timer, step = 0, next = 0, on = false, noise;
+  const BPM = 136, S = 60 / BPM / 4;
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  // roots per bar (MIDI): D, D, Bb, A ... second pass climbs to C before A
+  const ROOTS = [38, 38, 34, 33, 38, 38, 36, 33];
+  const CHORDS = { 38: [62, 65, 69], 34: [58, 62, 65], 36: [60, 64, 67], 33: [57, 61, 64] };
+  const store = v => { try { v === undefined ? 0 : localStorage.setItem('orbique-sound', v); return localStorage.getItem('orbique-sound'); } catch (e) { return null; } };
+
+  function init() {
+    ctx = new AC();
+    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
+    master = ctx.createGain(); master.gain.value = 0;
+    master.connect(comp); comp.connect(ctx.destination);
+    const len = ctx.sampleRate; noise = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); }
+  function bass(t, m, accent) {
+    const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.value = hz(m);
+    f.type = 'lowpass'; f.Q.value = 8; f.frequency.setValueAtTime(accent ? 1400 : 700, t); f.frequency.exponentialRampToValueAtTime(140, t + S * 0.9);
+    env(g, t, 0.004, accent ? 0.5 : 0.32, S * 0.85);
+    o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t + S);
+  }
+  function kick(t) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+    env(g, t, 0.002, 0.9, 0.22); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.3);
+  }
+  function hat(t, v) {
+    const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = noise; f.type = 'highpass'; f.frequency.value = 7500;
+    env(g, t, 0.001, v, 0.035); n.connect(f); f.connect(g); g.connect(master); n.start(t, Math.random() * 0.5); n.stop(t + 0.06);
+  }
+  function tick(t, hi) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.value = hi ? 2200 : 1650;
+    env(g, t, 0.001, 0.06, 0.02); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.04);
+  }
+  function pad(t, notes, dur) {
+    const f = ctx.createBiquadFilter(), g = ctx.createGain();
+    f.type = 'lowpass'; f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(1500, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.07, t + 0.3); g.gain.setValueAtTime(0.07, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.3);
+    f.connect(g); g.connect(master);
+    notes.forEach(m => [-6, 6].forEach(c => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(m - 12); o.detune.value = c; o.connect(f); o.start(t); o.stop(t + dur + 0.35); }));
+  }
+  function stab(t, notes) {
+    const f = ctx.createBiquadFilter(), g = ctx.createGain();
+    f.type = 'lowpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(400, t + 0.25);
+    env(g, t, 0.005, 0.16, 0.28); f.connect(g); g.connect(master);
+    notes.forEach(m => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(m); o.connect(f); o.start(t); o.stop(t + 0.35); });
+  }
+  function riser(t, dur) {
+    const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = noise; n.loop = true; f.type = 'bandpass'; f.Q.value = 3;
+    f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(6000, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.02);
+    n.connect(f); f.connect(g); g.connect(master); n.start(t); n.stop(t + dur + 0.05);
+  }
+  // bass pattern per 16th: root, root, octave, root ... with a pushing figure at the end of each bar
+  const BP = [0, 0, 12, 0, 0, 0, 12, 0, 0, 0, 12, 0, 0, 12, 0, 13];
+  function play(i, t) {
+    const bar = Math.floor(i / 16) % 8, s = i % 16, root = ROOTS[bar];
+    const last = s === 15 && bar % 4 === 3 ? 0 : BP[s] === 13 ? 1 : BP[s];
+    bass(t, root + last, s % 4 === 0);
+    if (s % 4 === 0 || s === 14 && bar % 2) kick(t);
+    hat(t, s % 2 ? 0.09 : 0.04);
+    if (s % 4 === 2) tick(t, bar % 2 === 0);
+    if (s === 0) pad(t, CHORDS[root], S * 16);
+    if (bar % 4 === 3 && (s === 10 || s === 13)) stab(t, CHORDS[root].map(m => m + 12));
+    if (bar === 7 && s === 0) riser(t, S * 16);
+  }
+  function loop() { while (next < ctx.currentTime + 0.12) { play(step++, next); next += S; } }
+  function start() {
+    if (!ctx) init();
+    ctx.resume();
+    step = 0; next = ctx.currentTime + 0.06;
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(master.gain.value, ctx.currentTime); master.gain.linearRampToValueAtTime(0.32, ctx.currentTime + 1.2);
+    clearInterval(timer); timer = setInterval(loop, 25); loop();
+  }
+  function stop() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(0, t + 0.4);
+    clearInterval(timer); setTimeout(() => { if (!on) ctx.suspend(); }, 500);
+  }
+  function set(v) {
+    on = v; btn.setAttribute('aria-pressed', String(v)); lbl.textContent = v ? 'Sound on' : 'Sound off';
+    btn.title = v ? 'Mute the soundtrack' : 'Play the soundtrack';
+    v ? start() : stop(); store(v ? '1' : '0');
+  }
+  btn.addEventListener('click', () => set(!on));
+  // a visitor who turned sound on before gets it back on their first click or key press
+  if (store() === '1') {
+    const resume = e => { if (e.target.closest && e.target.closest('#snd')) return; set(true); removeEventListener('pointerdown', resume, true); removeEventListener('keydown', resume, true); };
+    addEventListener('pointerdown', resume, true); addEventListener('keydown', resume, true);
+  }
+  document.addEventListener('visibilitychange', () => { if (!ctx || !on) return; if (document.hidden) { clearInterval(timer); ctx.suspend(); } else { ctx.resume().then(() => { next = ctx.currentTime + 0.06; timer = setInterval(loop, 25); }); } });
+})();
+</script>
 </body>
 </html>
