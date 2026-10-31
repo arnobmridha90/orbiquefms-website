@@ -67,19 +67,35 @@ nav.links a:not(.btn):hover { color: var(--ink); }
 .btn-quiet { background: transparent; color: var(--navy); border-color: var(--rule); }
 .btn-quiet:hover { border-color: var(--navy); }
 @media (max-width: 860px) { nav.links a:not(.btn) { display: none; } }
-/* sound toggle: off until the visitor presses it (browsers block sound before a click) */
-.snd { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--navy); font: 600 14px/1 var(--f-body); cursor: pointer; transition: border-color .16s, background-color .16s; }
-.snd:hover { border-color: var(--navy); }
+/* soundtrack: on by default, starts on the visitor's first tap or key press (browsers block sound before that) */
+.sndw { position: relative; display: inline-flex; }
+.snd, .snd-more { display: inline-flex; align-items: center; height: 40px; border: 1px solid var(--rule); background: var(--surface); color: var(--navy); font: 600 14px/1 var(--f-body); cursor: pointer; transition: border-color .16s, background-color .16s; }
+.snd { gap: 8px; padding: 0 12px 0 12px; border-radius: 999px 0 0 999px; border-right-width: 0; }
+.snd-more { padding: 0 11px 0 9px; border-radius: 0 999px 999px 0; border-left: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
+.snd-more svg { width: 12px; height: 12px; transition: transform .2s; }
+.snd-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.snd:hover, .snd-more:hover { background: color-mix(in srgb, var(--navy) 6%, var(--surface)); }
 .snd .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
-.snd .eq i { width: 3px; height: 6px; border-radius: 1px; background: currentColor; opacity: .55; }
+.snd .eq i { width: 3px; height: 6px; border-radius: 1px; background: currentColor; opacity: .5; }
 .snd .eq i:nth-child(2) { height: 11px; } .snd .eq i:nth-child(3) { height: 8px; } .snd .eq i:nth-child(4) { height: 13px; }
 .snd[aria-pressed="true"] .eq i { opacity: 1; }
-.snd[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
-.snd[aria-pressed="true"] .eq i { animation: eq .5s ease-in-out infinite alternate; }
-.snd[aria-pressed="true"] .eq i:nth-child(2) { animation-delay: -.2s; } .snd[aria-pressed="true"] .eq i:nth-child(3) { animation-delay: -.35s; } .snd[aria-pressed="true"] .eq i:nth-child(4) { animation-delay: -.1s; }
+.sndw.live .snd, .sndw.live .snd-more { background: var(--navy); color: #fff; border-color: var(--navy); }
+.sndw.live .snd-more { border-left-color: rgba(255,255,255,.3); }
+.sndw.live .eq i { animation: eq .5s ease-in-out infinite alternate; }
+.sndw.live .eq i:nth-child(2) { animation-delay: -.2s; } .sndw.live .eq i:nth-child(3) { animation-delay: -.35s; } .sndw.live .eq i:nth-child(4) { animation-delay: -.1s; }
 @keyframes eq { from { height: 3px; } to { height: 14px; } }
-@media (max-width: 520px) { .snd .lbl { display: none; } .snd { padding: 0 12px; } nav.links { gap: 8px; } nav.links .btn { padding: 11px 14px; font-size: 14px; white-space: nowrap; } .snd { height: 38px; padding: 0 11px; } .brand { gap: 8px; } .brand svg { width: 28px; height: 28px; } .brand-name { font-size: 17px; letter-spacing: .14em; } .brand-name small { font-size: 9.5px; letter-spacing: .2em; margin-left: 2px; } }
-@media (max-width: 370px) { .brand-name small { display: none; } nav.links .btn { padding: 10px 12px; font-size: 13.5px; } }
+.snd-menu { position: absolute; right: 0; top: calc(100% + 8px); width: 248px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; z-index: 20; }
+.snd-menu[hidden] { display: none; }
+.snd-menu p { font-size: 11.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 6px 10px 4px; }
+.snd-menu button { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 2px 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 8px 10px; font: inherit; color: var(--ink); cursor: pointer; }
+.snd-menu button:hover { background: var(--paper); }
+.snd-menu button::before { content: ""; grid-row: span 2; width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--rule); }
+.snd-menu button[aria-checked="true"]::before { border: 4px solid var(--teal); }
+.snd-menu b { font-size: 14.5px; font-weight: 600; }
+.snd-menu span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+@media (max-width: 520px) { .snd .lbl { display: none; } .snd { padding: 0 9px 0 11px; } .snd-more { padding: 0 9px 0 7px; } nav.links { gap: 8px; } nav.links .btn { padding: 11px 14px; font-size: 14px; white-space: nowrap; } .snd, .snd-more { height: 38px; } .brand { gap: 8px; } .brand svg { width: 28px; height: 28px; } .brand-name { font-size: 17px; letter-spacing: .14em; } .brand-name small { font-size: 9.5px; letter-spacing: .2em; margin-left: 2px; } }
+@media (max-width: 400px) { .brand-name small { display: none; } nav.links .btn { padding: 10px 12px; font-size: 13.5px; } }
+@media (max-width: 350px) { .brand svg { display: none; } nav.links { gap: 6px; } }
 
 
 /* hero */
@@ -621,7 +637,10 @@ footer b { color: var(--ink); font-weight: 600; }
       <a href="#schedules">Schedules</a>
       <a href="#custom">Custom features</a>
       <a href="#deposits">Deposits</a>
-      <button class="snd" id="snd" type="button" aria-pressed="false" title="Play the soundtrack"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="lbl">Sound off</span></button>
+      <div class="sndw" id="sndw">
+        <button class="snd" id="snd" type="button" aria-pressed="true" title="Mute the soundtrack"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="lbl">Sound on</span></button><button class="snd-more" id="snd-more" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="snd-menu" aria-label="Choose music"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 3.5 5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="snd-menu" id="snd-menu" role="menu" aria-label="Music" hidden><p>Music</p></div>
+      </div>
       <a class="btn btn-primary" href="#demo">Book a demo</a>
     </nav>
   </div>
@@ -1853,112 +1872,198 @@ footer b { color: var(--ink); font-weight: 600; }
 </script>
 
 <script>
-/* Soundtrack: a suspenseful, fast loop made live with Web Audio (no audio files).
-   D minor, 136 bpm: a driving 16th-note bass, ticking clock, kick, and a dark string pad over i-i-VI-V. */
+/* Soundtrack: suspense loops made live with Web Audio (no audio files to download).
+   On by default; browsers only allow sound after the visitor's first tap or key press, so it starts then. */
 (() => {
-  const btn = document.getElementById('snd'); if (!btn) return;
+  const wrap = document.getElementById('sndw'); if (!wrap) return;
+  const btn = document.getElementById('snd'), more = document.getElementById('snd-more'), menu = document.getElementById('snd-menu');
   const lbl = btn.querySelector('.lbl');
   const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) { btn.hidden = true; return; }
-  let ctx, master, comp, timer, step = 0, next = 0, on = false, noise;
-  const BPM = 136, S = 60 / BPM / 4;
+  if (!AC) { wrap.hidden = true; return; }
+  const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const put = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const hz = m => 440 * Math.pow(2, (m - 69) / 12);
-  // roots per bar (MIDI): D, D, Bb, A ... second pass climbs to C before A
-  const ROOTS = [38, 38, 34, 33, 38, 38, 36, 33];
-  const CHORDS = { 38: [62, 65, 69], 34: [58, 62, 65], 36: [60, 64, 67], 33: [57, 61, 64] };
-  const store = v => { try { v === undefined ? 0 : localStorage.setItem('orbique-sound', v); return localStorage.getItem('orbique-sound'); } catch (e) { return null; } };
+  let ctx, bus, noise, timer, step = 0, next = 0, S = 0.11, track, on = get('orbique-sound') !== '0';
 
   function init() {
     ctx = new AC();
-    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
-    master = ctx.createGain(); master.gain.value = 0;
-    master.connect(comp); comp.connect(ctx.destination);
-    const len = ctx.sampleRate; noise = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
+    bus = ctx.createGain(); bus.gain.value = 0; bus.connect(comp); comp.connect(ctx.destination);
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
-  function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); }
-  function bass(t, m, accent) {
-    const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    o.type = 'sawtooth'; o.frequency.value = hz(m);
-    f.type = 'lowpass'; f.Q.value = 8; f.frequency.setValueAtTime(accent ? 1400 : 700, t); f.frequency.exponentialRampToValueAtTime(140, t + S * 0.9);
-    env(g, t, 0.004, accent ? 0.5 : 0.32, S * 0.85);
-    o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t + S);
-  }
-  function kick(t) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
-    env(g, t, 0.002, 0.9, 0.22); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.3);
-  }
-  function hat(t, v) {
-    const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    n.buffer = noise; f.type = 'highpass'; f.frequency.value = 7500;
-    env(g, t, 0.001, v, 0.035); n.connect(f); f.connect(g); g.connect(master); n.start(t, Math.random() * 0.5); n.stop(t + 0.06);
-  }
-  function tick(t, hi) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = 'square'; o.frequency.value = hi ? 2200 : 1650;
-    env(g, t, 0.001, 0.06, 0.02); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.04);
-  }
-  function pad(t, notes, dur) {
-    const f = ctx.createBiquadFilter(), g = ctx.createGain();
-    f.type = 'lowpass'; f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(1500, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.07, t + 0.3); g.gain.setValueAtTime(0.07, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.3);
-    f.connect(g); g.connect(master);
-    notes.forEach(m => [-6, 6].forEach(c => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(m - 12); o.detune.value = c; o.connect(f); o.start(t); o.stop(t + dur + 0.35); }));
-  }
-  function stab(t, notes) {
-    const f = ctx.createBiquadFilter(), g = ctx.createGain();
-    f.type = 'lowpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(400, t + 0.25);
-    env(g, t, 0.005, 0.16, 0.28); f.connect(g); g.connect(master);
-    notes.forEach(m => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(m); o.connect(f); o.start(t); o.stop(t + 0.35); });
-  }
-  function riser(t, dur) {
-    const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    n.buffer = noise; n.loop = true; f.type = 'bandpass'; f.Q.value = 3;
-    f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(6000, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.02);
-    n.connect(f); f.connect(g); g.connect(master); n.start(t); n.stop(t + dur + 0.05);
-  }
-  // bass pattern per 16th: root, root, octave, root ... with a pushing figure at the end of each bar
-  const BP = [0, 0, 12, 0, 0, 0, 12, 0, 0, 0, 12, 0, 0, 12, 0, 13];
-  function play(i, t) {
-    const bar = Math.floor(i / 16) % 8, s = i % 16, root = ROOTS[bar];
-    const last = s === 15 && bar % 4 === 3 ? 0 : BP[s] === 13 ? 1 : BP[s];
-    bass(t, root + last, s % 4 === 0);
-    if (s % 4 === 0 || s === 14 && bar % 2) kick(t);
-    hat(t, s % 2 ? 0.09 : 0.04);
-    if (s % 4 === 2) tick(t, bar % 2 === 0);
-    if (s === 0) pad(t, CHORDS[root], S * 16);
-    if (bar % 4 === 3 && (s === 10 || s === 13)) stab(t, CHORDS[root].map(m => m + 12));
-    if (bar === 7 && s === 0) riser(t, S * 16);
-  }
-  function loop() { while (next < ctx.currentTime + 0.12) { play(step++, next); next += S; } }
-  function start() {
+  /* instruments */
+  const env = (g, t, a, peak, dec) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); };
+  const osc = (type, f, t, end, out, detune) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; if (detune) o.detune.value = detune; o.connect(out); o.start(t); o.stop(end); return o; };
+  const chain = (...n) => { for (let i = 0; i < n.length - 1; i++) n[i].connect(n[i + 1]); return n[0]; };
+  const lp = (f, q) => { const x = ctx.createBiquadFilter(); x.type = 'lowpass'; x.frequency.value = f; x.Q.value = q || 1; return x; };
+  const I = {
+    bass(t, m, len, bright, vol) {
+      const f = lp(bright, 8), g = ctx.createGain(); chain(f, g, bus);
+      f.frequency.setValueAtTime(bright, t); f.frequency.exponentialRampToValueAtTime(130, t + len * 0.9);
+      env(g, t, 0.004, vol, len * 0.85); osc('sawtooth', hz(m), t, t + len, f);
+    },
+    kick(t, v = 0.9, low = 42) {
+      const g = ctx.createGain(); g.connect(bus); env(g, t, 0.002, v, 0.22);
+      const o = osc('sine', 150, t, t + 0.3, g); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(low, t + 0.12);
+    },
+    hat(t, v, len = 0.035, cut = 7500) {
+      const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      n.buffer = noise; f.type = 'highpass'; f.frequency.value = cut; chain(n, f, g, bus);
+      env(g, t, 0.001, v, len); n.start(t, Math.random() * 0.5); n.stop(t + len + 0.03);
+    },
+    snare(t, v = 0.3) {
+      const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      n.buffer = noise; f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.8; chain(n, f, g, bus);
+      env(g, t, 0.001, v, 0.14); n.start(t, Math.random() * 0.5); n.stop(t + 0.2);
+      const g2 = ctx.createGain(); g2.connect(bus); env(g2, t, 0.001, v * 0.6, 0.07); osc('triangle', 190, t, t + 0.1, g2);
+    },
+    tick(t, hi, v = 0.06) { const g = ctx.createGain(); g.connect(bus); env(g, t, 0.001, v, 0.02); osc('square', hi ? 2200 : 1650, t, t + 0.04, g); },
+    pad(t, notes, dur, vol = 0.07, from = 500, to = 1500) {
+      const f = lp(from), g = ctx.createGain(); chain(f, g, bus);
+      f.frequency.setValueAtTime(from, t); f.frequency.linearRampToValueAtTime(to, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.3); g.gain.setValueAtTime(vol, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.3);
+      notes.forEach(m => [-6, 6].forEach(c => osc('sawtooth', hz(m - 12), t, t + dur + 0.35, f, c)));
+    },
+    stab(t, notes, v = 0.16) {
+      const f = lp(3000), g = ctx.createGain(); chain(f, g, bus);
+      f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(400, t + 0.25);
+      env(g, t, 0.005, v, 0.28); notes.forEach(m => osc('sawtooth', hz(m), t, t + 0.35, f));
+    },
+    pluck(t, m, v = 0.12, type = 'triangle', dec = 0.16) {
+      const f = lp(2600, 2), g = ctx.createGain(); chain(f, g, bus);
+      f.frequency.setValueAtTime(2600, t); f.frequency.exponentialRampToValueAtTime(500, t + dec);
+      env(g, t, 0.002, v, dec); osc(type, hz(m), t, t + dec + 0.05, f);
+    },
+    arp(t, m, cut, v = 0.07) {
+      const f = lp(cut, 6), g = ctx.createGain(); chain(f, g, bus);
+      env(g, t, 0.003, v, 0.1); osc('square', hz(m), t, t + 0.14, f);
+    },
+    braam(t, m, dur) {
+      const f = lp(200, 4), g = ctx.createGain(); chain(f, g, bus);
+      f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(900, t + 0.5); f.frequency.exponentialRampToValueAtTime(250, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      [0, 12, 7].forEach((o, i) => [-9, 9].forEach(c => osc('sawtooth', hz(m + o), t, t + dur + 0.05, f, c + i * 3)));
+    },
+    riser(t, dur, v = 0.12) {
+      const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      n.buffer = noise; n.loop = true; f.type = 'bandpass'; f.Q.value = 3; chain(n, f, g, bus);
+      f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(6000, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.02);
+      n.start(t); n.stop(t + dur + 0.05);
+    }
+  };
+  const tri = r => [r, r + 3, r + 7], maj = r => [r, r + 4, r + 7];
+  /* tracks: each plays one 16th-note step; 8 bars then loops */
+  const TRACKS = [
+    { id: 'pursuit', name: 'Pursuit', about: 'Racing bass and a ticking clock. D minor, 136 bpm.', bpm: 136,
+      roots: [38, 38, 34, 33, 38, 38, 36, 33], chords: { 38: tri(62), 34: maj(58), 36: maj(60), 33: maj(57) },
+      play(i, t, S) {
+        const bar = (i >> 4) % 8, s = i % 16, root = this.roots[bar], BP = [0, 0, 12, 0, 0, 0, 12, 0, 0, 0, 12, 0, 0, 12, 0, 1];
+        I.bass(t, root + (s === 15 && bar % 4 === 3 ? 0 : BP[s]), S, s % 4 === 0 ? 1400 : 700, s % 4 === 0 ? 0.5 : 0.32);
+        if (s % 4 === 0 || (s === 14 && bar % 2)) I.kick(t);
+        I.hat(t, s % 2 ? 0.09 : 0.04);
+        if (s % 4 === 2) I.tick(t, bar % 2 === 0);
+        if (s === 0) I.pad(t, this.chords[root], S * 16);
+        if (bar % 4 === 3 && (s === 10 || s === 13)) I.stab(t, this.chords[root].map(m => m + 12));
+        if (bar === 7 && s === 0) I.riser(t, S * 16);
+      } },
+    { id: 'countdown', name: 'Countdown', about: 'Heartbeat, clock and a rising arpeggio. A minor, 120 bpm.', bpm: 120,
+      roots: [45, 45, 41, 41, 38, 38, 40, 40],
+      play(i, t, S) {
+        const bar = (i >> 4) % 8, s = i % 16, r = this.roots[bar], ch = r === 40 ? [64, 68, 71] : r === 41 ? [65, 69, 72] : r === 38 ? [62, 65, 69] : [69, 72, 76];
+        if (s === 0 || s === 3) I.kick(t, s ? 0.55 : 0.85, 36);
+        if (s === 8 || s === 11) I.kick(t, s === 11 ? 0.45 : 0.7, 36);
+        if (s % 2 === 0) I.tick(t, s % 4 === 0, 0.05);
+        const seq = [0, 1, 2, 1, 0, 1, 2, 3]; const n = seq[s % 8] === 3 ? ch[0] + 12 : ch[seq[s % 8]];
+        I.arp(t, n + (bar >= 4 ? 12 : 0) * (s % 2), 600 + (i % 128) * 22);
+        if (s === 0) I.pad(t, [r + 12, r + 19], S * 16, 0.08, 300, 900);
+        if (s % 8 === 0) I.bass(t, r, S * 6, 500, 0.35);
+        if (i % 128 === 0) I.braam(t, r - 12, S * 14);
+        if (bar === 7 && s === 0) I.riser(t, S * 16, 0.1);
+      } },
+    { id: 'heist', name: 'Heist', about: 'Sneaky plucked strings and brushed snare. E minor, 126 bpm.', bpm: 126,
+      roots: [40, 40, 36, 36, 45, 45, 47, 47],
+      play(i, t, S) {
+        const bar = (i >> 4) % 8, s = i % 16, r = this.roots[bar];
+        const ch = r === 47 ? [71, 75, 78] : r === 36 ? [72, 76, 79] : r === 45 ? [69, 72, 76] : [64, 67, 71];
+        const pat = [0, null, 1, 0, null, 2, 1, null, 0, null, 1, 2, null, 1, 0, 2];
+        if (pat[s] !== null) I.pluck(t, ch[pat[s]] - 12, s % 4 === 0 ? 0.14 : 0.09);
+        if (s % 4 === 0) I.bass(t, r + (s === 8 ? 7 : 0), S * 3, 900, 0.36);
+        if (s === 14) I.bass(t, r + 10, S, 700, 0.25);
+        if (s === 0 || s === 10) I.kick(t, 0.7);
+        if (s === 4 || s === 12) I.snare(t, 0.22);
+        I.hat(t, s % 4 === 2 ? 0.07 : 0.025, 0.05, 6000);
+        if (bar % 4 === 3 && (s === 6 || s === 14)) I.stab(t, ch, 0.13);
+        if (s === 0 && bar % 2 === 0) I.pad(t, ch.map(m => m - 12), S * 32, 0.045, 400, 1000);
+      } },
+    { id: 'overdrive', name: 'Overdrive', about: 'Four-on-the-floor action chase. F minor, 150 bpm.', bpm: 150,
+      roots: [41, 41, 37, 39, 41, 41, 37, 36],
+      play(i, t, S) {
+        const bar = (i >> 4) % 8, s = i % 16, r = this.roots[bar];
+        const ch = r === 37 ? maj(61) : r === 39 ? maj(63) : r === 36 ? maj(60) : tri(65);
+        if (s % 2 === 0) I.bass(t, r + (s % 8 === 6 ? 12 : 0), S * 1.8, s % 4 === 0 ? 1100 : 1700, 0.42);
+        if (s % 4 === 0) I.kick(t, 0.95);
+        if (s % 4 === 2) I.hat(t, 0.12, 0.12, 5000);
+        if (s === 4 || s === 12) I.snare(t, 0.32);
+        if (s % 2) I.hat(t, 0.03);
+        if (s === 0) I.pad(t, ch, S * 16, 0.05, 800, 2200);
+        const riff = [0, null, null, 0, null, null, 1, null, 2, null, null, 1, null, 0, null, null];
+        if (riff[s] !== null && bar % 2 === 1) I.stab(t, [ch[riff[s]] + 12, ch[riff[s]]], 0.12);
+        if (bar === 7 && s === 0) I.riser(t, S * 16, 0.14);
+      } }
+  ];
+  track = TRACKS.find(x => x.id === get('orbique-track')) || TRACKS[0];
+
+  function loop() { while (next < ctx.currentTime + 0.12) { track.play(step++, next, S); next += S; } }
+  function fade(to, dur) { const t = ctx.currentTime; bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(to, t + dur); }
+  function run() {
     if (!ctx) init();
-    ctx.resume();
-    step = 0; next = ctx.currentTime + 0.06;
-    master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setValueAtTime(master.gain.value, ctx.currentTime); master.gain.linearRampToValueAtTime(0.32, ctx.currentTime + 1.2);
-    clearInterval(timer); timer = setInterval(loop, 25); loop();
+    const go = () => {
+      if (ctx.state !== 'running') return;
+      S = 60 / track.bpm / 4; step = 0; next = ctx.currentTime + 0.06;
+      fade(0.32, 1.2); clearInterval(timer); timer = setInterval(loop, 25); loop();
+      wrap.classList.add('live');
+    };
+    ctx.state === 'running' ? go() : ctx.resume().then(go, () => {});
   }
-  function stop() {
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(0, t + 0.4);
-    clearInterval(timer); setTimeout(() => { if (!on) ctx.suspend(); }, 500);
+  function halt() {
+    wrap.classList.remove('live'); clearInterval(timer);
+    if (!ctx) return; fade(0, 0.4); setTimeout(() => { if (!on) ctx.suspend(); }, 500);
   }
-  function set(v) {
-    on = v; btn.setAttribute('aria-pressed', String(v)); lbl.textContent = v ? 'Sound on' : 'Sound off';
-    btn.title = v ? 'Mute the soundtrack' : 'Play the soundtrack';
-    v ? start() : stop(); store(v ? '1' : '0');
+  function paint() {
+    btn.setAttribute('aria-pressed', String(on)); lbl.textContent = on ? 'Sound on' : 'Sound off';
+    btn.title = on ? 'Mute the soundtrack' : 'Play the soundtrack';
+    menu.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === track.id)));
   }
+  function set(v) { on = v; put('orbique-sound', v ? '1' : '0'); paint(); v ? run() : halt(); }
+  function pick(id) {
+    track = TRACKS.find(x => x.id === id); put('orbique-track', id); on = true; put('orbique-sound', '1'); paint();
+    if (ctx && wrap.classList.contains('live')) { fade(0, 0.15); clearInterval(timer); setTimeout(run, 180); } else run();
+  }
+  TRACKS.forEach(x => {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.dataset.id = x.id;
+    b.innerHTML = '<b></b><span></span>'; b.querySelector('b').textContent = x.name; b.querySelector('span').textContent = x.about;
+    b.addEventListener('click', () => { pick(x.id); toggleMenu(false); }); menu.appendChild(b);
+  });
+  const toggleMenu = open => { menu.hidden = !open; more.setAttribute('aria-expanded', String(open)); };
   btn.addEventListener('click', () => set(!on));
-  // a visitor who turned sound on before gets it back on their first click or key press
-  if (store() === '1') {
-    const resume = e => { if (e.target.closest && e.target.closest('#snd')) return; set(true); removeEventListener('pointerdown', resume, true); removeEventListener('keydown', resume, true); };
-    addEventListener('pointerdown', resume, true); addEventListener('keydown', resume, true);
-  }
-  document.addEventListener('visibilitychange', () => { if (!ctx || !on) return; if (document.hidden) { clearInterval(timer); ctx.suspend(); } else { ctx.resume().then(() => { next = ctx.currentTime + 0.06; timer = setInterval(loop, 25); }); } });
+  more.addEventListener('click', () => toggleMenu(menu.hidden));
+  document.addEventListener('click', e => { if (!wrap.contains(e.target)) toggleMenu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) { toggleMenu(false); more.focus(); } });
+  paint();
+  // on by default: begin with the first tap, click or key press anywhere on the page
+  const first = e => {
+    if (wrap.contains(e.target)) return;
+    ['pointerup', 'keydown', 'touchend'].forEach(k => removeEventListener(k, first, true));
+    if (on && !wrap.classList.contains('live')) run();
+  };
+  if (on) ['pointerup', 'keydown', 'touchend'].forEach(k => addEventListener(k, first, true));
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx || !on || !wrap.classList.contains('live')) return;
+    if (document.hidden) { clearInterval(timer); ctx.suspend(); }
+    else ctx.resume().then(() => { next = ctx.currentTime + 0.06; clearInterval(timer); timer = setInterval(loop, 25); });
+  });
 })();
 </script>
 </body>
