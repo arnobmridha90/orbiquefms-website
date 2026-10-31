@@ -1866,13 +1866,13 @@ footer b { color: var(--ink); font-weight: 600; }
   const lbl = btn.querySelector('.lbl');
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) { wrap.hidden = true; return; }
-  const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  const put = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const hz = m => 440 * Math.pow(2, (m - 69) / 12);
-  let ctx, bus, noise, timer, step = 0, next = 0, S = 0.11, track, on = get('orbique-sound') !== '0';
+  let ctx, bus, noise, timer, step = 0, next = 0, S = 0.11, track, on = true;
 
   function init() {
     ctx = new AC();
+    // a phone call or the OS can pause audio; pick up again on the next tap
+    ctx.onstatechange = () => { if (on && !document.hidden && ctx.state !== 'running' && wrap.classList.contains('live')) { wrap.classList.remove('live'); clearInterval(timer); listen(); paint(); } };
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
     bus = ctx.createGain(); bus.gain.value = 0; bus.connect(comp); comp.connect(ctx.destination);
     noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -1961,39 +1961,62 @@ footer b { color: var(--ink); font-weight: 600; }
 
   function loop() { while (next < ctx.currentTime + 0.12) { track.play(step++, next, S); next += S; } }
   function fade(to, dur) { const t = ctx.currentTime; bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(to, t + dur); }
-  function run() {
+  // iPhones mute Web Audio when the ring switch is on silent; asking for "playback" (and a silent media
+  // element on older iOS) makes it behave like video sound instead.
+  let keepAlive;
+  function unlock() {
     if (!ctx) init();
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    if (!keepAlive) {
+      const n = 8000, buf = new ArrayBuffer(44 + n), v = new DataView(buf), w = (o, str) => [...str].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+      w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+      for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+      keepAlive = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))); keepAlive.loop = true; keepAlive.setAttribute('playsinline', '');
+    }
+    keepAlive.play().catch(() => {});
+    const src = ctx.createBufferSource(); src.buffer = ctx.createBuffer(1, 1, 22050); src.connect(ctx.destination); src.start(0);
+    return ctx.resume();
+  }
+  function run() {
     const go = () => {
-      if (ctx.state !== 'running') return;
+      if (ctx.state !== 'running' || !on) return;
       S = 60 / track.bpm / 4; step = 0; next = ctx.currentTime + 0.06;
       fade(0.32, 1.2); clearInterval(timer); timer = setInterval(loop, 25); loop();
-      wrap.classList.add('live');
+      wrap.classList.add('live'); stopListening(); paint();
     };
-    ctx.state === 'running' ? go() : ctx.resume().then(go, () => {});
+    unlock().then(go, () => {});
+    if (ctx.state === 'running') go();
   }
   function halt() {
-    wrap.classList.remove('live'); clearInterval(timer);
+    wrap.classList.remove('live'); clearInterval(timer); paint();
+    if (keepAlive) keepAlive.pause();
     if (!ctx) return; fade(0, 0.4); setTimeout(() => { if (!on) ctx.suspend(); }, 500);
   }
   function paint() {
-    btn.setAttribute('aria-pressed', String(on)); lbl.textContent = on ? 'Sound on' : 'Sound off';
+    const live = wrap.classList.contains('live');
+    btn.setAttribute('aria-pressed', String(on)); lbl.textContent = !on ? 'Sound off' : live ? 'Sound on' : 'Play sound';
     btn.title = on ? 'Mute the soundtrack' : 'Play the soundtrack';
   }
-  function set(v) { on = v; put('orbique-sound', v ? '1' : '0'); paint(); v ? run() : halt(); }
-  btn.addEventListener('click', () => set(!on));
+  function set(v) { on = v; paint(); v ? run() : halt(); }
+  // before the browser lets sound start, the first press of the button starts it instead of muting
+  btn.addEventListener('click', () => (on && !wrap.classList.contains('live')) ? run() : set(!on));
   paint();
-  // on by default: begin with the first tap, click or key press anywhere on the page
-  const first = e => {
-    if (wrap.contains(e.target)) return;
-    ['pointerup', 'keydown', 'touchend'].forEach(k => removeEventListener(k, first, true));
-    if (on && !wrap.classList.contains('live')) run();
-  };
-  if (on) ['pointerup', 'keydown', 'touchend'].forEach(k => addEventListener(k, first, true));
+  // On by default. Browsers only allow sound after a real tap, click or key press (a scroll does not count),
+  // so keep listening on every interaction until the music is actually playing.
+  const KINDS = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
+  const first = e => { if (wrap.contains(e.target)) return; if (on && !wrap.classList.contains('live')) run(); };
+  const listen = () => KINDS.forEach(k => addEventListener(k, first, true));
+  const stopListening = () => KINDS.forEach(k => removeEventListener(k, first, true));
+  if (on) listen();
   document.addEventListener('visibilitychange', () => {
-    if (!ctx || !on || !wrap.classList.contains('live')) return;
+    if (!ctx || !on) return;
     if (document.hidden) { clearInterval(timer); ctx.suspend(); }
-    else ctx.resume().then(() => { next = ctx.currentTime + 0.06; clearInterval(timer); timer = setInterval(loop, 25); });
+    else ctx.resume().then(() => { if (ctx.state !== 'running') return; next = ctx.currentTime + 0.06; clearInterval(timer); timer = setInterval(loop, 25); wrap.classList.add('live'); }, () => {});
   });
+  // try straight away: browsers that already allow sound on this site (Chrome and Edge for sites you visit often,
+  // or any browser set to allow autoplay) start the music on load; the rest wait for the first tap or click
+  if (on) { init(); if (ctx.state === 'running') run(); else ctx.resume().then(() => { if (ctx.state === 'running' && on) run(); }, () => {}); }
 })();
 </script>
 </body>
