@@ -1,4 +1,30 @@
 {
   "cleanUrls": true,
-  "headers": [{ "source": "/(.*)", "headers": [{ "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }] }]
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/app",
+      "destination": "https://app.orbiquefms.com/",
+      "permanent": false
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "https://app.orbiquefms.com/",
+      "permanent": false
+    }
+  ]
 }
