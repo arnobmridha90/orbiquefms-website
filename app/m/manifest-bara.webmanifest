@@ -1,0 +1,17 @@
+{
+  "name": "Bara Staff",
+  "short_name": "Bara Staff",
+  "description": "Staff app for Bara (Orbique FMS demo, made-up data)",
+  "id": "/m/?co=bara",
+  "start_url": "/m/?co=bara",
+  "scope": "/m/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F5F7",
+  "theme_color": "#F4F5F7",
+  "icons": [
+    { "src": "icons/bara-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/bara-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/bara-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
