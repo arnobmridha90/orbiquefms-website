@@ -19,6 +19,8 @@ body = head + '<style>\n' + css + '\n/* Tabler icons used by the template system
 for bad in ['ventura', 'xtrecy']:
     if re.search(bad, body, re.I): print('FORBIDDEN word found:', bad)
 used = set(re.findall(r"tabler-([a-z0-9-]+)", js + css)) | set(re.findall(r"i\(['\"]([a-z0-9-]+)['\"]", js))
+used |= set(re.findall(r"icon:\s*['\"]([a-z0-9-]+)['\"]", js))
+used |= set(re.findall(r"^\s*'[a-z-]+': \['[^']*', '([a-z0-9-]+)',", js, re.M))   # PAGE_META menu icons
 have = set(re.findall(r'\.tabler-([a-z0-9-]+)\{', icons))
 missing = sorted(u for u in used - have if not u.startswith('icon'))
 ICONSET = os.environ.get('TABLER_JSON', '/home/claude/iconify/node_modules/@iconify-json/tabler/icons.json')

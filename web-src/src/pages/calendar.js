@@ -1,7 +1,9 @@
 /* ===================================================================
    Page: Calendar (#page=calendar)   Owner: builder 3
    A fleet timeline: one row per car, bookings as coloured bars across days, workshop time as striped bars.
-   Address: #page=calendar&view=timeline|month|week|day|list&date=2026-10-19
+   Address: #page=calendar&view=timeline|month|week|day|list&date=2026-10-19&q=plate
+   Cars that are Not in use or Sold are left off unless a booking in the dates is on them. Clicking an empty day on a car's
+   row starts a New Booking for that car and day at 10:00 AM. A plate box filters the rows. The list opens at today.
    =================================================================== */
 var CL_VIEWS = [['timeline', 'Timeline'], ['month', 'Month'], ['week', 'Week'], ['day', 'Day'], ['list', 'List']];
 /* bar colour from booking status + payment status (red, yellow, green, blue, grey) */
@@ -34,14 +36,16 @@ PAGES['calendar'] = {
     st.view = p.view && CL_VIEWS.some(function (v) { return v[0] === p.view; }) ? p.view : st.view || 'timeline';
     st.date = p.date && UI.parseDate(p.date) && !isNaN(UI.parseDate(p.date)) ? clDay(UI.parseDate(p.date)) : st.date || clDay(NOW());
     var today = clDay(NOW());
+    if (p.q != null) st.q = p.q;
+    st.q = st.q || '';
 
     root.innerHTML = '<div class="pg-h"><div><h1>Calendar</h1><p>Every car, every booking, day by day.</p></div><div class="acts">' +
       UI.btn('Check availability', { kind: 'o', icon: 'calendar-search', attrs: { 'data-cl': 'avail' } }) +
       (ctx.can('bookings.create') ? UI.btn('New Booking', { icon: 'plus', attrs: { 'data-cl': 'new' } }) : '') + '</div></div>' +
       '<div class="card cl-card"><div class="cl-bar"><div class="cl-nav">' + UI.iconBtn('chevron-left', 'Previous', { attrs: { 'data-cl': 'prev' } }) + UI.iconBtn('chevron-right', 'Next', { attrs: { 'data-cl': 'next' } }) +
       UI.btn('Today', { kind: 'tonal', size: 'sm', attrs: { 'data-cl': 'today' } }) + '<h2 class="cl-label" id="cl-label"></h2></div>' +
-      '<div class="cl-right"><span class="cl-count" id="cl-count"></span><div class="cl-views" role="tablist" aria-label="View">' + CL_VIEWS.map(function (v) { return '<button type="button" role="tab" data-view="' + v[0] + '" aria-selected="' + (st.view === v[0]) + '">' + v[1] + '</button>'; }).join('') + '</div></div></div>' +
-      '<div class="cl-legend">' + Object.keys(CL_TONES).map(function (k) { return '<span><i class="cl-sw ' + k + '"></i>' + CL_TONES[k][0] + '</span>'; }).join('') + '<span><i class="cl-sw shop"></i>Workshop</span></div>' +
+      '<div class="cl-right"><div class="cl-q">' + UI.input({ key: 'clq', icon: 'search', placeholder: 'Find a plate', value: st.q, type: 'search', attrs: { 'aria-label': 'Find a car by its plate', autocomplete: 'off' } }) + '</div><span class="cl-count" id="cl-count"></span><div class="cl-views" role="tablist" aria-label="View">' + CL_VIEWS.map(function (v) { return '<button type="button" role="tab" data-view="' + v[0] + '" aria-selected="' + (st.view === v[0]) + '">' + v[1] + '</button>'; }).join('') + '</div></div></div>' +
+      '<div class="cl-legend">' + Object.keys(CL_TONES).map(function (k) { return '<span><i class="cl-sw ' + k + '"></i>' + CL_TONES[k][0] + '</span>'; }).join('') + '<span><i class="cl-sw shop"></i>Workshop</span>' + (ctx.can('bookings.create') ? '<span class="cl-hint">' + i('hand-click') + 'Click an empty day on a car to book it</span>' : '') + '</div>' +
       '<div id="cl-body"></div></div>';
     var body = root.querySelector('#cl-body');
 
@@ -50,19 +54,29 @@ PAGES['calendar'] = {
       var shop = d.downtime.filter(function (w) { return w.from < r.to && (w.to || NOW()) > r.from; });
       return { bks: bks, shop: shop };
     }
+    /* the plate box: spaces and dashes do not matter ('vkp4418' finds VKP 4418); model words work too */
+    function carMatch(c) { var q = (st.q || '').trim(); if (!q) return true; var np = normPlate(q); return (np.length && normPlate(c.plate).indexOf(np) >= 0) || UI.wordsMatch(c.plate + ' ' + carName(c) + ' ' + c.color, q); }
+    /* cars on the calendar: active ones, plus a Not in use or Sold car only when a booking in these dates is on it */
+    function shownCars(ev) { return d.cars.filter(function (c) { return (!c.fleet || c.fleet === 'Active' || ev.bks.some(function (x) { return x.car === c; })) && carMatch(c); }); }
     function draw() {
-      var r = clRange(st.view, st.date), ev = inRange(r);
+      var r = clRange(st.view, st.date), ev = inRange(r), cars = shownCars(ev);
+      if (st.q) { ev = { bks: ev.bks.filter(function (x) { return cars.indexOf(x.car) >= 0; }), shop: ev.shop.filter(function (w) { return cars.some(function (c) { return c.id === w.car; }); }) }; }
       root.querySelector('#cl-label').textContent = r.label;
-      root.querySelector('#cl-count').textContent = plural(d.cars.length, 'car') + ' · ' + plural(ev.bks.length, 'booking');
+      root.querySelector('#cl-count').textContent = plural(cars.length, 'car') + ' · ' + plural(ev.bks.length, 'booking');
       root.querySelectorAll('[data-view]').forEach(function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-view') === st.view)); });
-      if (st.view === 'list') { body.innerHTML = listHtml(r, ev); return; }
-      body.innerHTML = gridHtml(r, ev);
+      if (st.view === 'list') {
+        body.innerHTML = listHtml(r, ev);
+        /* the list opens at today */
+        var td = body.querySelector('.cl-lday.td'), ls = body.querySelector('.cl-list'); if (td && ls) ls.scrollTop = Math.max(0, td.offsetTop);
+        return;
+      }
+      body.innerHTML = gridHtml(r, ev, cars);
       var wrap = body.querySelector('.cl-wrap');
       /* scroll so today (or 8 AM on the day view) is in sight */
       var tx = st.view === 'day' ? 8 / 24 : (today - r.from) / (r.to - r.from);
-      if (wrap && tx > 0 && tx < 1) { var tr = wrap.querySelector('.cl-track'); wrap.scrollLeft = Math.max(0, tr.offsetWidth * tx - (st.view === 'day' ? 0 : 120)); }
+      var tr = wrap && wrap.querySelector('.cl-track'); if (tr && tx > 0 && tx < 1) { wrap.scrollLeft = Math.max(0, tr.offsetWidth * tx - (st.view === 'day' ? 0 : 120)); }
     }
-    function gridHtml(r, ev) {
+    function gridHtml(r, ev, cars) {
       var colW = { timeline: 48, month: 46, week: 120, day: 64 }[st.view], span = r.to - r.from, pct = function (t) { return Math.max(0, Math.min(100, (t - r.from) / span * 100)); };
       var cells = [], head = '';
       for (var k = 0; k < r.n; k++) {
@@ -79,7 +93,7 @@ PAGES['calendar'] = {
       var bg = '<div class="cl-bg">' + cells.map(function (c) { return '<i class="' + c + '"></i>'; }).join('') + '</div>';
       var nowP = NOW() > r.from && NOW() < r.to ? '<span class="cl-now" style="left:' + pct(NOW()) + '%" aria-hidden="true"></span>' : '';
       var minW = r.n * colW;
-      var rows = d.cars.map(function (c) {
+      var rows = cars.map(function (c) {
         var items = ev.bks.filter(function (x) { return x.car === c; }).map(function (x) { return { s: x.start, e: x.end, b: x }; })
           .concat(ev.shop.filter(function (w) { return w.car === c.id; }).map(function (w) { return { s: w.from, e: w.to || new Date(Math.max(+NOW(), +r.to)), w: w }; }))
           .sort(function (a, b) { return a.s - b.s; });
@@ -94,24 +108,26 @@ PAGES['calendar'] = {
           return '<button type="button" class="cl-ev ' + clTone(x) + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + '" style="' + style + '" data-bk="' + x.code + '" aria-label="' + esc(x.code + ', ' + x.cust.name + ', ' + x.status) + '"><b>' + esc(x.cust.name) + '</b> • ' + tm(x.start) + ' - ' + tm(x.end) + ' • ' + clDays(x) + '</button>';
         }).join('');
         return '<div class="cl-car" data-car="' + c.id + '" role="button" tabindex="0" title="Open ' + esc(c.plate) + '">' + carsThumb(c, 'cl-ph') + '<div class="cl-ci"><b>' + esc(c.plate) + '</b><span>' + esc(carName(c)) + '</span><small>' + esc(c.color) + (c.fleet && c.fleet !== 'Active' ? ' · ' + esc(c.fleet) : '') + '</small></div></div>' +
-          '<div class="cl-track" style="height:' + (16 + nl * 30) + 'px" data-row="' + c.id + '">' + bg + nowP + bars + '</div>';
+          '<div class="cl-track' + (ctx.can('bookings.create') && (!c.fleet || c.fleet === 'Active') ? ' book' : '') + '" style="height:' + (16 + nl * 30) + 'px" data-row="' + c.id + '">' + bg + nowP + bars + '</div>';
       }).join('');
       return '<div class="cl-wrap"><div class="cl-grid" style="grid-template-columns:var(--cl-left) minmax(' + minW + 'px,1fr)">' +
-        '<div class="cl-corner">Cars (' + d.cars.length + ')</div><div class="cl-head" style="grid-template-columns:repeat(' + r.n + ',minmax(0,1fr))">' + head + '</div>' + rows + '</div></div>' +
-        (d.cars.length ? '' : UI.empty({ icon: 'car-off', title: 'No cars yet', text: 'Add a car on the Cars page to see it here.' }));
+        '<div class="cl-corner">Cars (' + cars.length + ')</div><div class="cl-head" style="grid-template-columns:repeat(' + r.n + ',minmax(0,1fr))">' + head + '</div>' + rows + '</div></div>' +
+        (cars.length ? '' : st.q ? UI.empty({ icon: 'car-off', title: 'No car matches "' + st.q + '"', text: 'Try the numbers of the plate, or clear the box.' }) : UI.empty({ icon: 'car-off', title: 'No cars yet', text: 'Add a car on the Cars page to see it here.' }));
     }
     function listHtml(r, ev) {
       var items = ev.bks.map(function (x) { return { at: x.start, b: x }; }).concat(ev.shop.map(function (w) { return { at: w.from, w: w }; })).sort(function (a, b) { return a.at - b.at; });
       if (!items.length) return UI.empty({ icon: 'calendar-off', title: 'No events to display', text: 'No bookings or workshop time in ' + r.label + '.' });
       var groups = {}, order = [];
       items.forEach(function (it) { var k = UI.isoDate(it.at < r.from ? r.from : it.at); if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
+      /* a Today heading even on a day with nothing, so the list always opens at today */
+      var tk = UI.isoDate(today); if (today >= r.from && today < r.to && !groups[tk]) { groups[tk] = []; order.push(tk); order.sort(); }
       return '<div class="cl-list">' + order.map(function (k) {
         var dt = UI.parseDate(k);
-        return '<div class="cl-lday"><span>' + WDL[dt.getDay()] + '</span><b>' + UI.fmt.date(dt) + '</b></div>' + groups[k].map(function (it) {
+        return '<div class="cl-lday' + (+dt === +today ? ' td' : '') + '"><span>' + (+dt === +today ? 'Today, ' : '') + WDL[dt.getDay()] + '</span><b>' + UI.fmt.date(dt) + '</b></div>' + groups[k].map(function (it) {
           if (it.w) { var c = carById(it.w.car); return '<button type="button" class="cl-li" data-shop="' + it.w.id + '"><span class="cl-lt">' + (it.at < r.from ? 'Continues' : tm(it.w.from)) + '</span><i class="cl-sw shop"></i><span class="cl-lx"><b>Workshop · ' + esc(it.w.reason) + '</b><span>' + (c ? esc(c.plate) + ' · ' + esc(carName(c)) : '') + ' · until ' + (it.w.to ? UI.fmt.dateTime(it.w.to) : 'no date set') + '</span></span></button>'; }
           var x = it.b;
           return '<button type="button" class="cl-li" data-bk="' + x.code + '"><span class="cl-lt">' + (it.at < r.from ? 'Continues' : tm(x.start)) + '</span><i class="cl-sw ' + clTone(x) + '"></i><span class="cl-lx"><b>' + esc(x.cust.name) + ' · ' + esc(x.car.plate) + '</b><span>' + x.code + ' · ' + clDays(x) + ', until ' + UI.fmt.dateTime(x.end) + '</span></span><span class="cl-lc">' + UI.status('booking', x.status) + UI.status('payment', x.pay) + '</span></button>';
-        }).join('');
+        }).join('') + (groups[k].length ? '' : '<div class="cl-lnone">No bookings or workshop time start today.</div>');
       }).join('') + '</div>';
     }
     function pointAnchor(ev, el) {
@@ -140,6 +156,16 @@ PAGES['calendar'] = {
     }
     UI.on(body, 'click', '[data-bk]', function (ev, el) { var x = findBooking(el.getAttribute('data-bk')); if (x) tip(ev, el, bookingCard(x)); });
     UI.on(body, 'click', '[data-shop]', function (ev, el) { var w = byId(d.downtime, el.getAttribute('data-shop')); if (w) tip(ev, el, shopCard(w)); });
+    /* an empty day (or hour) on a car's row starts a New Booking for that car, at 10:00 AM that day */
+    UI.on(body, 'click', '.cl-track', function (ev, el) {
+      if (ev.target.closest('.cl-ev') || !ctx.can('bookings.create')) return;
+      var c = carById(el.getAttribute('data-row')); if (!c) return;
+      if (c.fleet && c.fleet !== 'Active') { UI.toast(c.plate + ' is marked ' + c.fleet + ', so it cannot be booked.', { tone: 'warn' }); return; }
+      var r = clRange(st.view, st.date), rc = el.getBoundingClientRect(), fr = Math.max(0, Math.min(.9999, (ev.clientX - rc.left) / rc.width)), at = new Date(+r.from + fr * (r.to - r.from)), s;
+      if (r.unit === 'hour') { s = new Date(at.getFullYear(), at.getMonth(), at.getDate(), at.getHours(), 0); } else { s = clDay(at); s.setHours(10, 0, 0, 0); }
+      ctx.api.newBooking({ car: c.id, start: s, end: new Date(s.getTime() + DAY) });
+    });
+    UI.on(root, 'input', '[data-key="clq"]', UI.debounce(function (ev, el) { st.q = el.value; ctx.setParams({ q: st.q || null }, true); draw(); }, 180));
     var openCar = function (el) { ctx.api.openCar(el.getAttribute('data-car')); };
     UI.on(body, 'click', '.cl-car', function (ev, el) { openCar(el); });
     UI.on(body, 'keydown', '.cl-car', function (ev, el) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openCar(el); } });

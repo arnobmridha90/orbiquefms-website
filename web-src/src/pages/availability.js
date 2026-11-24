@@ -11,7 +11,7 @@ function avLenText(ms) {
   var h = Math.round(ms / 36e5), dd = Math.floor(h / 24), r = h % 24;
   return [dd ? plural(dd, 'day') : '', r ? plural(r, 'hour') : ''].filter(Boolean).join(' ') || mtDur(ms);
 }
-function avWhen(d) { return WD[d.getDay()] + ' ' + d.getDate() + ' ' + MON[d.getMonth()] + ', ' + tm(d); }
+function avWhen(d) { return WD[d.getDay()] + ', ' + UI.fmt.dt(d); }
 /* sort every car into available / check / booked for one period */
 function avCheck(from, to, d) {
   d = d || D();
@@ -20,9 +20,11 @@ function avCheck(from, to, d) {
     var bs = d.bookings.filter(function (x) { return x.car === c && AV_FREE.indexOf(x.status) < 0; });
     var over = bs.filter(function (x) { return x.start < to && x.end > from; });
     var w = d.downtime.filter(function (z) { return z.car === c.id && !z.back && z.from < to && (!z.to || z.to > from); })[0];
+    /* a car marked Not in use or Sold is never free */
+    if (c.fleet && c.fleet !== 'Active') { out.booked.push({ c: c, notes: [{ icon: c.fleet === 'Sold' ? 'tag' : 'ban', text: 'Marked ' + c.fleet + ', so it cannot be booked' }] }); return; }
     if (over.length || w) {
-      var notes = over.map(function (x) { return { icon: 'calendar-off', text: 'Booked in this period: ' + x.code + ', ' + dShort(x.start) + ' to ' + dShort(x.end), code: x.code }; });
-      if (w) notes.unshift({ icon: 'tool', text: 'In the workshop (' + w.reason.toLowerCase() + ') ' + dShort(w.from) + (w.to ? ' to ' + dShort(w.to) : ', no return date yet') });
+      var notes = over.map(function (x) { return { icon: 'calendar-off', text: 'Booked in this period: ' + x.code + ', ' + UI.fmt.dt(x.start) + ' to ' + UI.fmt.dt(x.end), code: x.code }; });
+      if (w) notes.unshift({ icon: 'tool', text: 'In the workshop (' + w.reason.toLowerCase() + ') ' + UI.fmt.dt(w.from) + (w.to ? ' to ' + UI.fmt.dt(w.to) : ', no return date yet') });
       out.booked.push({ c: c, notes: notes }); return;
     }
     var notes2 = [];
@@ -55,15 +57,16 @@ PAGES['availability'] = {
     var setLen = function () { if (st.len) st.to = new Date(st.from.getTime() + st.len * DAY + (st.half ? DAY / 2 : 0)); };
     var save = function () { ctx.setParams({ from: UI.isoDateTime(st.from), to: UI.isoDateTime(st.to) }, true); };
 
-    root.innerHTML = '<div class="card av-pick"><div class="av-pick-h"><div><h1 class="h4">Car Availability</h1><p class="muted">Pick a period to see which cars are free.</p></div>' +
-      UI.iconBtn('dots-vertical', 'More', { attrs: { 'data-av': 'more' } }) + '</div><div id="av-form"></div></div><div id="av-res" aria-live="polite"></div>';
+    root.innerHTML = '<div class="pg-h"><div><h1>Availability checker</h1><p>Pick a period to see at once which cars are free, which are close and which are booked.</p></div><div class="acts">' +
+      UI.btn('Open the calendar', { kind: 'o', icon: 'calendar', attrs: { 'data-av': 'cal' } }) + UI.iconBtn('dots-vertical', 'More', { attrs: { 'data-av': 'more' } }) + '</div></div>' +
+      '<div class="card av-pick"><div id="av-form"></div></div><div id="av-res" aria-live="polite"></div>';
     var form = root.querySelector('#av-form'), res = root.querySelector('#av-res');
 
     function drawForm() {
       var bad = !(st.to > st.from);
       form.innerHTML = '<div class="av-dates">' +
-        UI.input({ key: 'from', label: 'From', type: 'datetime-local', value: st.from, required: true }) +
-        UI.input({ key: 'to', label: 'To', type: 'datetime-local', value: st.to, required: true, error: bad ? 'End must be after start' : '' }) + '</div>' +
+        UI.dateTimeField({ key: 'from', label: 'From', value: st.from, required: true }) +
+        UI.dateTimeField({ key: 'to', label: 'To', value: st.to, required: true, chips: false, error: bad ? 'End must be after start' : '' }) + '</div>' +
         '<div class="av-lab">Rental length</div><div class="av-chips" role="group" aria-label="Rental length">' +
         AV_LENS.map(function (l) { return '<button type="button" class="av-chip" data-len="' + l[0] + '" aria-pressed="' + (st.len === l[0]) + '">' + l[1] + '</button>'; }).join('') +
         '<button type="button" class="av-chip" data-av="half" aria-pressed="' + !!st.half + '">' + i('plus') + '12 hours</button></div>' +
@@ -110,6 +113,7 @@ PAGES['availability'] = {
     UI.on(res, 'click', '[data-book]', function (ev, el) { ctx.api.newBooking({ car: el.getAttribute('data-book'), start: UI.isoDateTime(st.from), end: UI.isoDateTime(st.to) }); });
     UI.on(res, 'click', '[data-open]', function (ev, el) { ctx.api.openCar(el.getAttribute('data-open')); });
     UI.on(res, 'click', '[data-bk]', function (ev, el) { ctx.api.openBooking(el.getAttribute('data-bk')); });
+    UI.on(root, 'click', '[data-av="cal"]', function () { ctx.go('calendar', { date: UI.isoDate(st.from) }); });
     UI.on(root, 'click', '[data-av="more"]', function (ev, el) {
       UI.menu(el, [{ header: 'Preview other states' },
         { label: 'Booking times could not be loaded', icon: 'alert-triangle', onClick: function () { p.demo = 'offline'; ctx.setParams({ demo: 'offline' }); drawRes(); } },

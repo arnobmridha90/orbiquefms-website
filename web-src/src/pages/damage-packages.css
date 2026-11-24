@@ -2,7 +2,7 @@
 .dp-name{display:flex;align-items:center;gap:10px;min-width:0}
 .dp-ic{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;flex:none;background:rgb(var(--primary-rgb) / .12);color:var(--primary-text);font-size:18px}
 .dp-name b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dp-max{display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px}
+.dp-max{display:inline-flex;flex-direction:column;align-items:center;gap:3px}
 .dp-bar{display:block;width:90px;height:4px;border-radius:4px;background:var(--track);overflow:hidden}
 .dp-bar i{display:block;height:100%;background:var(--primary);border-radius:4px}
 .dp-g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}

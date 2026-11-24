@@ -51,3 +51,10 @@
 .dep-foot b{white-space:nowrap}
 .dep-foot b{font-size:19px;font-weight:600;color:var(--primary-text)}
 .dep-foot .grow{flex:1;min-width:0}
+/* KPI split: adjustments this month */
+.pg-deposits .dep-adj .dep-adj-r{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:13px;color:var(--text2);margin-top:4px}
+.pg-deposits .dep-adj .dep-adj-r b{font-size:16px;font-weight:600;color:var(--text);white-space:nowrap}
+.pg-deposits .dep-q select{height:36px;min-width:150px}
+.pg-deposits .dep-q > .inp:not(.srch){flex:0 1 220px;margin:0}
+@media (max-width:560px){.pg-deposits .dep-q > *,.pg-deposits .dep-q > .inp:not(.srch){flex:1 1 100%;max-width:none}}
+.dep-given{padding:12px;border-radius:8px;background:var(--hover)}

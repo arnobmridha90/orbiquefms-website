@@ -4,7 +4,18 @@
    papers (road tax, insurance, grant) with "Read document" and the review step, private owner files, gallery.
    Address: #page=cars&car=<id> opens a car, &action=add opens New Car. Sets API.openCar.
    =================================================================== */
-var CARS_SORTS = [['default', 'Sort: default'], ['plate', 'Plate number'], ['name', 'Make and model'], ['newest', 'Newest first'], ['status', 'Status'], ['serial', 'Serial']];
+var CARS_SORTS = [['default', 'Sort: default'], ['plate', 'Plate number'], ['name', 'Make and model'], ['newest', 'Newest first'], ['status', 'Status'], ['serial', 'Serial'], ['roadtax', 'Road tax: soonest first']];
+/* filter chips: [id, label, test, tone] */
+var CARS_CHIPS = [
+  ['all', 'All', function () { return true; }],
+  ['active', 'Active', function (c) { return (c.fleet || 'Active') === 'Active'; }, 'ok'],
+  ['notuse', 'Not in use', function (c) { return c.fleet === 'Not in use'; }, 'grey'],
+  ['sold', 'Sold', function (c) { return c.fleet === 'Sold'; }, 'grey'],
+  ['hidden', 'Hidden from website', function (c) { return c.web === false; }, 'info'],
+  ['tax', 'Road tax due', function (c) { return c.fleet !== 'Sold' && (!c.tax || UI.fmt.daysFrom(c.tax) <= 30); }, 'warn'],
+  ['shop', 'In workshop', function (c) { return !!c.inWorkshop; }, 'warn']
+];
+function carsPlatforms() { var l = (CO().trackerPlatforms || []).filter(Boolean); return l.length ? l : ['Tracksolid Pro']; }
 var CARS_SLOTS = [['roadtax', 'Road tax', 'receipt-tax'], ['insurance', 'Insurance', 'shield-check'], ['grant', 'Car grant', 'license']];
 var CARS_OWNER = [['ic', 'Owner IC', 'id'], ['licence', 'Owner driving licence', 'id-badge-2'], ['agreement', 'Agreement', 'file-text']];
 var CARS_SHAPE = { Hatchback: 'hatch', Sedan: 'sedan', SUV: 'suv', MPV: 'mpv', Other: 'sedan' };
@@ -30,6 +41,7 @@ function carsSorted(list, s) {
   else if (s === 'newest') l.sort(function (a, b) { return (b.created || 0) - (a.created || 0) || b.year - a.year || b.serial - a.serial; });
   else if (s === 'status') l.sort(function (a, b) { return (st[a.fleet] || 0) - (st[b.fleet] || 0) || (a.serial || 0) - (b.serial || 0); });
   else if (s === 'serial') l.sort(function (a, b) { return (a.serial || 999) - (b.serial || 999); });
+  else if (s === 'roadtax') l.sort(function (a, b) { return (a.tax ? +a.tax : 9e15) - (b.tax ? +b.tax : 9e15); });
   return l;
 }
 
@@ -39,8 +51,11 @@ PAGES['cars'] = {
     var st = ctx.state, d = ctx.data;
     st.q = st.q || ''; st.sort = st.sort || 'default'; st.per = st.per || 12; st.page = st.page || 1;
     if (!st.view) { try { st.view = localStorage.getItem('fms.carView') || 'cards'; } catch (e) { st.view = 'cards'; } }
-    var q = st.q.toLowerCase();
-    var list = carsSorted(d.cars.filter(function (c) { return !q || (c.plate + ' ' + carName(c) + ' ' + c.color + ' ' + (c.serial || '') + ' ' + c.type).toLowerCase().indexOf(q) >= 0; }), st.sort);
+    var q = st.q.toLowerCase(), qp = normPlate(st.q);
+    st.chip = st.chip || 'all';
+    var chipDef = CARS_CHIPS.filter(function (x) { return x[0] === st.chip; })[0] || CARS_CHIPS[0];
+    var matchQ = function (c) { return !q || (c.plate + ' ' + carName(c) + ' ' + c.color + ' ' + (c.serial || '') + ' ' + c.type).toLowerCase().indexOf(q) >= 0 || (qp.length >= 2 && normPlate(c.plate).indexOf(qp) >= 0); };
+    var list = carsSorted(d.cars.filter(function (c) { return matchQ(c) && chipDef[2](c); }), st.sort);
     var pages = Math.max(1, Math.ceil(list.length / st.per)); if (st.page > pages) st.page = pages;
     var shown = list.slice((st.page - 1) * st.per, st.page * st.per), from = list.length ? (st.page - 1) * st.per + 1 : 0, to = Math.min(list.length, st.page * st.per);
     var canE = ctx.can('cars.edit'), canD = ctx.can('cars.delete');
@@ -57,8 +72,9 @@ PAGES['cars'] = {
       '<div class="card cr-tools"><div class="inp srch cr-search">' + i('search') + '<input type="search" data-key="cars-q" placeholder="Search cars..." aria-label="Search cars" value="' + esc(st.q) + '"></div>' +
       UI.btn(st.sort === 'default' ? 'Sort: default' : 'Sort: ' + CARS_SORTS.filter(function (s) { return s[0] === st.sort; })[0][1], { kind: 'o', size: 'sm', icon: 'arrows-sort', attrs: { 'data-cact': 'sort', 'aria-haspopup': 'menu' } }) +
       '<div class="ptabs cr-view" role="group" aria-label="View">' + [['cards', 'layout-grid', 'Cards'], ['table', 'list', 'Table']].map(function (v) { return '<button type="button" class="ptab" data-cview="' + v[0] + '" aria-selected="' + (st.view === v[0]) + '">' + i(v[1]) + v[2] + '</button>'; }).join('') + '</div>' +
-      '<label class="row gap6 b2 cr-per">Show<span class="inp"><select data-key="cars-per" aria-label="Cars per page">' + UI.options([12, 24, 48], st.per) + '</select></span></label></div>' +
-      (list.length ? (st.view === 'cards' ? '<div class="cr-grid">' + shown.map(card).join('') + '</div>' : '<div class="card"><div id="cr-t"></div></div>') : '<div class="card">' + UI.empty({ icon: 'car-off', title: 'No cars found', text: q ? 'Nothing matches "' + st.q + '". Clear the search.' : 'Add your first car.' }) + '</div>') + pager;
+      '<label class="row gap6 b2 cr-per">Show<span class="inp"><select data-key="cars-per" aria-label="Cars per page">' + UI.options([12, 24, 48], st.per) + '</select></span></label>' +
+      '<div class="ui-fchips cr-chips" role="group" aria-label="Show">' + CARS_CHIPS.map(function (x) { var n = d.cars.filter(function (c) { return x[2](c); }).length; return x[0] !== 'all' && !n && st.chip !== x[0] ? '' : '<button type="button" class="ui-fchip' + (x[3] ? ' ' + x[3] : '') + '" data-cchip="' + x[0] + '" aria-pressed="' + (st.chip === x[0]) + '">' + esc(x[1]) + '<span class="n">' + n + '</span></button>'; }).join('') + '</div></div>' +
+      (list.length ? (st.view === 'cards' ? '<div class="cr-grid">' + shown.map(card).join('') + '</div>' : '<div class="card"><div id="cr-t"></div></div>') : '<div class="card">' + UI.empty({ icon: 'car-off', title: 'No cars found', text: q ? 'Nothing matches "' + st.q + '". Clear the search.' : st.chip !== 'all' ? 'No car is in "' + chipDef[1] + '". Pick All.' : 'Add your first car.' }) + '</div>') + pager;
     if (st.view === 'table' && list.length) {
       UI.table(root.querySelector('#cr-t'), {
         columns: [
@@ -72,21 +88,24 @@ PAGES['cars'] = {
           { key: 'owner', label: 'Owner', hidden: !ctx.can('cars.see_owner_details'), render: function (c) { return c.owner && c.owner.name ? esc(c.owner.name) + '<div class="b2">' + UI.phone(c.owner.mobile) + '</div>' : '<span class="faint">-</span>'; } },
           { key: 'inst', label: 'Instalment', hidden: !ctx.can('cars.see_instalment'), render: function (c) { return c.instalment ? UI.money(c.instalment.amount) + ' · day ' + c.instalment.day : '<span class="faint">None</span>'; } },
           { key: 'status', label: 'Status', render: function (c) { return '<div class="row wrap gap4">' + carsChips(c) + '</div>'; } },
-          { key: 'acts', label: 'Actions', render: function (c) { return '<span class="row gap4">' + UI.iconBtn(canE ? 'edit' : 'eye', canE ? 'Edit' : 'View details', { size: 'sm', attrs: { 'data-cact': 'edit', 'data-id': c.id } }) + (canD ? UI.iconBtn('trash', 'Delete', { size: 'sm', attrs: { 'data-cact': 'del', 'data-id': c.id } }) : '') + '</span>'; } }
+          { key: 'acts', label: 'Actions', render: function (c) { return '<span class="row gap4">' + UI.iconBtn('eye', 'View ' + c.plate, { size: 'sm', attrs: { 'data-cact': 'view', 'data-id': c.id } }) + (canE ? UI.iconBtn('edit', 'Edit ' + c.plate, { size: 'sm', attrs: { 'data-cact': 'edit', 'data-id': c.id } }) : '') + (canD ? UI.iconBtn('trash', 'Delete', { size: 'sm', attrs: { 'data-cact': 'del', 'data-id': c.id } }) : '') + '</span>'; } }
         ], rows: shown, rowKey: 'id', density: 'compact', pageSize: false, minWidth: 1100, sticky: false, onRowClick: function (c) { openCar(c.id); }
       });
     }
-    var openCar = function (cid) { ctx.setParams({ car: cid }); b3Open(ctx, 'car', carsDrawer); };
+    var openCar = function (cid) { ctx.setParams({ car: cid }); b3Open(ctx, 'car', carsProfile); };
+    var editCar = function (cid) { carsDrawer(cid); };
     var search = root.querySelector('[data-key="cars-q"]');
     search.addEventListener('input', UI.debounce(function () { st.q = search.value; st.page = 1; ctx.refresh(); }, 250));
     root.querySelector('[data-key="cars-per"]').addEventListener('change', function (ev) { st.per = +ev.target.value; st.page = 1; ctx.refresh(); });
     UI.on(root, 'click', '[data-cview]', function (ev, el) { st.view = el.getAttribute('data-cview'); try { localStorage.setItem('fms.carView', st.view); } catch (e) { /* private window */ } ctx.refresh(); });
+    UI.on(root, 'click', '[data-cchip]', function (ev, el) { st.chip = el.getAttribute('data-cchip'); st.page = 1; ctx.refresh(); });
     UI.on(root, 'click', '[data-cpg]', function (ev, el) { st.page = +el.getAttribute('data-cpg'); ctx.refresh(); window.scrollTo(0, 0); });
     UI.on(root, 'click', '[data-cact]', function (ev, el) {
       ev.stopPropagation();
       var a = el.getAttribute('data-cact'), idv = el.getAttribute('data-id');
       if (a === 'new') carsDrawer(null);
-      else if (a === 'edit') openCar(idv);
+      else if (a === 'edit') editCar(idv);
+      else if (a === 'view') openCar(idv);
       else if (a === 'del') carsDelete(idv);
       else if (a === 'sort') UI.menu(el, CARS_SORTS.map(function (s) { return { label: s[1], checked: st.sort === s[0], onClick: function () { st.sort = s[0]; st.page = 1; ctx.refresh(); } }; }));
     });
@@ -94,7 +113,7 @@ PAGES['cars'] = {
     UI.on(root, 'keydown', '.cr-card', function (ev, el) { if (ev.key === 'Enter' && ev.target === el) openCar(el.getAttribute('data-car')); });
     var p = ctx.params;
     if (p.action === 'add') { ctx.setParams({ action: null }); setTimeout(function () { carsDrawer(null); }, 0); }
-    b3Open(ctx, 'car', carsDrawer);
+    b3Open(ctx, 'car', carsProfile);
   },
   search: [{ label: 'New Car', icon: 'car', run: function () { carsDrawer(null); } }]
 };
@@ -254,8 +273,10 @@ function carsDrawer(id, onClose) {
       (isNew ? '' : '<p class="b2 cr-note">' + i('gauge') + 'Odometer: ' + mtKm(c.odo) + '. Update it from the Maintenance button, it follows every service and hand-over.</p>'), { icon: 'flag' });
     if (seeOwn || seeInst) h += sec('Owner and instalment', '<div class="cr-form">' + (seeOwn ? I({ key: 'ownerName', label: 'Owner name', value: w.ownerName }) + I({ key: 'ownerMobile', label: 'Owner mobile', type: 'tel', value: w.ownerMobile, placeholder: '+60 00-000 0000' }) + I({ key: 'ownerIc', label: 'Owner IC number (12 digits)', value: w.ownerIc, maxlength: 14, placeholder: '900101145678' }) : '') +
       (seeInst ? I({ key: 'instDay', label: 'Instalment day', type: 'number', min: 1, max: 31, value: w.instDay, help: 'The same date every month. Leave empty for none.' }) + I({ key: 'instAmt', label: 'Monthly instalment (RM)', type: 'number', prefix: 'RM', min: 0, value: w.instAmt, help: 'Shows on the Instalments page when it is due' }) : '') + '</div>', { icon: 'user-dollar' });
-    h += sec('Tracker', '<div class="cr-form">' + I({ key: 'trkPlatform', label: 'Platform / app', value: w.trkPlatform, placeholder: 'Tracksolid Pro' }) + I({ key: 'trkImei', label: 'IMEI', value: w.trkImei, maxlength: 15, help: 'The IMEI is how the Tracking page recognises this car, so each IMEI can be on one car only.' }) + I({ key: 'trkSim', label: 'SIM number', value: w.trkSim }) + '</div>', { icon: 'radar-2' });
-    h += sec('Dashcam', '<div class="cr-form">' + I({ key: 'camPlatform', label: 'Platform / app', value: w.camPlatform }) + I({ key: 'camImei', label: 'IMEI', value: w.camImei, maxlength: 15 }) + I({ key: 'camSim', label: 'SIM number', value: w.camSim }) + '</div>', { icon: 'video' });
+    var plats = carsPlatforms();
+    h += '<datalist id="cr-plats">' + plats.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>';
+    h += sec('Tracker', '<div class="cr-form">' + I({ key: 'trkPlatform', label: 'Platform / app', value: w.trkPlatform, placeholder: plats[0], attrs: { list: 'cr-plats' }, help: 'Pick one from your list in Settings, or type it' }) + I({ key: 'trkImei', label: 'IMEI', value: w.trkImei, maxlength: 15, attrs: { inputmode: 'numeric' }, help: 'The IMEI is how the Tracking page recognises this car, so each IMEI can be on one car only.' }) + I({ key: 'trkSim', label: 'SIM number', value: w.trkSim, type: 'tel' }) + '</div>', { icon: 'radar-2' });
+    h += sec('Dashcam', '<div class="cr-form">' + I({ key: 'camPlatform', label: 'Platform / app', value: w.camPlatform, placeholder: plats[0], attrs: { list: 'cr-plats' } }) + I({ key: 'camImei', label: 'IMEI', value: w.camImei, maxlength: 16, attrs: { inputmode: 'numeric' }, help: '14 to 16 digits, on a sticker on the dashcam' }) + I({ key: 'camSim', label: 'SIM number', value: w.camSim, type: 'tel' }) + '</div>', { icon: 'video' });
     h += facts();
     h += sec('Road tax, insurance and car grant', '<p class="b2">Upload each paper as a picture or PDF. "Read document" reads the expiry date, engine and chassis numbers, capacity, model, year, spec and owner IC from it and shows them to you to check. Nothing changes on the car until you press Save on that screen.</p>' +
       CARS_SLOTS.map(function (s) { return slot(s[0], s[1], s[2], x.papers[s[0]], { read: true, manage: canE, group: 'papers' }); }).join(''), { icon: 'files' });
@@ -327,12 +348,14 @@ function carsDrawer(id, onClose) {
     var imei = String(w.trkImei || '').replace(/\D/g, '');
     if (imei && imei.length !== 15) { UI.toast('The tracker IMEI has 15 digits', { tone: 'warn' }); return false; }
     if (imei && d.cars.some(function (o) { return o !== c && o.tracker && o.tracker.imei === imei; })) { UI.toast('That IMEI is on another car. Each IMEI can be on one car only.', { tone: 'warn' }); return false; }
+    var camImei = String(w.camImei || '').replace(/\D/g, '');
+    if (camImei && (camImei.length < 14 || camImei.length > 16)) { UI.toast('The dashcam IMEI has 14 to 16 digits', { tone: 'warn' }); return false; }
     var ic = String(w.ownerIc || '').replace(/\D/g, '');
     if (seeOwn && ic && ic.length !== 12) { UI.toast('The owner IC number has 12 digits', { tone: 'warn' }); return false; }
     if (seeInst && w.instDay && (w.instDay < 1 || w.instDay > 31)) { UI.toast('The instalment day is between 1 and 31', { tone: 'warn' }); return false; }
     var rec = { make: w.make, model: w.model, plate: plate, serial: w.serial || null, color: w.color, year: Number(w.year), seats: Number(w.seats), cc: w.cc || null, type: w.type, fuel: w.fuel, trans: w.trans, tax: mtDate(w.tax), fleet: w.fleet, web: !!w.web,
       vin: w.vin, chassis: w.vin, engine: w.engine, spec: w.spec, boughtOn: mtDate(w.boughtOn), rate: Number(w.rate) || 0, hourly: Number(w.hourly) || 0, deposit: Number(w.deposit) || 0, shape: CARS_SHAPE[w.type] || 'sedan',
-      tracker: imei || w.trkPlatform ? { platform: w.trkPlatform, imei: imei, sim: w.trkSim } : null, dashcam: w.camImei || w.camPlatform ? { platform: w.camPlatform, imei: String(w.camImei || '').replace(/\D/g, ''), sim: w.camSim } : null,
+      tracker: imei || w.trkPlatform ? { platform: w.trkPlatform, imei: imei, sim: w.trkSim } : null, dashcam: camImei || w.camPlatform ? { platform: w.camPlatform, imei: camImei, sim: w.camSim } : null,
       thumb: x.thumbDel ? null : x.thumb, gallery: x.gallery.filter(function (g) { return !g.del; }).sort(function (a, b) { return a.order - b.order; }), papers: x.papers, ownerDocs: x.ownerDocs };
     if (mtCostsOk()) rec.boughtFor = Number(w.boughtFor) || null;
     if (seeOwn) rec.owner = { name: w.ownerName, mobile: w.ownerMobile, ic: ic };
@@ -354,6 +377,61 @@ function carsDrawer(id, onClose) {
   return dr;
 }
 
+
+/* ---------------- the car profile: what staff need at a glance, read only, with Edit ---------------- */
+var CARS_PROF = null;
+function carsProfile(id, onClose) {
+  var c0 = carById(id); if (!c0) { UI.toast('That car is no longer in the fleet', { tone: 'warn' }); return; }
+  if (CARS_PROF && !CARS_PROF.closed && CARS_PROF.carId === id) return CARS_PROF;
+  var tile = function (icon, label, value, sub, extra) { return '<div class="cr-pt">' + i(icon, 'cr-pt-ic') + '<div class="cr-pt-b"><span class="cr-pt-l">' + esc(label) + '</span><b>' + value + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + (extra || '') + '</div></div>'; };
+  var dateChip = function (dt, warn) { if (!dt) return UI.chip('Not recorded', 'grey', { sm: true }); var k = UI.fmt.daysFrom(dt); return k < 0 ? UI.chip('Expired ' + plural(-k, 'day') + ' ago', 'bad', { sm: true }) : k === 0 ? UI.chip('Expires today', 'bad', { sm: true }) : k <= (warn || 30) ? UI.chip('In ' + plural(k, 'day'), 'warn', { sm: true }) : UI.chip('Valid', 'ok', { sm: true }); };
+  var dr = UI.drawer({ title: c0.plate, subtitle: carName(c0), width: 600, live: true, onClose: onClose, body: function (el, dw) {
+    var d = D(), c = carById(id); if (!c) { setTimeout(function () { dw.close(true); }, 0); return ''; }
+    dw.setTitle(c.plate, carName(c) + (c.year ? ' · ' + c.year : ''));
+    var now = NOW(), mine = d.bookings.filter(function (x) { return x.car === c && x.status !== 'Cancelled'; });
+    var out = mine.filter(function (x) { return x.status === 'Car Delivered'; })[0];
+    var next = mine.filter(function (x) { return x.start > now && ['Completed', 'Car Returned', 'Car Delivered'].indexOf(x.status) < 0; }).sort(function (a, b) { return a.start - b.start; })[0];
+    var ins = typeof mtLatestPaper === 'function' ? mtLatestPaper(c.id, 'Insurance', d) : null, insAt = ins && ins.until ? ins.until : c.insExp;
+    var lastJ = (d.jobs || []).filter(function (j) { return j.car === c.id && j.status === 'Done'; }).sort(function (a, b) { return (b.doneAt || b.date) - (a.doneAt || a.date); })[0];
+    var nextS = typeof mtRemInfo === 'function' ? (d.reminders || []).filter(function (r) { return r.car === c.id && r.on; }).map(function (r) { return { r: r, x: mtRemInfo(r, c) }; }).filter(function (z) { return z.x.state !== 'none'; }).sort(function (a, b) { return a.x.sort - b.x.sort; })[0] : null;
+    var trk = (d.trackers || []).filter(function (t) { return t.car === c.id; })[0], seeInst = can('cars.see_instalment');
+    var inst = seeInst ? (d.instalments || []).filter(function (it) { return it.car === c.id && !it.paid; }).sort(function (a, b) { return a.due - b.due; })[0] : null;
+    var w = typeof mtDowntimeOn === 'function' ? mtDowntimeOn(c.id, now, now, d) : null;
+    var acts = [];
+    if (!can('cars.edit')) acts.push(UI.btn('All details', { kind: 'o', icon: 'list-details', size: 'sm', attrs: { 'data-cp': 'edit' } }));
+    if (can('bookings.create') && (c.fleet || 'Active') === 'Active') acts.push(UI.btn('New booking', { kind: 'tonal', icon: 'calendar-plus', size: 'sm', attrs: { 'data-cp': 'book' } }));
+    if (can('maintenance.view')) acts.push(UI.btn('Maintenance', { kind: 'tonal', icon: 'tool', size: 'sm', attrs: { 'data-cp': 'health' } }));
+    if (trk && can('tracking.history')) acts.push(UI.btn('Trip history', { kind: 'g', icon: 'route', size: 'sm', attrs: { 'data-cp': 'trip' } }));
+    var nowLine = out ? UI.chip('Out with ' + out.cust.name.split(' ')[0] + ' until ' + UI.fmt.date(out.end), out.end < now ? 'bad' : 'info', { icon: 'road' }) : w ? UI.chip('In the workshop' + (w.to ? ' until ' + UI.fmt.date(w.to) : ''), 'warn', { icon: 'tool' }) : (c.fleet || 'Active') === 'Active' ? UI.chip('At the office, free now', 'ok', { icon: 'circle-check' }) : '';
+    return '<div class="cr-prof">' +
+      '<div class="cr-ph">' + carsThumb(c, 'cr-ph-img') + '<div class="cr-ph-t"><span class="plate cr-ph-plate">' + esc(c.plate) + '</span><div class="b2">' + esc(carsSpec(c)) + (c.color ? ' · ' + esc(c.color) : '') + '</div><div class="row wrap gap6">' + carsChips(c) + '</div>' + (nowLine ? '<div>' + nowLine + '</div>' : '') + '</div></div>' +
+      '<div class="row wrap gap8 cr-pacts">' + acts.join('') + '</div>' +
+      '<div class="cr-pgrid">' +
+      tile('receipt-tax', 'Road tax', c.tax ? UI.fmt.date(c.tax) : 'Not recorded', '', dateChip(c.tax)) +
+      tile('shield-check', 'Insurance', insAt ? UI.fmt.date(insAt) : 'Not recorded', ins && ins.provider ? esc(ins.provider) : c.insurer ? esc(c.insurer) : '', dateChip(insAt)) +
+      tile('calendar-event', 'Next booking', next ? '<button type="button" class="cr-plink" data-cp="bk" data-v="' + next.code + '">' + esc(next.code) + '</button>' : 'None booked', next ? esc(next.cust.name) + '<br>' + UI.fmt.dateTime(next.start) + ' to ' + UI.fmt.date(next.end) : 'Free from now on') +
+      tile('tool', 'Last service', lastJ ? UI.fmt.date(lastJ.doneAt || lastJ.date) : 'None yet', lastJ ? esc(lastJ.title) + (lastJ.odo ? ' · ' + UI.fmt.num(lastJ.odo) + ' km' : '') : '', nextS ? '<small class="' + (nextS.x.state === 'over' ? 'cr-bad' : nextS.x.state === 'soon' ? 'cr-warn' : '') + '">Next: ' + esc(nextS.r.service) + ', ' + esc(nextS.x.text.toLowerCase()) + '</small>' : '') +
+      tile('gauge', 'Odometer', UI.fmt.num(c.odo || 0) + ' km', c.odoAt ? 'As of ' + UI.fmt.date(c.odoAt) : '') +
+      (seeInst ? tile('calendar-dollar', 'Instalment', c.instalment ? UI.money(c.instalment.amount) + ' a month' : 'None', c.instalment ? 'Due on day ' + c.instalment.day + (inst ? ' · next ' + UI.fmt.date(inst.due) + (inst.due < now ? ' (overdue)' : '') : '') : '') : '') +
+      tile('radar-2', 'Tracker', c.tracker && (c.tracker.imei || c.tracker.platform) ? esc(c.tracker.platform || 'Tracker') : 'No tracker', c.tracker && c.tracker.imei ? 'IMEI ' + esc(c.tracker.imei) : '', trk ? '<span class="row gap4 wrap">' + UI.status('tracker', trk.state) + '<small>' + (trk.at ? UI.fmt.ago(trk.at) : '') + '</small></span>' : '') +
+      tile('video', 'Dashcam', c.dashcam && (c.dashcam.imei || c.dashcam.platform) ? esc(c.dashcam.platform || 'Dashcam') : 'No dashcam', c.dashcam && c.dashcam.imei ? 'IMEI ' + esc(c.dashcam.imei) : '') +
+      tile('cash', 'Rates', c.rate ? UI.money(c.rate) + ' a day' : 'No daily rate', [c.hourly ? UI.fmt.money(c.hourly) + ' an hour' : '', c.deposit ? UI.fmt.money(c.deposit) + ' deposit' : ''].filter(Boolean).join(' · ')) +
+      '</div></div>';
+  }, foot: [{ label: 'Close', kind: 'g' }].concat(can('cars.edit') ? [{ label: 'Edit car', icon: 'edit', close: false, onClick: function () { carsDrawer(id); return false; } }] : []) });
+  dr.carId = id; CARS_PROF = dr;
+  dr.body.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-cp]'); if (!b) return;
+    var a = b.getAttribute('data-cp');
+    if (a === 'edit') carsDrawer(id);
+    else if (a === 'health') mtCarHealth(id);
+    else if (a === 'book') API.newBooking({ car: id });
+    else if (a === 'bk') API.openBooking(b.getAttribute('data-v'));
+    else if (a === 'trip') { UI.closeAll(); go('tracking', { tab: 'history', car: id }); }
+  });
+  return dr;
+}
+
 /* other pages open a car here; the old string drawer forwards to it */
-API.openCar = function (id) { carsDrawer(id); };
-DRAWERS['car'] = function (dr) { var c = D().cars[dr.i]; setTimeout(function () { S.drawer = null; if (c) carsDrawer(c.id); }, 0); return ''; };
+API.openCar = function (id) { carsProfile(id); };
+API.editCar = function (id) { carsDrawer(id); };
+DRAWERS['car'] = function (dr) { var c = D().cars[dr.i]; setTimeout(function () { S.drawer = null; if (c) carsProfile(c.id); }, 0); return ''; };

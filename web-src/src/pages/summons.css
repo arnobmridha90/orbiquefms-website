@@ -83,3 +83,11 @@
 /* dark: the theme sets --primary-text for light paper only, so lift it here */
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pg-summons,:root:not([data-theme="light"]) .ui-ov:has(.sms-sec,.sms-form,.sms-imp,.sms-uplist,.sms-lead,.sms-orig){--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}}
 :root[data-theme="dark"] .pg-summons,:root[data-theme="dark"] .ui-ov:has(.sms-sec,.sms-form,.sms-imp,.sms-uplist,.sms-lead,.sms-orig){--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}
+/* W5: three short lines in the no-booking banner, the plate picker */
+.sms-nbl{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.sms-nbl li{display:flex;align-items:center;gap:8px;min-height:40px;border-top:1px solid rgb(var(--error-rgb) / .15)}
+.sms-nbl li:first-child{border-top:0}
+.sms-nbl .sms-show{min-height:36px;white-space:nowrap}
+.sms-nbl .sms-show[aria-pressed="true"]{background:rgb(var(--error-rgb) / .12)}
+.sms-platebox{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sms-platebox .sms-ptog{align-self:flex-start;min-height:36px;padding-left:0;padding-right:0}

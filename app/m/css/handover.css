@@ -1,0 +1,98 @@
+/* ---------- handover and return checklist (M5) ---------- */
+.hoc { flex: 1; display: flex; flex-direction: column; min-height: 100%; }
+.ho-step { flex: 1; }
+.ho-prog { display: flex; gap: 5px; margin: 2px 0 8px; }
+.ho-prog i { flex: 1; height: 5px; border-radius: 3px; background: #E3E6EB; }
+.ho-prog i.done { background: var(--brand); opacity: .55; }
+.ho-prog i.on { background: var(--brand); }
+.ho-stepname { font-size: 13px; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; min-height: 28px; }
+.ho-stepname b { color: var(--text); font-weight: 700; }
+.ho-over { margin-left: auto; height: 32px; padding: 0 10px; border-radius: 9px; font-size: 13px; font-weight: 650; color: var(--t-red); }
+.ho-ask { margin: 2px 0 12px; font-size: 15px; font-weight: 600; }
+.ho-bact { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ho-bact .btn.sm { height: 40px; }
+.ho-slots { display: grid; gap: 10px; margin-bottom: 4px; }
+.ho-slots.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ho-slots.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ho-slots.three .ho-slot { min-height: 0; }
+.ho-slots.one { grid-template-columns: 1fr; }
+.ho-slot { position: relative; aspect-ratio: 4 / 3; border-radius: 14px; border: 1.5px dashed #C6CBD3; background: #F7F8FA; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; color: var(--muted); min-height: 96px; }
+.ho-slots.one .ho-slot { aspect-ratio: 16 / 7; }
+.ho-slot:active { background: var(--tint); }
+.ho-slot-ic { width: 42px; height: 42px; border-radius: 13px; background: var(--tint); color: var(--brand-ink); display: grid; place-items: center; }
+.ho-slot-ic svg { width: 22px; height: 22px; }
+.ho-slot-t { font-size: 13.5px; font-weight: 650; color: #3B4250; }
+.ho-slot.has { border-style: solid; border-color: var(--line); background: #000; }
+.ho-slot.has img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ho-slot-l { position: absolute; left: 6px; bottom: 6px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 6px; border-radius: 8px; background: rgba(0,0,0,.62); color: #fff; font-size: 12px; font-weight: 650; }
+.ho-slot-l svg { width: 13px; height: 13px; color: #7CE0A6; }
+.ho-del { position: absolute; top: 4px; right: 4px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; display: grid; place-items: center; }
+.ho-del svg { width: 16px; height: 16px; }
+.ho-sample { height: 40px; font-size: 13.5px; margin: 4px 0 8px; }
+.ho-sample svg { width: 17px; height: 17px; }
+.ho-km { font-size: 22px; height: 56px; font-weight: 700; letter-spacing: .01em; }
+.ho-km::placeholder { font-size: 16px; font-weight: 500; letter-spacing: 0; }
+.ho-fuel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.ho-fuel button { height: 64px; border-radius: 13px; border: 1px solid #D9DCE2; background: #fff; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.ho-fuel button.on { border-color: var(--brand); background: var(--tint); color: var(--brand-ink); box-shadow: 0 0 0 1px var(--brand) inset; }
+.ho-gauge { width: 12px; height: 30px; border-radius: 4px; border: 1.5px solid currentColor; position: relative; overflow: hidden; opacity: .8; }
+.ho-gauge i { position: absolute; left: 0; right: 0; bottom: 0; background: currentColor; }
+.ho-ta { height: 110px; padding: 10px 12px; resize: vertical; line-height: 1.4; }
+.ho-yn button { min-width: 88px; height: 46px; font-size: 15px; }
+.ho-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ho-now { height: 40px; font-size: 14px; margin: -4px 0 10px; width: auto; padding: 0 4px; }
+.ho-now svg { width: 17px; height: 17px; }
+.ho-sum { background: var(--bg); border-radius: 12px; padding: 8px 12px; margin: 6px 0 10px; }
+.ho-sum-h { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 4px 0; }
+.ho-sum > div:not(.ho-sum-h) { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid #E6E8EC; font-size: 14px; }
+.ho-sum > div:nth-child(2) { border-top: 0; }
+.ho-sum > div > span { color: var(--muted); }
+.ho-sum > div > b { font-weight: 650; text-align: right; display: inline-flex; gap: 6px; align-items: center; }
+.ho-gps { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin: 4px 0 6px; }
+.ho-gps svg { width: 18px; height: 18px; flex: none; color: var(--t-green); }
+.ho-foot { margin-top: auto; }
+.ho-btns { display: flex; gap: 10px; }
+.ho-btns .ho-backb { width: auto; flex: none; padding: 0 16px; }
+.ho-btns .btn:last-child { flex: 1; }
+.ho-saving { padding: 4px 0; }
+.ho-bar { height: 10px; border-radius: 5px; background: #E6E8EC; overflow: hidden; margin-bottom: 8px; }
+.ho-bar i { display: block; height: 100%; width: 0; background: var(--brand); border-radius: 5px; transition: width .1s linear; }
+.ho-saving span { font-size: 14px; font-weight: 650; color: #3B4250; }
+.ho-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+.ho-chips .fchip { height: 40px; padding: 0 15px; }
+.ho-keep.on { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px 4px; margin-bottom: 8px; }
+.ho-keep.on .rmfield, .ho-keep.on .inp { margin-bottom: 6px; }
+.ho-keep-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.ho-keep-h .iconbtn { width: 38px; height: 38px; }
+.ho-depline { display: flex; justify-content: space-between; align-items: center; padding: 8px 2px; font-size: 14.5px; border-bottom: 1px solid var(--line); }
+.ho-depline .money { min-width: 110px; text-align: center; }
+.ho-depline.big { font-weight: 750; font-size: 16px; border-bottom: 0; }
+.ho-done { text-align: center; padding-top: 52px; flex: 1; }
+.ho-done .ho-sum { text-align: left; margin: 12px 0 14px; }
+.ho-done .ho-sum > div:first-child { border-top: 0; }
+.confirm-ic.ok { background: var(--t-green-bg); color: var(--t-green); }
+.ho-fee { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; border-radius: 14px; background: var(--tint); border: 1px solid transparent; margin-bottom: 8px; min-height: 64px; }
+.ho-fee > svg { width: 24px; height: 24px; color: var(--brand-ink); flex: none; }
+.ho-fee > svg:last-child { width: 18px; height: 18px; color: var(--muted); }
+.ho-fee .grow { flex: 1; min-width: 0; }
+.ho-fee .grow b { display: block; font-size: 15px; }
+.ho-fee .grow span { display: block; font-size: 13px; color: var(--muted); }
+.ho-fee > .money { font-size: 16px; min-width: 92px; text-align: center; }
+.ho-fee.taken { background: var(--t-green-bg); }
+.ho-fee.taken > svg { color: var(--t-green); }
+/* fee sheet */
+.fee-list { display: grid; gap: 8px; margin: 6px 0 8px; }
+.fee-opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px; border-radius: 13px; border: 1px solid #D9DCE2; background: #fff; min-height: 60px; }
+.fee-opt.on { border-color: var(--brand); background: var(--tint); box-shadow: 0 0 0 1px var(--brand) inset; }
+.fee-opt.taken { background: #F4F5F7; opacity: .8; cursor: default; }
+.fee-opt .grow { flex: 1; min-width: 0; }
+.fee-opt .grow b { display: block; font-size: 14.5px; }
+.fee-opt .grow small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.fee-opt > .money { min-width: 86px; text-align: center; font-weight: 700; }
+.fee-rad { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #C6CBD3; flex: none; position: relative; }
+.fee-opt.on .fee-rad { border-color: var(--brand); }
+.fee-opt.on .fee-rad::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--brand); }
+.fee-opt.taken .fee-rad { border-style: dashed; }
+/* work around: core applyTheme gets NaN from C.contrast(brand, "#fff") (3-digit hex), so --on-brand is #111 for every company. All three brands need white text. */
+.ho-sheet .btn:not(.ghost):not(.link):not(.danger), .fee-sheet .btn:not(.ghost):not(.link) { color: #fff; }
+.banner .ho-bact .btn svg { color: currentColor; }

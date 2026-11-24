@@ -5,21 +5,24 @@
    Address: #page=tracking&tab=now|history|alarms|accounts  (&car=<id> on history)
    =================================================================== */
 var TR_TABS = [{ id: 'now', label: 'Fleet now', icon: 'map-pin', code: 'tracking.view' }, { id: 'history', label: 'Trip history', icon: 'route', code: 'tracking.history' }, { id: 'alarms', label: 'Alarms', icon: 'bell-ringing', code: 'tracking.alarms' }, { id: 'accounts', label: 'Accounts', icon: 'plug-connected', code: 'tracking.manage_accounts' }];
-var TR_OVER = 110, TR_KEEP = 90;
-var TR_PLATFORMS = ['Tracksolid Pro', 'Tracksolid (Bangladesh)', 'Other (same API, own address)'];
+/* the over-speed limit, how long trips are kept and the platform list come from Settings (Fleet settings) */
+function trFleet() { var c = CO() || {}; return c.fleet || {}; }
+function trOver() { return Number(trFleet().overspeed) || 110; }
+function trKeep() { return Number(trFleet().historyDays) || 30; }
+function trPlatforms() { var l = ((CO() || {}).trackerPlatforms || []).filter(Boolean); return l.length ? l : ['Tracksolid Pro', 'Other']; }
 
 function trMaps(lat, lng) { return 'https://www.google.com/maps?q=' + lat.toFixed(5) + ',' + lng.toFixed(5); }
 function trPos(lat, lng) { return '<span class="tr-pos"><span class="num">' + lat.toFixed(4) + ', ' + lng.toFixed(4) + '</span><a href="' + trMaps(lat, lng) + '" target="_blank" rel="noopener" data-stop>Open in Maps</a></span>'; }
 function trKm(a, b) { var R = 6371, r = Math.PI / 180, dLa = (b.lat - a.lat) * r, dLo = (b.lng - a.lng) * r, h = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLo / 2) * Math.sin(dLo / 2); return 2 * R * Math.asin(Math.sqrt(h)); }
 function trSeed(s) { var h = 2166136261; for (var k = 0; k < s.length; k++) { h ^= s.charCodeAt(k); h = Math.imul(h, 16777619); } return function () { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; }; }
-function trStateChip(t) { return UI.status('tracker', t.state) + (t.speed > TR_OVER ? ' ' + UI.chip('Over-speed', 'bad') : ''); }
+function trStateChip(t) { return UI.status('tracker', t.state) + (t.speed > trOver() ? ' ' + UI.chip('Over-speed', 'bad') : ''); }
 function trAccChip(a) { return UI.chip(a.status, { Working: 'ok', Problem: 'bad', 'Switched off': 'grey', 'Not read yet': 'warn' }[a.status] || 'grey'); }
 
 /* trip points for one car between two days (made up but the same on every load) */
 function trTrip(carId, from, to) {
   var c = carById(carId), pos = CITY_POS[B().id] || CITY_POS.mine, pts = [];
   if (!c) return pts;
-  var keepFrom = new Date(mtToday().getTime() - TR_KEEP * DAY);
+  var keepFrom = new Date(mtToday().getTime() - trKeep() * DAY);
   for (var day = new Date(from); day <= to; day = new Date(day.getTime() + DAY)) {
     if (day < keepFrom || day > NOW()) continue;
     var R = trSeed(carId + UI.isoDate(day)), trips = R() < .18 ? 0 : 1 + Math.floor(R() * 2);
@@ -97,7 +100,7 @@ PAGES['tracking'] = {
       st.f = st.f || { state: 'all', q: '' };
       el.innerHTML = '<div class="tr-now"><div class="card tr-mapc"><div class="tr-maph"><b>Map</b><span class="faint" id="tr-upd"></span>' + UI.btn('Refresh', { kind: 't', size: 'sm', icon: 'refresh', attrs: { 'data-tr': 'tick' } }) + '</div><div id="tr-map"></div>' +
         '<div class="tr-leg"><span><i class="moving"></i>Moving</span><span><i class="parked"></i>Parked</span><span><i class="offline"></i>Offline</span><span><i class="over"></i>Over-speed</span></div></div>' +
-        '<div class="card tr-listc"><div id="tr-f"></div><div id="tr-t"></div></div></div><p class="tr-note">' + i('info-circle') + 'Updates every 30 seconds. A car is Offline when nothing was heard from its tracker for a while. Over-speed is flagged at ' + TR_OVER + ' km/h.</p>';
+        '<div class="card tr-listc"><div id="tr-f"></div><div id="tr-t"></div></div></div><p class="tr-note">' + i('info-circle') + 'Updates every 30 seconds. A car is Offline when nothing was heard from its tracker for a while. Over-speed is flagged at ' + trOver() + ' km/h.</p>';
       var counts = function () { var c = { all: d.trackers.length, Moving: 0, Parked: 0, Offline: 0 }; d.trackers.forEach(function (t) { c[t.state]++; }); return c; };
       var rows = function () {
         var q = (st.f.q || '').toLowerCase();
@@ -108,7 +111,7 @@ PAGES['tracking'] = {
           { key: 'car', label: 'Car', sort: function (t) { var c = carById(t.car); return c ? c.plate : 'zz'; }, render: function (t) { var c = carById(t.car); return c ? mtCarCell(c) : '<span class="faint">Not linked to a car</span>'; } },
           { key: 'name', label: 'Tracker', sort: true, render: function (t) { return esc(t.name); } },
           { key: 'state', label: 'State', sort: true, render: trStateChip },
-          { key: 'speed', label: 'Speed', align: 'right', sort: true, render: function (t) { return t.state === 'Offline' ? '-' : '<span class="num' + (t.speed > TR_OVER ? ' tr-fast' : '') + '">' + t.speed + ' km/h</span>'; } },
+          { key: 'speed', label: 'Speed', align: 'right', sort: true, render: function (t) { return t.state === 'Offline' ? '-' : '<span class="num' + (t.speed > trOver() ? ' tr-fast' : '') + '">' + t.speed + ' km/h</span>'; } },
           { key: 'ign', label: 'Ignition', render: function (t) { return t.ign ? 'On' : 'Off'; } },
           { key: 'at', label: 'Last update', sort: true, render: function (t) { return t.at ? UI.fmt.ago(t.at) : '<span class="faint">No report yet</span>'; } },
           { key: 'pos', label: 'Position', render: function (t) { return trPos(t.lat, t.lng); } }
@@ -125,7 +128,7 @@ PAGES['tracking'] = {
       };
       function drawMap() {
         var vis = rows();
-        el.querySelector('#tr-map').innerHTML = trMap({ points: vis.map(function (t) { var c = carById(t.car); return { id: t.id, lat: t.lat, lng: t.lng, cls: t.state.toLowerCase(), state: t.state, over: t.speed > TR_OVER, sel: st.sel === t.id, label: c ? c.plate : t.name }; }) });
+        el.querySelector('#tr-map').innerHTML = trMap({ points: vis.map(function (t) { var c = carById(t.car); return { id: t.id, lat: t.lat, lng: t.lng, cls: t.state.toLowerCase(), state: t.state, over: t.speed > trOver(), sel: st.sel === t.id, label: c ? c.plate : t.name }; }) });
         el.querySelector('#tr-upd').textContent = 'Updated ' + UI.fmt.ago(st.lastTick || NOW());
       }
       filt(); drawMap();
@@ -160,9 +163,10 @@ PAGES['tracking'] = {
       if (p.car && carById(p.car)) st.hcar = p.car;
       st.hcar = st.hcar || (cars[0] && cars[0].id) || '';
       st.hfrom = st.hfrom || UI.isoDate(NOW()); st.hto = st.hto || UI.isoDate(NOW());
-      el.innerHTML = '<div class="card tr-pick"><div class="tr-pickf">' + UI.select({ key: 'car', label: 'Car', value: st.hcar, options: cars.map(function (c) { var t = d.trackers.filter(function (x) { return x.car === c.id; })[0]; return [c.id, c.plate + ' (' + (t ? t.name : '') + ')']; }), placeholder: cars.length ? '' : 'No car has a tracker' }) +
-        UI.input({ key: 'from', label: 'From', type: 'date', value: st.hfrom }) + UI.input({ key: 'to', label: 'To', type: 'date', value: st.hto }) + UI.btn('Show trip', { icon: 'route', attrs: { 'data-tr': 'show' } }) + '</div><div id="tr-herr"></div></div><div id="tr-hres"></div>';
+      el.innerHTML = '<div class="card tr-pick"><div class="tr-pickf"><div class="tr-carpk"></div>' +
+        UI.dateField({ key: 'from', label: 'From', value: st.hfrom, max: UI.isoDate(NOW()), chips: [{ label: 'Today', days: 0 }, { label: 'Yesterday', days: -1 }] }) + UI.dateField({ key: 'to', label: 'To', value: st.hto, max: UI.isoDate(NOW()), chips: [{ label: 'Today', days: 0 }, { label: 'Yesterday', days: -1 }] }) + UI.btn('Show trip', { icon: 'route', attrs: { 'data-tr': 'show' } }) + '</div><div id="tr-herr"></div></div><div id="tr-hres"></div>';
       var res = el.querySelector('#tr-hres'), err = el.querySelector('#tr-herr');
+      UI.carPicker(el.querySelector('.tr-carpk'), { key: 'car', label: 'Car', value: st.hcar, cars: cars, badges: false, placeholder: cars.length ? 'Search plate' : 'No car has a tracker', title: 'Trip history of which car?', emptyText: 'No car has a tracker yet.', onChange: function (v) { if (v) run(); } });
       function run() {
         var f = UI.form(el.querySelector('.tr-pickf')); st.hcar = f.car; st.hfrom = f.from; st.hto = f.to;
         err.innerHTML = '';
@@ -171,16 +175,17 @@ PAGES['tracking'] = {
         if (!a || !b) { err.innerHTML = UI.alert('Pick both dates.', 'warn'); return; }
         if (b < a) { err.innerHTML = UI.alert('The To date must be on or after the From date.', 'warn'); return; }
         if ((b - a) / DAY > 6) { err.innerHTML = UI.alert('Pick at most 7 days at a time.', 'warn'); return; }
+        if (a < new Date(mtToday().getTime() - trKeep() * DAY)) err.innerHTML = UI.alert('Trips are kept for ' + trKeep() + ' days (Settings, Fleet settings). Older days show nothing.', 'info');
         ctx.setParams({ car: f.car }, true);
         var pts = trTrip(f.car, a, b), s = trTripSummary(pts);
-        if (!pts.length) { res.innerHTML = '<div class="card">' + UI.empty({ icon: 'route-off', title: 'No points saved for these dates.', text: 'Trips are kept for ' + TR_KEEP + ' days.' }) + '</div>'; return; }
+        if (!pts.length) { res.innerHTML = '<div class="card">' + UI.empty({ icon: 'route-off', title: 'No points saved for these dates.', text: 'Trips are kept for ' + trKeep() + ' days.' }) + '</div>'; return; }
         var c = carById(f.car);
         res.innerHTML = '<div class="tr-stats">' + [['Points', UI.fmt.num(s.points)], ['Distance (straight lines)', s.km.toFixed(1) + ' km'], ['Top speed', s.top + ' km/h'], ['Stops of 5 min or more', s.stops]].map(function (x) { return '<div class="card tr-stat"><span>' + x[0] + '</span><b class="num">' + x[1] + '</b></div>'; }).join('') + '</div>' +
-          '<div class="card tr-mapc">' + trMap({ path: pts, label: 'Trip of ' + c.plate }) + '<div class="tr-leg"><span><i class="start"></i>Start</span><span><i class="end"></i>End</span>' + (s.top > TR_OVER ? '<span>' + UI.chip('Over ' + TR_OVER + ' km/h at least once', 'bad') + '</span>' : '') + '</div></div>' +
+          '<div class="card tr-mapc">' + trMap({ path: pts, label: 'Trip of ' + c.plate }) + '<div class="tr-leg"><span><i class="start"></i>Start</span><span><i class="end"></i>End</span>' + (s.top > trOver() ? '<span>' + UI.chip('Over ' + trOver() + ' km/h at least once', 'bad') + '</span>' : '') + '</div></div>' +
           '<div class="card"><div class="tr-th"><b>' + plural(pts.length, 'point') + '</b>' + UI.btn('Excel', { kind: 'o', size: 'sm', icon: 'file-spreadsheet', attrs: { 'data-tr': 'xls' } }) + '</div><div id="tr-pts"></div></div>';
         UI.table(res.querySelector('#tr-pts'), { columns: [
           { key: 'at', label: 'Time', render: function (x) { return x.at.getDate() + ' ' + MON[x.at.getMonth()] + ' ' + String(x.at.getHours()).padStart(2, '0') + ':' + String(x.at.getMinutes()).padStart(2, '0'); } },
-          { key: 'speed', label: 'Speed', align: 'right', render: function (x) { return '<span class="num' + (x.speed > TR_OVER ? ' tr-fast' : '') + '">' + x.speed + ' km/h</span>'; } },
+          { key: 'speed', label: 'Speed', align: 'right', render: function (x) { return '<span class="num' + (x.speed > trOver() ? ' tr-fast' : '') + '">' + x.speed + ' km/h</span>'; } },
           { key: 'ign', label: 'Ignition', render: function (x) { return x.ign ? 'On' : 'Off'; } },
           { key: 'pos', label: 'Position', render: function (x) { return trPos(x.lat, x.lng); } }], rows: pts, rowKey: function (x) { return +x.at; }, density: 'compact', pageSize: 50, pageSizes: [50, 100, 500], minWidth: 560 });
         UI.on(res, 'click', '[data-tr="xls"]', function () {
@@ -225,7 +230,7 @@ PAGES['tracking'] = {
         rows: d.trackerAccounts, pageSize: false, minWidth: 820,
         card: function (a) { return '<div class="tr-mc"><div class="row between"><b>' + esc(a.name) + '</b>' + trAccChip(a) + '</div><div class="b2">' + d.trackers.filter(function (t) { return t.account === a.id; }).length + ' trackers · read ' + (a.lastRead ? UI.fmt.ago(a.lastRead) : 'never') + '</div><div class="tr-acts" data-stop>' + UI.btn('Test', { kind: 't', size: 'sm', icon: 'plug', attrs: { 'data-acc': 'test', 'data-id': a.id } }) + UI.btn('Sync now', { kind: 't', size: 'sm', icon: 'refresh', attrs: { 'data-acc': 'sync', 'data-id': a.id } }) + UI.iconBtn('edit', 'Edit', { size: 'sm', attrs: { 'data-acc': 'edit', 'data-id': a.id } }) + UI.iconBtn('trash', 'Remove', { size: 'sm', attrs: { 'data-acc': 'del', 'data-id': a.id } }) + '</div></div>'; },
         empty: { icon: 'plug-connected-x', title: 'No tracker account yet', text: 'Add your Tracksolid account to read your trackers.' } });
-      var carSel = function (t) { return '<select class="tr-link" data-link="' + t.id + '" aria-label="Car for ' + esc(t.name) + '" data-stop><option value="">Not linked</option>' + UI.options(mtCarOpts(true), t.car || '') + '</select>'; };
+      var carSel = function (t) { var c = carById(t.car); return '<button type="button" class="btn o sm tr-link" data-link="' + t.id + '" aria-label="Car for ' + esc(t.name) + '" data-stop>' + (c ? '<b>' + esc(c.plate) + '</b>' : '<span class="faint">Not linked</span>') + i('chevron-down') + '</button>'; };
       UI.table(el.querySelector('#tr-devt'), { columns: [
         { key: 'name', label: 'Tracker', render: function (t) { return esc(t.name); } },
         { key: 'imei', label: 'IMEI', render: function (t) { var c = carById(t.car); return '<span class="num">' + esc(t.imei) + '</span>' + (c && (!c.tracker || c.tracker.imei !== t.imei) ? '<div class="b2 faint">Linked by hand</div>' : ''); } },
@@ -233,13 +238,7 @@ PAGES['tracking'] = {
         { key: 'car', label: 'Car', render: carSel }], rows: d.trackers, pageSize: false, minWidth: 640,
         card: function (t) { return '<div class="tr-mc"><b>' + esc(t.name) + '</b><div class="b2 num">' + esc(t.imei) + '</div>' + carSel(t) + '</div>'; },
         empty: { icon: 'device-mobile-off', title: 'No tracker yet', text: 'No tracker yet. Press Sync now on an account to read its tracker list.' } });
-      UI.on(el, 'change', '[data-link]', function (ev, s) {
-        var t = byId(d.trackers, s.getAttribute('data-link')), c = carById(s.value);
-        var other = c && d.trackers.filter(function (x) { return x.car === c.id && x !== t; })[0];
-        if (other) DB.update('trackers', other, { car: null }, { silent: true });
-        DB.update('trackers', t, { car: s.value || null }, { text: DB.actor() + (c ? ' linked tracker ' + t.name + ' to ' + c.plate : ' unlinked tracker ' + t.name) });
-        UI.toast(c ? t.name + ' now follows ' + c.plate : t.name + ' is not linked to a car');
-      });
+      UI.on(el, 'click', '[data-link]', function (ev, s) { ev.stopPropagation(); trLinkDialog(byId(d.trackers, s.getAttribute('data-link'))); });
       UI.on(el, 'click', '[data-tr="add"]', function () { trAccountDialog(null); });
       UI.on(el, 'click', '[data-acc]', function (ev, b) {
         var a = byId(d.trackerAccounts, b.getAttribute('data-id')), act = b.getAttribute('data-acc'); if (!a) return;
@@ -276,14 +275,32 @@ PAGES['tracking'] = {
   search: [{ label: 'Where are the cars now', icon: 'map-pin', run: function () { go('tracking', { tab: 'now' }); } }, { label: 'Add a tracker account', icon: 'plug-connected', run: function () { go('tracking', { tab: 'accounts' }); setTimeout(function () { trAccountDialog(null); }, 50); } }]
 };
 
+/* link a tracker to a car by hand: a searchable car list; a car can follow one tracker only */
+function trLinkDialog(t) {
+  if (!t) return;
+  var pick = t.car || '';
+  var dl = UI.dialog({ title: 'Which car has ' + t.name + '?', text: 'IMEI ' + t.imei, width: 'sm', body: '<div class="tr-lpk"></div><p class="b2">The car is usually found by the IMEI typed on it (Cars, Tracker). Link one by hand only when that is missing.</p><div class="tr-lwarn"></div>',
+    buttons: [{ label: 'Unlink', kind: 't', disabled: !t.car, onClick: function () { save(''); } }, { label: 'Cancel', kind: 'g' }, { label: 'Link', icon: 'link', onClick: function () { if (!pick) { UI.toast('Pick the car first', { tone: 'warn' }); return false; } save(pick); } }] });
+  var warn = function () { var o = pick && D().trackers.filter(function (x) { return x.car === pick && x !== t; })[0]; dl.body.querySelector('.tr-lwarn').innerHTML = o ? UI.alert(carById(pick).plate + ' now follows ' + o.name + '. Linking moves it to ' + t.name + '.', 'warn') : ''; };
+  UI.carPicker(dl.body.querySelector('.tr-lpk'), { key: 'car', label: 'Car', value: pick, badges: false, placeholder: 'Search plate', onChange: function (v) { pick = v || ''; warn(); } });
+  warn();
+  function save(v) {
+    var c = carById(v), other = c && D().trackers.filter(function (x) { return x.car === c.id && x !== t; })[0];
+    if (other) DB.update('trackers', other, { car: null }, { silent: true });
+    DB.update('trackers', t, { car: v || null }, { text: DB.actor() + (c ? ' linked tracker ' + t.name + ' to ' + c.plate : ' unlinked tracker ' + t.name) });
+    UI.toast(c ? t.name + ' now follows ' + c.plate : t.name + ' is not linked to a car');
+  }
+  return dl;
+}
+
 /* Add / Edit tracker account */
 function trAccountDialog(a) {
-  var isNew = !a, v = a ? Object.assign({}, a) : { name: 'Tracksolid Pro', platform: 'Tracksolid Pro', api: '', appKey: '', user: '', sub: '', every: true };
+  var isNew = !a, v = a ? Object.assign({}, a) : { name: trPlatforms()[0], platform: trPlatforms()[0], api: '', appKey: '', user: '', sub: '', every: true };
   var draw = function (err) {
     err = err || {};
     return '<div class="alert pri tr-help">' + i('info-circle') + '<div>In Tracksolid, open the API Request page of your account to get the app key and app secret. Ask Tracksolid support to switch the API on if you do not see it.</div></div>' +
       '<div class="tr-form">' + UI.input({ key: 'name', label: 'Name', required: true, value: v.name, placeholder: 'Tracksolid Pro', error: err.name }) +
-      UI.select({ key: 'platform', label: 'Platform', value: v.platform, options: TR_PLATFORMS }) +
+      UI.select({ key: 'platform', label: 'Platform', value: v.platform, options: trPlatforms().concat(v.platform && trPlatforms().indexOf(v.platform) < 0 ? [v.platform] : []), help: 'The list comes from Settings' }) +
       UI.input({ key: 'api', label: 'Web address of the API (optional)', value: v.api, placeholder: 'https://', help: 'Only for Other. Leave empty for the usual address.', full: true, error: err.api }) +
       UI.input({ key: 'appKey', label: 'App key', required: true, value: isNew ? '' : 'saved-app-key', error: err.appKey }) +
       UI.input({ key: 'secret', label: 'App secret', type: 'password', required: isNew, value: '', help: isNew ? '' : 'Saved. Leave empty to keep it, or type a new one.', error: err.secret }) +
@@ -301,7 +318,7 @@ function trAccountDialog(a) {
     if (isNew && !f.secret) err.secret = 'Type the app secret';
     if (isNew && !f.pass) err.pass = 'Type the account password';
     if (f.api && !/^https?:\/\/\S+\.\S+/.test(f.api)) err.api = 'Type a web address that starts with https://';
-    if (f.platform === TR_PLATFORMS[2] && !f.api) err.api = 'Other needs its own web address';
+    if (/^Other/i.test(f.platform || '') && !f.api) err.api = 'Other needs its own web address';
     if (Object.keys(err).length) { dl2.setBody(draw(err)); return false; }
     var rec = { name: f.name.trim(), platform: f.platform, api: f.api, appKey: 'saved', user: f.user.trim(), sub: f.sub, every: !!f.every };
     if (isNew) { rec.status = 'Not read yet'; rec.count = 0; rec.lastRead = null; DB.add('trackerAccounts', rec, { label: 'tracker account' }); UI.toast(rec.name + ' added. Press Sync now to read its trackers.'); }

@@ -15,9 +15,14 @@
 .pg-expenses .exp-parts b{font-size:15px;font-weight:600}
 .pg-expenses .exp-parts small{font-size:12px;color:var(--text3)}
 .pg-expenses .exp-own{display:flex;gap:6px;align-items:center;margin:auto 0 0;padding-top:14px;border-top:1px solid var(--divider);font-size:13px;color:var(--text2)}
-.pg-expenses .exp-where h3{margin:0 0 6px;font-size:15px;font-weight:500}
-.pg-expenses .exp-kinds{display:flex;flex-direction:column;gap:12px}
-.pg-expenses .exp-kind{display:flex;gap:12px;align-items:center}
+.pg-expenses .exp-where h3{margin:0 0 6px;font-size:15px;font-weight:500;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.pg-expenses .exp-where h3 .b2{font-size:12.5px;font-weight:400}
+.pg-expenses .exp-parts button[aria-pressed="true"]{background:rgb(var(--primary-rgb) / .1);box-shadow:inset 0 0 0 1px rgb(var(--primary-rgb) / .45)}
+.pg-expenses .exp-kinds{display:flex;flex-direction:column;gap:4px}
+.pg-expenses .exp-kind{display:flex;gap:12px;align-items:center;width:100%;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;padding:6px 8px;margin:0 -8px;width:calc(100% + 16px);border-radius:8px;cursor:pointer;min-height:44px}
+.pg-expenses .exp-kind:hover{background:var(--hover)}
+.pg-expenses .exp-kind.on{background:rgb(var(--primary-rgb) / .1);box-shadow:inset 0 0 0 1px rgb(var(--primary-rgb) / .45)}
+.pg-expenses .exp-kind > .grow{display:block;min-width:0}
 .pg-expenses .exp-kind .row{display:flex;align-items:baseline;gap:10px;font-size:14px}
 .pg-expenses .exp-kind .row b{font-weight:500;font-size:13.5px}
 .pg-expenses .exp-kind .row small{color:var(--text3);font-size:12px;min-width:32px;text-align:right}
@@ -106,3 +111,63 @@
 .exp-cfh{margin:-8px 0 0}
 .exp-cfb{justify-content:flex-end}
 @media (max-width:760px){.pg-expenses .exp-head{flex-direction:column;gap:10px}.pg-expenses .exp-head > .grow{width:100%}}
+
+/* FAB: keep the last rows and the "Where the money went" figures clear of the round button */
+@media (max-width:760px){.pg-expenses{padding-bottom:92px}.pg-expenses .exp-fab{bottom:calc(20px + env(safe-area-inset-bottom))}}
+.pg-expenses .exp-hacts .btn{min-height:38px}
+/* add sheet: receipt */
+.exp-opt{font-weight:400;color:var(--text2)}
+.exp-rch{margin:-4px 0 0}
+.exp-rcb{display:flex;flex-wrap:wrap;gap:8px}
+.exp-rcb .btn{min-height:38px}
+.exp-ok{display:flex;gap:6px;align-items:flex-start;margin:0;font-size:13px;color:var(--success-text, var(--success))}
+.exp-rc .exp-ok{font-size:12px;margin-top:2px}
+.exp-warn{display:flex;gap:6px;align-items:flex-start;margin:0;font-size:13px;color:var(--warning-text, var(--warning));background:rgb(var(--warning-rgb) / .1);padding:8px 10px;border-radius:8px}
+.exp-err{display:flex;gap:6px;align-items:flex-start;margin:0;font-size:13px;color:var(--error-text, var(--error))}
+.exp-errt{color:var(--error-text, var(--error)) !important}
+.exp-reading{display:flex;gap:8px;align-items:center;margin:0}
+.exp-spin{width:14px;height:14px;border-radius:50%;border:2px solid rgb(var(--primary-rgb) / .25);border-top-color:var(--primary);animation:exp-spin .8s linear infinite;flex:none}
+@keyframes exp-spin{to{transform:rotate(360deg)}}
+.exp-rcf p i,.exp-f > p i{font-size:16px;flex:none;margin-top:1px}
+/* add sheet: kinds with amounts */
+.exp-sub{margin:2px 0 0}
+.exp-lsrch input{min-height:40px}
+.exp-lines{border:1px solid var(--divider);border-radius:10px;overflow:hidden}
+.exp-lh{padding:6px 12px;font-size:11.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--text2);background:var(--hover);border-top:1px solid var(--divider)}
+.exp-lines > .exp-lh:first-child{border-top:0}
+.exp-ln{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;min-height:50px;padding:4px 10px;border-top:1px solid var(--divider)}
+.exp-lines > .exp-ln:first-child,.exp-lh + .exp-ln{border-top:0}
+.exp-ln.on{background:rgb(var(--primary-rgb) / .06)}
+.exp-ln.off{opacity:.62}
+.exp-lcb{flex:1 1 200px;min-width:0;min-height:42px;align-items:center}
+.exp-lname{display:flex;gap:8px;align-items:center;min-width:0}
+.exp-lname > i{font-size:18px;color:var(--text2);flex:none}
+.exp-lname > span{min-width:0}
+.exp-lname small{display:block;font-size:12px;color:var(--text3)}
+.exp-lfix{display:inline-flex;align-items:center;gap:6px;justify-content:center;min-width:140px;font-weight:600}
+.exp-lfix i{color:var(--text2);font-size:15px}
+.exp-lamt{display:flex;align-items:center;flex-wrap:wrap;gap:6px;width:150px;margin-left:auto}
+.exp-lamt span{color:var(--text2);font-size:13.5px}
+.exp-lamt input{flex:1;min-width:0;width:100px;height:40px;border:1px solid var(--input-border);border-radius:8px;padding:0 10px;font:inherit;font-size:15px;text-align:center;background:var(--paper);color:var(--text)}
+.exp-lamt input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.exp-lamt.bad input{border-color:var(--error)}
+.exp-lamt small{flex-basis:100%;font-size:11.5px;color:var(--error-text, var(--error))}
+.exp-lmore{display:flex;align-items:center;gap:6px;width:100%;min-height:44px;padding:0 12px;border:0;border-top:1px solid var(--divider);background:transparent;color:var(--primary-text);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;text-align:left}
+.exp-lnone{margin:0;padding:12px}
+.exp-ltot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border-top:1px solid var(--divider)}
+.exp-ltot b{font-size:17px;font-weight:600}
+.exp-lchk{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--divider)}
+.exp-lchk.warn{background:rgb(var(--warning-rgb) / .1)}
+.exp-wtxt{display:flex;gap:4px;align-items:center;font-size:13px;color:var(--warning-text, var(--warning))}
+.exp-clash{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:8px;background:rgb(var(--error-rgb) / .08);border:1px solid rgb(var(--error-rgb) / .35)}
+.exp-clash p{display:flex;gap:6px;align-items:flex-start;margin:0;font-size:13px;color:var(--error-text, var(--error))}
+.exp-sheet .ui-drw-b{display:flex;flex-direction:column;gap:18px}
+@media (max-width:760px){.exp-lamt{width:100%;margin-left:30px}.exp-lfix{margin-left:30px;justify-content:flex-start}}
+/* categories dialog */
+.exp-days-box{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--divider);border-radius:10px;margin:4px 0 14px}
+.exp-days-box .row{align-items:flex-start}
+.exp-days-box .btn{margin-top:4px}
+.exp-cgh{margin:-2px 0 6px}
+.exp-cfa{display:flex;flex-direction:column;gap:6px}
+.exp-cfa p{margin:0}
+.exp-cfa .row{align-items:center}

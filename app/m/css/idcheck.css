@@ -1,0 +1,48 @@
+/* idcheck screens (M2). Shared classes live in base.css. */
+.idc { padding-bottom: 8px; }
+.idc-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 10px; }
+.idc-tile { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px; border: 1px solid #D9DCE2; border-radius: 13px; background: #fff; text-align: left; }
+.idc-tile.main { grid-column: 1 / -1; border-color: var(--brand); background: var(--tint); min-height: 68px; }
+.idc-tile.has { border-color: var(--t-green); }
+.idc-tile.main.has { background: var(--t-green-bg); }
+.idc-tile[disabled] { opacity: .6; }
+.idc-ic { width: 38px; height: 38px; border-radius: 11px; background: #EEF0F4; display: grid; place-items: center; flex: none; color: var(--brand-ink); }
+.idc-tile.main .idc-ic { background: #fff; }
+.idc-tile.has .idc-ic { background: var(--t-green); color: #fff; }
+.idc-ic svg { width: 20px; height: 20px; }
+.idc-tl { min-width: 0; }
+.idc-tl b { display: block; font-size: 14px; line-height: 1.25; }
+.idc-tl small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; margin-top: 1px; }
+.idc-spin { width: 18px; height: 18px; border: 2.5px solid var(--tint); border-top-color: var(--brand); border-radius: 50%; display: inline-block; animation: idcSpin .8s linear infinite; flex: none; }
+@keyframes idcSpin { to { transform: rotate(360deg); } }
+.idc-sample { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-size: 13.5px; color: var(--muted); margin-bottom: 6px; }
+.idc-files { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 12px; }
+.idc-file { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 4px; border-radius: 12px; background: var(--t-green-bg); color: #0E4F2C; font-size: 13px; font-weight: 650; max-width: 100%; }
+.idc-th { width: 34px; height: 28px; border-radius: 7px; overflow: hidden; background: #fff; display: grid; place-items: center; flex: none; }
+.idc-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.idc-th svg { width: 16px; height: 16px; }
+.idc-fl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idc-x { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: #0E4F2C; flex: none; }
+.idc-x svg { width: 16px; height: 16px; }
+.idc-busy { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #F4F5F7; font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.idc-res { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+.idc-res > .chip:first-child { font-size: 13px; }
+.idc-facts { margin: 8px 0 10px; }
+.idc-facts div { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding: 5px 0; border-top: 1px solid var(--line); }
+.idc-facts div:first-child { border-top: 0; }
+.idc-facts span { color: var(--muted); }
+.idc-issues { margin: 4px 0 4px 18px; padding: 0; }
+.idc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.idc-why { margin: 0 0 6px; font-weight: 600; }
+.idc-why.red { color: var(--t-red); } .idc-why.amber { color: var(--t-amber); }
+.idc-note { margin: 0 0 8px; }
+.idc-anyway { width: 100%; margin-bottom: 6px; border-color: var(--t-amber); color: #6B3D0A; }
+.idc-retry { width: 100%; gap: 6px; }
+.idc-retry svg { width: 18px; height: 18px; }
+.idc-edit { border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 10px; }
+.idc-edit .small { margin-bottom: 8px; }
+.idc-edit .btn { width: 100%; }
+.idc-paper { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: #F4F5F7; font-size: 14px; margin-bottom: 10px; }
+.idc-paper span { color: #3B4250; }
+.idc-foot { margin: 6px 0 0; text-align: center; }
+.idc-noacc { margin-top: 4px; }

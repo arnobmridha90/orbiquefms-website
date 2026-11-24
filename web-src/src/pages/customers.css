@@ -3,7 +3,7 @@
    =================================================================== */
 
 /* ---------- segment tiles: Everyone, Blacklisted, Be careful, VIP, Repeat ---------- */
-.cu-seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.cu-seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:12px;margin-bottom:18px}
 .cu-seg-b{--c:var(--grey-rgb);position:relative;display:flex;align-items:center;gap:12px;padding:14px 14px 14px 16px;border-radius:12px;border:1px solid var(--divider);background:var(--paper);box-shadow:var(--sh-sm);text-align:left;font:inherit;color:var(--text);cursor:pointer;overflow:hidden;min-width:0;transition:box-shadow .15s,border-color .15s,transform .15s}
 .cu-seg-b::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:rgb(var(--c));opacity:.9}
 .cu-seg-b.t-bad{--c:var(--error-rgb)}.cu-seg-b.t-warn{--c:var(--warning-rgb)}.cu-seg-b.t-info{--c:var(--info-rgb)}.cu-seg-b.t-ok{--c:var(--success-rgb)}.cu-seg-b.t-grey{--c:var(--primary-rgb)}
@@ -125,7 +125,7 @@
 .cu-ictbl .nw{white-space:nowrap}
 
 @media (max-width:1100px){
-  .cu-seg{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cu-seg{grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (max-width:760px){
   .cu-seg{display:flex;overflow-x:auto;scrollbar-width:none;gap:8px;margin:0 0 14px;padding-bottom:2px}
@@ -140,3 +140,14 @@
   .cu-docs{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 .cu-kv .kv b .num,.cu-kv .kv b .ui-phone{color:var(--text)}
+/* W5: blacklisted customer that a blacklist editor may still book, note link to its booking */
+.ib.cu-nbb.cu-nbw{background:rgb(var(--error-rgb) / .1);color:rgb(var(--error-rgb))}
+.cu-nbk{color:var(--primary-text);font-weight:600;text-decoration:none;padding:6px 2px;margin:-6px 0}
+.cu-nbk:hover{text-decoration:underline}
+@media (min-width:1101px) and (max-width:1560px){
+  .cu-seg{gap:10px}
+  .cu-seg-b{gap:10px;padding:12px 10px 12px 14px}
+  .cu-seg-ic{width:36px;height:36px;font-size:19px}
+  .cu-seg-t b{font-size:20px}
+  .cu-seg-t > span{white-space:nowrap}
+}

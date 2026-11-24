@@ -19,6 +19,52 @@ function cuFlags(p) {
 }
 /* keep the old single flag field in step for pages that read it */
 function cuSyncFlag(p) { var f = cuFlags(p); p.flag = f.black ? 'Blacklisted' : f.vip ? 'VIP' : f.careful ? 'Be careful' : ''; }
+/* country from a phone number: a number without "+" is a local one (the company's country) */
+var CU_CC = [['+673', 'Brunei'], ['+966', 'Saudi Arabia'], ['+971', 'United Arab Emirates'], ['+60', 'Malaysia'], ['+65', 'Singapore'], ['+62', 'Indonesia'], ['+66', 'Thailand'], ['+63', 'Philippines'], ['+84', 'Vietnam'], ['+91', 'India'], ['+86', 'China'], ['+81', 'Japan'], ['+82', 'South Korea'], ['+61', 'Australia'], ['+44', 'United Kingdom'], ['+49', 'Germany'], ['+33', 'France'], ['+1', 'United States or Canada']];
+var CU_NAT_CC = { Singaporean: '+65', Indonesian: '+62', Thai: '+66', Bruneian: '+673', Filipino: '+63', Vietnamese: '+84', Indian: '+91', Chinese: '+86', Japanese: '+81', Korean: '+82', Australian: '+61', British: '+44', American: '+1', German: '+49', French: '+33', Saudi: '+966', Emirati: '+971' };
+function cuCountry(phone) {
+  var s = String(phone || '').trim(), home = (typeof CO === 'function' && CO() && CO().countryCode) || '+60';
+  if (!s.replace(/\D/g, '')) return { code: '', country: '' };
+  var code = s.charAt(0) === '+' ? '' : home;
+  if (!code) { var dg = '+' + s.replace(/\D/g, ''); CU_CC.forEach(function (c) { if (dg.indexOf(c[0]) === 0 && c[0].length > code.length) code = c[0]; }); }
+  var hit = CU_CC.filter(function (c) { return c[0] === code; })[0];
+  return { code: code || 'Other', country: hit ? hit[1] : 'Other' };
+}
+/* made-up data: visitors get a phone from home, a few locals typed theirs without +60, some notes say which booking they came from */
+DATA_INIT.push(function (d) {
+  if (d.cuReady) return; d.cuReady = true;
+  d.people.forEach(function (p, k) {
+    var dg = String(p.phone || '').replace(/\D/g, '').slice(-7), cc = CU_NAT_CC[p.nat];
+    if (cc && dg.length === 7) p.phone = cc + ' 00 ' + dg.slice(0, 3) + ' ' + dg.slice(3);
+    else if (!cc && (k === 5 || k === 17) && dg.length === 7) p.phone = '000-' + dg.slice(0, 3) + ' ' + dg.slice(3);
+    var bks = d.bookings.filter(function (x) { return x.cust === p && x.start <= TODAY; }).sort(function (a, b) { return b.start - a.start; });
+    (p.notes || []).forEach(function (z, j) { if (!z.booking && bks.length && (j === 0 || z.flag === 'Be careful')) z.booking = bks[Math.min(j, bks.length - 1)].code; });
+  });
+});
+/* the booking a new note is written from: given by the caller, else the open booking drawer, else the address */
+function cuNoteBooking(el, o) {
+  if (o && o.booking) return o.booking;
+  var h = el.closest && el.closest('.ui-drw'), t = h && h.querySelector('.ui-drw-h'), m = t && /Booking\s+([A-Z]+-\d+)/.exec(t.textContent);
+  if (m) return m[1];
+  m = /[#&]booking=([^&]+)/.exec(location.hash); return m ? decodeURIComponent(m[1]) : null;
+}
+function cuSince(p) { var s = cuBookings(p).map(function (x) { return x.created || x.start; }).sort(function (a, b) { return a - b; })[0] || p.since; return s ? UI.fmt.date(s).replace(/^\d+\s/, '') : ''; }
+function cuMoneyLine(p) {
+  var all = cuBookings(p), done = all.filter(function (x) { return x.status !== 'Cancelled'; }), cx = all.length - done.length;
+  var t = plural(done.length, 'rental') + (cx ? ', ' + cx + ' cancelled' : '');
+  if (can('bookings.see_amounts')) t += ', ' + UI.fmt.money(sum(all.map(function (x) { return bookingPaid(x).all; }))) + ' paid';
+  return t;
+}
+/* New booking for a customer. A blacklisted one is blocked, unless the person may change the blacklist: then they see the reason and can go ahead (logged). */
+function cuNewBooking(p) {
+  if (!p.blacklist) { API.newBooking({ customer: p.id }); return; }
+  if (!can('customers.blacklist_edit')) { UI.toast('This customer is on the blacklist. Ask someone who can change the blacklist.', { tone: 'warn' }); return; }
+  UI.confirm({ title: 'Book anyway?', text: p.name + ' is on the blacklist since ' + UI.fmt.date(p.blacklist.since) + '. Reason: ' + (p.blacklist.reason || 'none given') + ' This will be noted in the activity log.', ok: 'Book anyway', danger: true }).then(function (y) {
+    if (!y) return;
+    DB.log('Booked a blacklisted customer', 'Customer', p.id, DB.actor() + ' started a new booking for ' + p.name + ', who is on the blacklist');
+    setTimeout(function () { API.newBooking({ customer: p.id }); }, 150);
+  });
+}
 function cuSeeIc() { return can('customers.view_documents') || can('customers.check_ic'); }
 function cuIcText(ic) { return cuSeeIc() ? esc(ic) : esc(UI.fmt.ic(ic)); }
 function cuFlagChips(p, o) {
@@ -39,10 +85,10 @@ function cuBanner(p) {
   var f = cuFlags(p), notes = (p.notes || []).slice().sort(function (a, b) { return (b.pinned - a.pinned) || (b.at - a.at); });
   var showNotes = can('customer_notes.view');
   var line = function (flag) { return showNotes ? notes.filter(function (z) { return z.flag === flag; }).map(function (z) { return '<li>' + esc(z.text) + '</li>'; }).join('') : ''; };
-  var repeat = f.repeat ? '<div class="cu-ban-rep">' + i('repeat') + 'Repeat customer: ' + f.count + ' rentals' + (f.last ? ', last on ' + UI.fmt.date(f.last) : '') + '</div>' : '';
+  var repeat = f.repeat ? '<div class="cu-ban-rep">' + i('repeat') + 'Repeat customer: ' + esc(cuMoneyLine(p)) + (f.last ? '. Last on ' + UI.fmt.date(f.last) : '') + '</div>' : '';
   var box = function (tone, icon, title, body) { return '<div class="cu-ban ' + tone + '" role="status"><span class="cu-ban-ic">' + i(icon) + '</span><div class="grow"><b>' + title + '</b>' + (body ? '<ul>' + body + '</ul>' : '') + repeat + '</div></div>'; };
   if (f.black) return box('bad', 'ban', 'Blacklisted customer: ' + esc(p.name) + ' is on the blacklist since ' + UI.fmt.date(p.blacklist.since) + '.', (p.blacklist.reason ? '<li>' + esc(p.blacklist.reason) + '</li>' : '') + line('Be careful'));
-  var repOnly = f.repeat ? '<div class="cu-ban ok" role="status"><span class="cu-ban-ic">' + i('repeat') + '</span><div class="grow"><b>Repeat customer: ' + f.count + ' rentals' + (f.last ? ', last on ' + UI.fmt.date(f.last) : '') + '</b></div></div>' : '';
+  var repOnly = f.repeat ? '<div class="cu-ban ok" role="status"><span class="cu-ban-ic">' + i('repeat') + '</span><div class="grow"><b>Repeat customer: ' + esc(cuMoneyLine(p)) + '</b>' + (f.last ? '<div class="cu-ban-rep">Last pick-up on ' + UI.fmt.date(f.last) + '</div>' : '') + '</div></div>' : '';
   if (!showNotes) return repOnly;
   if (f.careful) return box('warn', 'alert-triangle', 'Be careful with this customer', line('Be careful'));
   if (f.vip) return box('info', 'crown', 'VIP customer', line('VIP') + line('Info'));
@@ -129,13 +175,14 @@ function cuNotesMount(el, p, o) {
       (st.adding ? form(null) : '') +
       (notes.length ? '<div class="cu-nlist">' + notes.map(function (n) {
         if (st.edit === n.id) return form(n);
-        return '<div class="cu-note ' + tone[n.flag] + '"><div class="cu-note-top">' + UI.status('flag', n.flag, null, { sm: true }) + (n.pinned ? '<span class="cu-pin" title="Pinned">' + i('pinned') + 'Pinned</span>' : '') + '<span class="b2">' + esc(n.by) + ' · ' + UI.fmt.date(n.at) + '</span><span class="grow"></span>' +
+        return '<div class="cu-note ' + tone[n.flag] + '"><div class="cu-note-top">' + UI.status('flag', n.flag, null, { sm: true }) + (n.pinned ? '<span class="cu-pin" title="Pinned">' + i('pinned') + 'Pinned</span>' : '') + '<span class="b2">' + esc(n.by) + ' · ' + UI.fmt.date(n.at) + (n.booking ? ' · from <a href="#" class="cu-nbk" data-cu-nbk="' + esc(n.booking) + '">' + esc(n.booking) + '</a>' : '') + '</span><span class="grow"></span>' +
           (can('customer_notes.edit') ? UI.iconBtn(n.pinned ? 'pinned-off' : 'pin', n.pinned ? 'Unpin' : 'Pin to the top', { size: 'sm', attrs: { 'data-cu-npin': n.id } }) + UI.iconBtn('pencil', 'Edit note', { size: 'sm', attrs: { 'data-cu-nedit': n.id } }) : '') +
           (can('customer_notes.delete') ? UI.iconBtn('trash', 'Delete note', { size: 'sm', cls: 'cu-del', attrs: { 'data-cu-ndel': n.id } }) : '') + '</div><p>' + esc(n.text) + '</p></div>';
       }).join('') + '</div>' : (st.adding ? '' : '<div class="cu-nempty">' + i('notes') + 'No notes yet. Tap "Add note" to tell the team something about this customer.</div>')) + '</div>';
   }
   el.addEventListener('click', function (ev) {
     var t = ev.target, x;
+    if ((x = t.closest('[data-cu-nbk]'))) { ev.preventDefault(); var bc = x.getAttribute('data-cu-nbk'); if (typeof API.openBooking === 'function') API.openBooking(bc); return; }
     if (t.closest('[data-cu-nadd]')) { st.adding = true; st.edit = null; draw(); var ta = el.querySelector('textarea'); if (ta) ta.focus(); return; }
     if (t.closest('[data-cu-ncancel]')) { st.adding = false; st.edit = null; draw(); return; }
     if ((x = t.closest('[data-cu-flag]'))) { x.parentNode.querySelectorAll('[data-cu-flag]').forEach(function (b) { b.setAttribute('aria-checked', b === x); }); return; }
@@ -144,7 +191,7 @@ function cuNotesMount(el, p, o) {
       if (!text) { UI.toast('Write the note first', { tone: 'warn' }); box.querySelector('textarea').focus(); return; }
       var notes = (p.notes || []).slice();
       if (id) { notes = notes.map(function (n) { return n.id === id ? Object.assign({}, n, { text: text, flag: flag, pinned: pin }) : n; }); st.edit = null; save(notes, DB.actor() + ' changed a note about ' + p.name); UI.toast('Note saved'); }
-      else { notes.push({ id: 'note-' + Date.now().toString(36), flag: flag, text: text, pinned: pin, by: DB.actor(), at: NOW() }); st.adding = false; save(notes, DB.actor() + ' added a ' + flag + ' note about ' + p.name); UI.toast('Note added. It shows on every booking of ' + p.name + '.'); }
+      else { notes.push({ id: 'note-' + Date.now().toString(36), flag: flag, text: text, pinned: pin, by: DB.actor(), at: NOW(), booking: cuNoteBooking(el, o) }); st.adding = false; save(notes, DB.actor() + ' added a ' + flag + ' note about ' + p.name); UI.toast('Note added. It shows on every booking of ' + p.name + '.'); }
       return;
     }
     if ((x = t.closest('[data-cu-npin]'))) { var pid = x.getAttribute('data-cu-npin'), pn; save((p.notes || []).map(function (n) { if (n.id === pid) { pn = !n.pinned; return Object.assign({}, n, { pinned: pn }); } return n; }), DB.actor() + (pn ? ' pinned' : ' unpinned') + ' a note about ' + p.name); return; }
@@ -260,7 +307,8 @@ var CU_SHOW = [
   ['black', 'Blacklisted', 'ban', 'bad', 'Never rent to them again'],
   ['careful', 'Be careful', 'alert-triangle', 'warn', 'Check them twice'],
   ['vip', 'VIP', 'crown', 'info', 'Look after them well'],
-  ['repeat', 'Repeat', 'repeat', 'ok', 'Came back two times or more']
+  ['repeat', 'Repeat', 'repeat', 'ok', 'Came back two times or more'],
+  ['notes', 'Has notes', 'notes', 'grey', 'Staff left a note']
 ];
 PAGES['customers'] = {
   title: 'Customers',
@@ -268,14 +316,15 @@ PAGES['customers'] = {
     var d = ctx.data, st = ctx.state;
     st.f = st.f || {}; st.show = ctx.params.show || st.show || 'all';
     var seeFlags = ctx.can('customer_notes.view');
-    if (!seeFlags) st.show = 'all';
+    if (!seeFlags || !CU_SHOW.some(function (s) { return s[0] === st.show; })) st.show = 'all';
     var people = d.people.filter(function (p) { return cuBookings(p, d).length; });
     var flagsOf = {}; people.forEach(function (p) { flagsOf[p.id] = cuFlags(p); });
-    var test = { all: function () { return true; }, black: function (f) { return f.black; }, careful: function (f) { return f.careful; }, vip: function (f) { return f.vip; }, repeat: function (f) { return f.repeat; } };
+    var test = { all: function () { return true; }, black: function (f) { return f.black; }, careful: function (f) { return f.careful; }, vip: function (f) { return f.vip; }, repeat: function (f) { return f.repeat; }, notes: function (f) { return f.notes; } };
     var counts = {}; CU_SHOW.forEach(function (s) { counts[s[0]] = people.filter(function (p) { return test[s[0]](flagsOf[p.id]); }).length; });
     var shows = CU_SHOW.filter(function (s) { return s[0] !== 'black' || ctx.can('customers.blacklist_view'); });
 
     root.innerHTML = '<div class="pg-h"><div><h1>Customers</h1><p>Everyone who has booked, with their notes, IC check and rentals.</p></div><div class="acts">' +
+      (ctx.can('bookings.export') && ctx.can('customers.view') ? UI.btn('Excel', { kind: 'o', icon: 'file-spreadsheet', attrs: { 'data-act': 'xlsx', title: 'Download the customers in this list as Excel' } }) : '') +
       (ctx.can('bookings.create') ? UI.btn('New Booking', { icon: 'plus', attrs: { 'data-act': 'new' } }) : '') + '</div></div>' +
       (seeFlags ? '<div class="cu-seg" role="group" aria-label="Show">' + shows.map(function (s) {
         return '<button type="button" class="cu-seg-b t-' + s[3] + '" data-show="' + s[0] + '" aria-pressed="' + (st.show === s[0]) + '"><span class="cu-seg-ic">' + i(s[2]) + '</span><span class="cu-seg-t"><b class="num">' + counts[s[0]] + '</b><span>' + s[1] + '</span><small>' + s[4] + '</small></span></button>';
@@ -290,7 +339,7 @@ PAGES['customers'] = {
       { key: 'phone', label: 'Phone', nowrap: true, cls: 'cu-ph', render: function (p) { return UI.phone(p.phone, { wa: true }); } },
       { key: 'email', label: 'Email', render: function (p) { return '<span class="cu-mail ellip" title="' + esc(p.email) + '">' + esc(p.email) + '</span>'; } },
       { key: 'nat', label: 'Nationality', sort: true, nowrap: true },
-      { key: 'view', label: 'Actions', align: 'center', render: function (p) { return '<div class="cu-acts">' + UI.iconBtn('eye', 'View ' + p.name, { size: 'sm', attrs: { 'data-cu-view': p.id } }) + (!ctx.can('bookings.create') ? '' : flagsOf[p.id].black ? '<span class="b2 cu-nbx" title="Blacklisted customers cannot get a new booking from here">' + i('ban') + '</span>' : UI.iconBtn('calendar-plus', 'New booking for ' + p.name, { size: 'sm', cls: 'cu-nbb', attrs: { 'data-cu-new': p.id } })) + '</div>'; } }
+      { key: 'view', label: 'Actions', align: 'center', render: function (p) { return '<div class="cu-acts">' + UI.iconBtn('eye', 'View ' + p.name, { size: 'sm', attrs: { 'data-cu-view': p.id } }) + (!ctx.can('bookings.create') ? '' : flagsOf[p.id].black && !ctx.can('customers.blacklist_edit') ? '<span class="b2 cu-nbx" title="Blacklisted customers cannot get a new booking from here">' + i('ban') + '</span>' : UI.iconBtn('calendar-plus', 'New booking for ' + p.name, { size: 'sm', cls: 'cu-nbb' + (flagsOf[p.id].black ? ' cu-nbw' : ''), attrs: { 'data-cu-new': p.id } })) + '</div>'; } }
     ];
     if (showCol === 'black') cols.splice(2, 0, { key: 'why', label: 'On the blacklist', render: function (p) { return '<div class="cu-why"><b>Since ' + UI.fmt.date(p.blacklist.since) + '</b><small>' + esc(p.blacklist.reason || '') + '</small></div>'; } });
     if (showCol === 'careful' || showCol === 'vip') cols.splice(2, 0, { key: 'why', label: 'Pinned note', render: function (p) { var n = (p.notes || []).filter(function (z) { return z.flag === (showCol === 'vip' ? 'VIP' : 'Be careful'); }).sort(function (a, b) { return b.pinned - a.pinned || b.at - a.at; })[0]; return n ? '<div class="cu-why"><small>' + esc(n.text) + '</small><span class="faint">' + esc(n.by) + ' · ' + UI.fmt.date(n.at) + '</span></div>' : '<span class="faint">-</span>'; } });
@@ -298,11 +347,14 @@ PAGES['customers'] = {
     if (showCol) cols = cols.filter(function (c) { return c.key !== 'email' && c.key !== 'nat'; }); /* the segment column takes their room; both stay in the customer drawer */
 
     var rowsFor = function () {
-      var q = (st.f.q || '').toLowerCase().trim(), qd = q.replace(/\D/g, '');
+      var raw = (st.f.q || '').trim(), q = raw.toLowerCase(), digitsOnly = /^[+\d\s\-().]+$/.test(raw), qd = raw.replace(/\D/g, '');
       return people.filter(function (p) {
         if (!test[st.show](flagsOf[p.id])) return false;
         if (!q) return true;
-        return (p.name + ' ' + p.ic + ' ' + p.email + ' ' + p.phone).toLowerCase().indexOf(q) >= 0 || (qd.length >= 3 && (p.phone + p.ic).replace(/\D/g, '').indexOf(qd) >= 0);
+        if ((p.name + ' ' + p.ic + ' ' + p.email + ' ' + p.phone).toLowerCase().indexOf(q) >= 0) return true;
+        if (!digitsOnly || qd.length < 3) return false;
+        /* each number on its own: the phone (0, 60 and +60 at the start count as the same) and the IC */
+        return phoneHas(p.phone, qd) || String(p.ic || '').replace(/\D/g, '').indexOf(qd) >= 0;
       }).sort(function (a, b) { return (flagsOf[b.id].last || 0) - (flagsOf[a.id].last || 0); });
     };
     var t = UI.table(root.querySelector('#cu-t'), {
@@ -313,7 +365,7 @@ PAGES['customers'] = {
         var f = flagsOf[p.id];
         return '<div class="cu-card"><div class="cu-who">' + UI.avatar(p.name) + '<div class="cu-who-t"><b class="ellip">' + esc(p.name) + '</b><small>' + plural(f.count, 'rental') + ' · ' + esc(p.nat) + '</small></div></div>' +
           '<div class="cu-flags">' + cuFlagChips(p) + '</div><div class="cu-card-l">' + UI.phone(p.phone, { wa: true }) + '<span class="num faint">' + esc(UI.fmt.ic(p.ic)) + '</span></div>' +
-          '<div class="cu-card-a">' + UI.btn('View', { kind: 'o', size: 'sm', icon: 'eye', attrs: { 'data-cu-view': p.id } }) + (ctx.can('bookings.create') && !f.black ? UI.btn('New Booking', { kind: 'tonal', size: 'sm', icon: 'calendar-plus', attrs: { 'data-cu-new': p.id } }) : '') + '</div></div>';
+          '<div class="cu-card-a">' + UI.btn('View', { kind: 'o', size: 'sm', icon: 'eye', attrs: { 'data-cu-view': p.id } }) + (ctx.can('bookings.create') && (!f.black || ctx.can('customers.blacklist_edit')) ? UI.btn('New Booking', { kind: 'tonal', size: 'sm', icon: 'calendar-plus', attrs: { 'data-cu-new': p.id } }) : '') + '</div></div>';
       }
     });
     UI.filters(root.querySelector('#cu-f'), { values: st.f, fields: [{ type: 'search', key: 'q', placeholder: 'Search customers: name, IC / passport, phone, email' }], onChange: function () { t.setRows(rowsFor()); },
@@ -321,12 +373,36 @@ PAGES['customers'] = {
 
     UI.on(root, 'click', '[data-show]', function (ev, el) { st.show = el.getAttribute('data-show'); ctx.setParams({ show: st.show === 'all' ? '' : st.show }); ctx.refresh(); });
     UI.on(root, 'click', '[data-cu-view]', function (ev, el) { cuOpen(el.getAttribute('data-cu-view')); });
-    UI.on(root, 'click', '[data-cu-new]', function (ev, el) { API.newBooking({ customer: el.getAttribute('data-cu-new') }); });
+    UI.on(root, 'click', '[data-cu-new]', function (ev, el) { var q = byId(d.people, el.getAttribute('data-cu-new')); if (q) cuNewBooking(q); });
+    UI.on(root, 'click', '[data-act="xlsx"]', function () { cuExport(rowsFor(), st.show); });
     UI.on(root, 'click', '[data-act="new"]', function () { API.newBooking(); });
     if (ctx.params.customer) setTimeout(function () { cuOpen(ctx.params.customer); }, 0);
   },
   search: [{ label: 'Blacklisted customers', icon: 'ban', run: function (ctx) { ctx.state.show = 'black'; ctx.refresh(); } }, { label: 'Repeat customers', icon: 'repeat', run: function (ctx) { ctx.state.show = 'repeat'; ctx.refresh(); } }]
 };
+
+/* ---------------- Excel export of the list on screen (never the ID scans) ---------------- */
+function cuExport(list, show) {
+  if (!can('bookings.export') || !can('customers.view')) { UI.toast('Downloading customers needs the "Export" access.', { tone: 'warn' }); return; }
+  if (!list.length) { UI.toast('No customers in this list to download.', { tone: 'warn' }); return; }
+  var flags = can('customer_notes.view'), day = function (v) { return v ? new Date(v.getFullYear(), v.getMonth(), v.getDate()) : ''; };
+  var head = ['Name', 'Phone', 'Country code', 'Country', 'Email', 'IC / Passport', 'Nationality', 'Driving licence', 'Licence expiry', 'Address', 'Emergency contact', 'Emergency phone', 'Relationship', 'Bookings', 'Last booking', 'Last pick-up'].concat(flags ? ['Flags'] : []);
+  var by = {};
+  var rows = list.map(function (p) {
+    var bks = cuBookings(p).sort(function (a, b) { return b.start - a.start; }), f = cuFlags(p), cc = cuCountry(p.phone), em = p.emergency || {};
+    var lastPick = bks.filter(function (x) { return x.status !== 'Cancelled' && x.start <= NOW(); })[0];
+    var k = cc.code || 'None'; by[k] = by[k] || { code: k, country: cc.country || 'No phone', people: 0, bookings: 0 }; by[k].people++; by[k].bookings += bks.length;
+    var fl = [f.black ? 'Blacklisted' : '', f.careful ? 'Be careful' : '', f.vip ? 'VIP' : '', f.repeat ? 'Repeat' : '', f.notes ? 'Has notes' : ''].filter(Boolean).join(', ');
+    return [p.name, p.phone || '', cc.code, cc.country, p.email || '', cuSeeIc() ? p.ic || '' : UI.fmt.ic(p.ic || ''), p.nat || '', p.licenceNo || '', day(p.licenceExp), p.address || '', em.name || '', em.phone || '', em.rel || '', bks.length, bks[0] ? bks[0].code : '', lastPick ? day(lastPick.start) : ''].concat(flags ? [fl] : []);
+  });
+  var cc = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.people - a.people || (a.code < b.code ? -1 : 1); });
+  var name = 'customers' + (show && show !== 'all' ? '-' + show : '') + '-' + UI.isoDate(NOW()) + '.xlsx';
+  UI.xlsx(name, [
+    { name: 'Customers', rows: [head].concat(rows), cols: [24, 18, 12, 18, 28, 18, 14, 16, 14, 40, 20, 18, 14, 10, 14, 14, 30], filter: true, dateFormat: 'dd mmm yyyy' },
+    { name: 'By country code', rows: [['Country code', 'Country', 'Customers', 'Bookings']].concat(cc.map(function (r) { return [r.code, r.country, r.people, r.bookings]; })).concat([['Total', '', list.length, sum(cc.map(function (r) { return r.bookings; }))]]), cols: [14, 26, 12, 12] }
+  ]);
+  DB.log('Exported', 'Customer', '', DB.actor() + ' downloaded ' + plural(list.length, 'customer') + ' as Excel');
+}
 
 /* ---------------- Customer Details drawer ---------------- */
 var CU_DR = null;
@@ -335,7 +411,6 @@ function cuOpen(id) {
   var d = D(), p = byId(d.people, id); if (!p) { UI.toast('That customer was not found', { tone: 'warn' }); return; }
   if (CU_DR && !CU_DR.closed && CU_DR.data.id === id) return CU_DR;
   var onPage = S.page === 'customers' && CUR && CUR.ctx;
-  var latest = cuBookings(p).sort(function (a, b) { return b.n - a.n; })[0];
   var editing = false;
   function head() {
     var f = cuFlags(p), btn = '';
@@ -356,14 +431,14 @@ function cuOpen(id) {
       '<section class="cu-sec" id="cu-notes"></section>' +
       '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('phone-call') + 'Emergency contact</h3></div><div class="cu-kv three">' + UI.kv('Name', esc(em.name)) + UI.kv('Phone', UI.phone(em.phone)) + UI.kv('Relationship', esc(em.rel)) + '</div></section>' +
       (can('customers.check_ic') ? '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('id-badge-2') + 'Check IC</h3></div><div id="cu-ic"></div></section>' : '') +
-      '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('calendar-event') + 'Bookings (' + bks.length + ')</h3>' + (can('bookings.create') && !f.black ? UI.btn('New Booking', { kind: 'tonal', size: 'sm', icon: 'plus', attrs: { 'data-cu-nb': 1 } }) : '') + '</div><div class="cu-bks">' +
+      '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('calendar-event') + 'Bookings (' + bks.length + ')</h3>' + (can('bookings.create') && (!f.black || can('customers.blacklist_edit')) ? UI.btn('New Booking', { kind: 'tonal', size: 'sm', icon: 'plus', attrs: { 'data-cu-nb': 1 } }) : '') + '</div><div class="cu-bks">' +
       (bks.length ? bks.map(function (x) {
         return '<div class="cu-bk"><div class="grow"><b>' + x.code + ' - ' + esc(x.cust.name) + '</b><div class="b2">' + esc(x.car.plate) + ' (' + esc(carName(x.car)) + ')</div><div class="b2">' + UI.fmt.dmy(x.start) + ' to ' + UI.fmt.dmy(x.end) + '</div><div class="row gap6 wrap" style="margin-top:4px"><span class="b2">Status:</span>' + UI.status('booking', x.status, null, { sm: true }) + UI.status('payment', x.pay || 'None', null, { sm: true }) + '</div></div>' + UI.btn('View Details', { kind: 'tonal', size: 'sm', icon: 'eye', attrs: { 'data-cu-bk': x.code } }) + '</div>';
       }).join('') : '<div class="b2">No bookings yet.</div>') + '</div></section>' +
       (can('customers.view_documents') ? '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('files') + 'Documents</h3></div><div id="cu-docs"></div></section>' : '');
   }
   var dr = UI.drawer({
-    title: 'Customer Details', subtitle: (latest ? latest.code + ' · ' : '') + p.name, width: 860, data: { id: id },
+    title: p.name, subtitle: [plural(cuBookings(p).filter(function (x) { return x.status !== 'Cancelled'; }).length, 'rental'), p.nat, cuSince(p) ? 'since ' + cuSince(p) : ''].filter(Boolean).join(' · '), width: 860, data: { id: id },
     actions: head(),
     body: function (el) {
       el.innerHTML = body(el);
@@ -371,7 +446,7 @@ function cuOpen(id) {
       var ic = el.querySelector('#cu-ic'); if (ic) cuIcMount(ic, p, {});
       var dc = el.querySelector('#cu-docs'); if (dc) cuDocsMount(dc, p.docs || (p.docs = {}), { readonly: true, person: p });
     },
-    foot: [{ label: 'Close', kind: 'o' }].concat(can('bookings.create') ? [{ label: 'New Booking', icon: 'calendar-plus', onClick: function () { if (cuFlags(p).black) { UI.toast('This customer is on the blacklist. Take them off it first.', { tone: 'warn' }); return false; } setTimeout(function () { API.newBooking({ customer: p.id }); }, 200); } }] : []),
+    foot: [{ label: 'Close', kind: 'o' }].concat(can('bookings.create') ? [{ label: 'New Booking', icon: 'calendar-plus', onClick: function () { if (cuFlags(p).black) { cuNewBooking(p); return false; } setTimeout(function () { API.newBooking({ customer: p.id }); }, 200); } }] : []),
     onClose: function () { if (onPage && S.page === 'customers') CUR.ctx.setParams({ customer: '' }); }
   });
   CU_DR = dr;
@@ -394,7 +469,7 @@ function cuOpen(id) {
       editing = v === 'on'; dr.refresh(); return;
     }
     if ((x = t.closest('[data-cu-bk]'))) { API.openBooking(x.getAttribute('data-cu-bk')); return; }
-    if (t.closest('[data-cu-nb]')) { API.newBooking({ customer: p.id }); }
+    if (t.closest('[data-cu-nb]')) { cuNewBooking(p); }
   });
   return dr;
 }

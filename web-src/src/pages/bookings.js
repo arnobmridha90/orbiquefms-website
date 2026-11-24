@@ -22,12 +22,15 @@ DATA_INIT.push(function (d) {
 
 /* ---------------- small helpers ---------------- */
 var BK_HELD = ['Deposit Received', 'Full Payment Received', 'Refund Pending'];
+var BK_REF_OFF = 'Deposit Refunded (set by recording the refund on the deposits page)';
 function bkRecv(x) { var r = DB.received(x.code); return r || (D().payments.some(function (p) { return p.booking === x.code; }) ? r : x.received || 0); }
 function bkMoney(x) {
   var rec = bkRecv(x), due = Math.round((x.payable - rec) * 100) / 100;
   var tone = x.status === 'Cancelled' ? 'grey' : !x.payable ? 'info' : due < 0 ? 'info' : due === 0 ? 'ok' : rec > 0 ? 'warn' : 'bad';
   return { total: x.payable, rec: rec, due: due, tone: tone, pct: x.payable ? Math.min(100, rec / x.payable * 100) : 100 };
 }
+/* "RM 120.00 due" / "Paid" / "RM 20.00 extra" */
+function bkDueText(m) { return m.due > 0 ? UI.fmt.money(m.due) + ' due' : m.due < 0 ? UI.fmt.money(-m.due) + ' extra' : 'Paid'; }
 function bkAgents(x) {
   var ids = {}; (x.agentIds || []).forEach(function (a) { ids[a] = 1; });
   D().tasks.forEach(function (t) { if (t.booking === x.code && t.status !== 'Cancelled') (t.agents || []).forEach(function (a) { ids[a] = 1; }); });
@@ -38,32 +41,35 @@ function bkAgents(x) {
 function bkT(d) { var h = d.getHours(), m = d.getMinutes(); return (h % 12 || 12) + (m ? ':' + String(m).padStart(2, '0') : '') + ' ' + (h < 12 ? 'AM' : 'PM'); }
 function bkWhen(d) { return d.getDate() + ' ' + MON[d.getMonth()] + ', ' + bkT(d); }
 function bkPkgLabel(p) { return p.name + ' (' + UI.fmt.money(p.daily) + '/day)'; }
-/* the stated rule: under 24 h = hourly x hours; else full days x daily + remaining hours x hourly;
-   payable = rent + deposit + damage cover (per started day) + delivery + return + others - discount */
-function bkCalc(o) {
-  var ms = o.end - o.start, hrs = Math.max(0, ms / 36e5), full = Math.floor(hrs / 24), rem = Math.ceil(hrs - full * 24 - 1e-9);
-  var rent = hrs <= 0 ? 0 : hrs < 24 ? Math.ceil(hrs) * o.hourly : full * o.rate + rem * o.hourly;
-  var days = Math.max(1, Math.ceil(hrs / 24 - 1e-9)), cover = (o.covDaily || 0) * days;
-  var mins = Math.round((ms % DAY) / 6e4), dur = full + ' day' + (full === 1 ? '' : 's') + ', ' + Math.floor(mins / 60) % 24 + ':' + String(mins % 60).padStart(2, '0') + ':00';
-  return { hrs: hrs, days: days, rent: rent, cover: cover, dur: hrs < 24 ? '0 days, ' + Math.floor(hrs) + ':' + String(Math.round((hrs % 1) * 60)).padStart(2, '0') + ':00' : dur,
-    payable: rent + (o.dep || 0) + cover + (o.deliv || 0) + (o.ret || 0) + (o.others || 0) - (o.disc || 0) };
+/* prices: the shared bkCalc in data.js (exact remaining hours, whole RM like the backend) */
+/* is the car free? the shared busy() rules: other bookings, workshop time, Not in use and Sold */
+function bkClash(carId, s, e, except) { if (!carId || !s || !e) return { free: true }; return busy(carId, s, e, except); }
+function bkBusyText(b) {
+  if (!b || b.free) return '';
+  if (b.kind === 'fleet') return 'This car is not available. It is marked ' + b.reason + '.';
+  if (b.kind === 'workshop') { var w = b.downtime; return 'This car is in the workshop' + (w && w.reason ? ' (' + String(w.reason).toLowerCase() + ')' : '') + (w && w.to ? ' until ' + UI.fmt.dt(w.to) : ', with no return date yet') + '. Pick another car or other dates.'; }
+  var z = b.booking; return 'This car is not available for the selected dates. It is booked on ' + z.code + ' (' + esc(z.cust.name) + ', ' + bkWhen(z.start) + ' to ' + bkWhen(z.end) + ').';
 }
-/* bookings of the same car that overlap; cars sold or not in use are never free */
-function bkClash(carId, s, e, except) {
-  var c = carById(carId); if (!c || !s || !e) return [];
-  if (c.fleet && c.fleet !== 'Active') return [{ fleet: c.fleet }];
-  return D().bookings.filter(function (x) { return x.car === c && x.code !== except && x.status !== 'Cancelled' && x.status !== 'Completed' && x.start < e && x.end > s; });
+/* a phone typed or pasted in any form: digits with an optional leading + */
+function bkTidyPhone(s) { var t = String(s || '').trim(), plus = /^\+/.test(t), dg = t.replace(/\D/g, ''); return dg ? (plus ? '+' : '') + dg : ''; }
+/* the payment status select: Deposit Refunded is switched off when the refund must be recorded on Deposit refunds */
+function bkPayOptions(locked) {
+  return [['', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s === 'Deposit Refunded' && locked ? BK_REF_OFF : s]; }));
 }
-function bkLocOpts(start) {
-  var locs = B().locations || [], out = [['Not chosen', 'Not chosen']];
-  locs.filter(function (l) { return start ? l.p !== false : l.d !== false; }).forEach(function (l) { out.push([(start ? 'Pick-up from our location' : 'Drop-off at our location') + '|' + l.n, (start ? 'Pick-up from our location - ' : 'Drop-off at our location - ') + l.n]); });
-  return out.concat(start ? [['Delivery to client location', 'Delivery to client location'], ['Delivery to KLIA', 'Delivery to KLIA']] : [['Return from client location', 'Return from client location'], ['Return from KLIA', 'Return from KLIA']]);
+function bkLockRefunded(html, locked) { return locked ? html.replace(/<option value="Deposit Refunded"( selected)?>/, '<option value="Deposit Refunded" disabled>') : html; }
+/* pick-up ('start') and return ('end') choices from our locations and the company's places; a saved choice that is
+   no longer in Settings still shows */
+function bkHandoverOpts(which, saved) {
+  var list = handoverOptions(which), out = [['Not chosen', 'Not chosen']].concat(list.map(function (o) { return [o.value, o.label]; }));
+  if (saved && saved !== 'Not chosen' && !list.some(function (o) { return o.value === saved; })) out.push([saved, saved.replace('|', ' - ') + ' (no longer in Settings)']);
+  return out;
 }
-function bkCarLabel(c) { return c.serial + ' | ' + carName(c) + ' | ' + c.plate + ' | ' + c.color; }
+function bkCarLabel(c) { return c.plate + ' | ' + carName(c) + ' | ' + c.color; }
 function bkLinkCopy(x, kind) {
   var label = { '': 'Booking form link copied', pdf: 'Agreement link copied', agent: 'Agent inspection link copied', customer: 'Customer inspection link copied' }[kind || ''];
   UI.copy(siteLink(x, kind || ''), { label: label });
 }
+function bkIsPhone() { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); }
 
 /* ---------------- invoices and receipts of a booking ---------------- */
 function bkInvoice(code) { var l = D().invoices.filter(function (v) { return v.booking === code && v.status !== 'Void'; }); return l[l.length - 1] || null; }
@@ -234,17 +240,35 @@ function bkAgreementPdf(x) {
   });
 }
 
-/* ---------------- status dialogs ---------------- */
+/* ---------------- status dialogs ----------------
+   Both go through the shared applyStatusRules: signed -> Agreement Signed + Deposit due, Car Returned -> Refund Pending
+   (or Deposit Refunded with no deposit). Deposit Refunded cannot be picked by hand for bookings ending on or after the
+   company lock date: it is set by recording the refund on Deposit refunds. */
+function bkSaveStatus(x, patch, label) {
+  var r = applyStatusRules(x, patch), notes = r.notes || []; delete r.notes;
+  if (r.pay === 'Deposit Refunded' && x.pay !== 'Deposit Refunded' && patch.pay === 'Deposit Refunded' && !canPickRefunded(x)) { UI.toast('Record the refund on Deposit refunds to set Deposit Refunded.', { tone: 'warn' }); return false; }
+  DB.update('bookings', x, r, { text: DB.actor() + ' changed ' + label + ' of ' + x.code + ' to ' + (patch.status || patch.pay || 'None') + (notes.length ? ' (' + notes.join(' ') + ')' : '') });
+  UI.toast(x.code + ': ' + (patch.status || patch.pay || 'None') + (notes.length ? '. ' + notes.join(' ') : ''), { ms: notes.length ? 6000 : 3500 });
+  return true;
+}
 function bkStatusDialog(x, kind) {
   if (!can('bookings.change_status')) { UI.toast('Changing a status needs the "Change status" access', { tone: 'warn' }); return; }
-  var pay = kind === 'pay', opts = pay ? [['', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s]; })) : LISTS.bookingStatus;
+  var pay = kind === 'pay', locked = pay && !canPickRefunded(x);
+  var sel = pay ? bkLockRefunded(UI.select({ key: 'st', label: 'New Status', options: bkPayOptions(locked), value: x.pay || '' }), locked) : UI.select({ key: 'st', label: 'New Status', options: LISTS.bookingStatus, value: x.status });
+  var hint = function (v) {
+    if (pay) return locked ? 'Deposit Refunded is set by recording the refund on the Deposit refunds page.' : '';
+    var r = applyStatusRules(x, { status: v }); return (r.notes || []).join(' ');
+  };
   UI.dialog({ title: pay ? 'Update Payment Status' : 'Update Booking Status', text: 'Select a new status for booking ' + x.code, width: 'sm',
-    body: UI.select({ key: 'st', label: 'New Status', options: opts, value: pay ? x.pay : x.status }) + '<div class="row gap8 b2">Now: ' + (pay ? UI.status('payment', x.pay || 'None', null, { sm: true }) : UI.status('booking', x.status, null, { sm: true })) + '</div>',
+    body: function (el) {
+      el.innerHTML = sel + '<div class="row gap8 b2" style="margin-top:8px">Now: ' + (pay ? UI.status('payment', x.pay || 'None', null, { sm: true }) : UI.status('booking', x.status, null, { sm: true })) + '</div><p class="b2 bkx-rule" data-bkx-rule></p>';
+      var s = el.querySelector('select'), rl = el.querySelector('[data-bkx-rule]'), upd = function () { rl.textContent = s.value === (pay ? x.pay || '' : x.status) ? (pay && locked ? hint() : '') : hint(s.value); };
+      s.addEventListener('change', upd); upd();
+    },
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Update', onClick: function (d) {
       var v = UI.form(d.body).st, patch = {}; if ((pay ? x.pay || '' : x.status) === v) return;
       patch[pay ? 'pay' : 'status'] = v; if (!pay && v === 'Agreement Signed' && !x.submitted) { patch.submitted = true; patch.submittedAt = NOW(); }
-      DB.update('bookings', x, patch, { text: DB.actor() + ' changed the ' + (pay ? 'payment' : 'booking') + ' status of ' + x.code + ' to ' + (v || 'None') });
-      UI.toast(x.code + ': ' + (v || 'None'));
+      return bkSaveStatus(x, patch, pay ? 'the payment status' : 'the booking status');
     } }] });
 }
 
@@ -389,8 +413,11 @@ function bkExportPop(anchor, f) {
   pop.el.addEventListener('change', function (ev) { var k = ev.target.getAttribute('data-key'); if (k === 'ex-from') st.from = ev.target.value; if (k === 'ex-to') st.to = ev.target.value; pop.refresh(); });
 }
 
-/* ---------------- the booking drawer ---------------- */
+/* ---------------- the booking drawer ----------------
+   Sections, in the order staff fill them: (Check the customer first), Customer, Car and dates, Prices and cover,
+   Pick-up and return, Payment and status, Admin, Documents. Existing bookings also get a side column. */
 var BK_DR = null;
+var BK_LENS = [['1', '1 day'], ['2', '2 days'], ['3', '3 days'], ['7', '1 week'], ['h12', '+12 hours']];
 function bkOpenBooking(code, prefill) {
   if (!can(code ? 'bookings.view' : 'bookings.create')) { UI.toast(code ? 'Seeing bookings needs the "See bookings" access.' : 'Adding bookings needs the "Add bookings" access.', { tone: 'warn' }); return null; }
   var d = D(), x = code ? findBooking(code) : null;
@@ -399,57 +426,89 @@ function bkOpenBooking(code, prefill) {
   if (BK_DR && !BK_DR.closed && BK_DR.data.key === key) return BK_DR;
   prefill = prefill || {};
   var isNew = !x, ro = !isNew && !can('bookings.edit'), amt = can('bookings.edit_amounts'), seeAmt = amt || can('bookings.see_amounts'), chSt = can('bookings.change_status');
-  var pre = !x && prefill.customer ? byId(d.people, prefill.customer) : null;
-  var p = x ? x.cust : pre, carPre = prefill.car ? carById(prefill.car) || d.cars.filter(function (c) { return c.plate === prefill.car; })[0] : null;
-  var s0 = prefill.start ? (prefill.start instanceof Date ? prefill.start : UI.parseDate(prefill.start)) : null; if (!s0) { s0 = new Date(NOW().getTime() + DAY); s0.setHours(10, 0, 0, 0); }
-  var e0 = prefill.end ? (prefill.end instanceof Date ? prefill.end : UI.parseDate(prefill.end)) : new Date(s0.getTime() + 2 * DAY);
+  var preId = prefill.customer || prefill.cust, pre = !x && preId ? byId(d.people, preId) : null;
+  var p = x ? x.cust : pre, carPre = prefill.car ? carById(prefill.car) || d.cars.filter(function (c) { return normPlate(c.plate) === normPlate(prefill.car); })[0] : null;
+  var asDate = function (v) { return v instanceof Date ? v : v ? UI.parseDate(v) : null; };
+  var s0 = asDate(prefill.start); if (!s0 || isNaN(s0)) { s0 = new Date(NOW().getTime() + DAY); s0.setHours(10, 0, 0, 0); }
+  var e0 = asDate(prefill.end); if (!e0 || isNaN(e0)) e0 = new Date(s0.getTime() + 2 * DAY);
   var docs = x ? Object.assign({}, x.docs || {}) : { poa: null, dl: null, icFront: null, icBack: null, other: null };
+  var optOf = function (opt, loc) { return opt === 'Pick-up from our location' || opt === 'Drop-off at our location' ? opt + '|' + loc : opt || 'Not chosen'; };
   var v = x ? { car: x.car.id, start: x.start, end: x.end, rate: x.rate, hourly: x.hourly, dep: x.dep, disc: x.disc, pkg: x.pkg || (x.cov ? 'manual' : ''), covName: x.cov ? x.cov.name : '', covDaily: x.cov ? x.cov.daily : '', covMax: x.cov ? x.cov.max : '', deliv: x.deliv, ret: x.ret, others: x.others || 0,
-    startOpt: x.startOpt === 'Pick-up from our location' ? x.startOpt + '|' + x.pickup : x.startOpt, endOpt: x.endOpt === 'Drop-off at our location' ? x.endOpt + '|' + x.drop : x.endOpt, delNote: x.delNote, retNote: x.retNote, method: x.method, pay: x.pay || '', status: x.status, signature: x.signature || '', filledByAdmin: x.filledByAdmin, submitted: x.submitted }
-    : { car: carPre ? carPre.id : '', start: s0, end: e0, rate: carPre ? carPre.rate : 0, hourly: carPre ? carPre.hourly : 0, dep: carPre ? carPre.deposit : 0, disc: 0, pkg: '', covName: '', covDaily: '', covMax: '', deliv: 0, ret: 0, others: 0, startOpt: 'Not chosen', endOpt: 'Not chosen', delNote: '', retNote: '', method: 'Online Transfer', pay: '', status: 'Pending', signature: (d.signatures[0] || {}).id || '', filledByAdmin: true, submitted: false };
-  var c0 = p || {}, em = c0.emergency || {};
-  var cust = { name: c0.name || '', phone: c0.phone || '', email: c0.email || '', address: c0.address || '', nat: c0.nat || 'Malaysian', ic: c0.ic || '', licenceNo: c0.licenceNo || '', licenceExp: c0.licenceExp || null, emName: em.name || '', emPhone: em.phone || '', emRel: em.rel || '' };
-  var check = { files: [], read: null, results: null }, dirty = false, saved = false, offData = null;
+    startOpt: optOf(x.startOpt, x.pickup), endOpt: optOf(x.endOpt, x.drop), delNote: x.delNote, retNote: x.retNote, method: x.method, pay: x.pay || '', status: x.status, signature: x.signature || '', filledByAdmin: x.filledByAdmin, submitted: x.submitted }
+    : { car: carPre ? carPre.id : '', start: s0, end: e0, rate: carPre ? carPre.rate : 0, hourly: carPre ? carPre.hourly : 0, dep: carPre ? carPre.deposit : 0, disc: 0, pkg: CO().packageDefault || '', covName: '', covDaily: '', covMax: '', deliv: 0, ret: 0, others: 0, startOpt: 'Not chosen', endOpt: 'Not chosen', delNote: '', retNote: '', method: 'Online Transfer', pay: '', status: 'Pending', signature: (d.signatures[0] || {}).id || '', filledByAdmin: true, submitted: false };
+  if (v.pkg && v.pkg !== 'manual' && !byId(d.damagePackages, v.pkg)) v.pkg = '';
+  var custOf = function (c0) { c0 = c0 || {}; var em = c0.emergency || {}; return { name: c0.name || '', phone: c0.phone || '', email: c0.email || '', address: c0.address || '', nat: c0.nat || 'Malaysian', ic: c0.ic || '', licenceNo: c0.licenceNo || '', licenceExp: c0.licenceExp || null, emName: em.name || '', emPhone: em.phone || '', emRel: em.rel || '' }; };
+  var cust = custOf(p);
+  var check = { files: [], read: null, results: null, valid: null, filled: '', why: '', fill: false, error: '' }, dirty = false, saved = false, offData = null, carCtl = null, custCtl = null, avail = { key: '', res: { free: true } }, prevEnd = v.end;
   var onPage = S.page === 'bookings' && CUR && CUR.ctx;
+  var refLocked = function () { var f = dr && dr.body ? form() : {}; var e = f.end ? UI.parseDate(f.end) : v.end; return !canPickRefunded({ end: e, pay: x ? x.pay : '' }); };
 
   /* ---- field builders ---- */
-  var money = function (k, label, req, o) { o = o || {}; return UI.input({ key: k, label: label, type: 'number', value: v[k], required: req, readonly: !amt, step: '0.01', min: 0, placeholder: o.ph, style: o.style }); };
+  var money = function (k, label, req, o) { o = o || {}; return UI.input({ key: k, label: label, type: 'number', value: v[k], required: req, readonly: !amt, step: '0.01', min: 0, placeholder: o.ph, prefix: 'RM' }); };
   var sect = function (title, icon, inner, o) { o = o || {}; return '<section class="bkx-sec' + (o.coll ? ' coll' : '') + (o.shut ? ' shut' : '') + '"' + (o.id ? ' id="' + o.id + '"' : '') + '><div class="bkx-sec-h"' + (o.coll ? ' role="button" tabindex="0" data-bkx-tog' : '') + '>' + i(icon) + '<span class="grow">' + title + '</span>' + (o.act || '') + (o.coll ? i('chevron-down', 'bkx-chev') : '') + '</div><div class="bkx-sec-b">' + inner + '</div></section>'; };
   var pkgOpts = [['', 'No damage cover']].concat(d.damagePackages.map(function (pk) { return [pk.id, bkPkgLabel(pk)]; })).concat([['manual', 'Set by hand']]);
-  var carOpts = [['', '- No Car -']].concat(d.cars.filter(function (c) { return c.fleet !== 'Sold' || (x && x.car === c); }).map(function (c) { return [c.id, bkCarLabel(c)]; }));
 
+  function checkerHtml() {
+    return '<div class="bkx-chk"><div class="bkx-chk-b">' + [['ic', 'IC', 'id', 'c'], ['icBack', 'IC back', 'id', 'tonal'], ['passport', 'Passport', 'book-2', 'tonal'], ['dl', 'DL', 'license', 'tonal'], ['poa', 'POA', 'home', 'tonal'], ['other', 'Other files', 'paperclip', 'tonal']].map(function (b2) {
+      return '<label class="btn ' + b2[3] + ' sm" title="' + ({ dl: 'Driving licence', poa: 'Proof of address' }[b2[0]] || b2[1]) + '">' + i(b2[2]) + b2[1] + '<input type="file" accept="' + (/^(ic|passport|dl)$/.test(b2[0]) ? 'image/*' : 'image/*,.pdf') + '" hidden data-bkx-chk="' + b2[0] + '"></label>';
+    }).join('') + '</div><p class="b2">The IC, passport and licence are read on our own server. Everything uploaded here is saved with the booking.</p><div id="bkx-chk-out"></div></div>';
+  }
   function formHtml() {
     var h = '<div class="bkx-form">';
-    if (isNew && can('customers.check_ic')) h += sect('Check the customer first', 'shield-search', '<div class="bkx-chk"><div class="bkx-chk-b">' + [['ic', 'IC', 'id'], ['icBack', 'IC back', 'id'], ['passport', 'Passport', 'book-2'], ['dl', 'DL', 'license'], ['poa', 'POA', 'home'], ['other', 'Other files', 'files']].map(function (b2) { return '<label class="btn o sm">' + i(b2[2]) + b2[1] + '<input type="file" accept="image/*,.pdf" hidden data-bkx-chk="' + b2[0] + '"></label>'; }).join('') + '</div><p class="b2">The IC, passport and licence are read on our own server. Everything uploaded here is saved with the booking.</p><div id="bkx-chk-out"></div></div>');
-    h += sect('Rental info', 'car', '<div class="bkx-g">' + UI.select({ key: 'car', label: 'Car', required: true, options: carOpts, value: v.car, style: 'grid-column:1 / -1' }) + UI.input({ key: 'start', label: 'Booking start date & time', type: 'datetime-local', value: v.start, required: true, style: 'grid-column:span 2' }) + UI.input({ key: 'end', label: 'Booking end date & time', type: 'datetime-local', value: v.end, required: true, style: 'grid-column:span 2' }) +
-      '<div class="full" id="bkx-alerts"></div>' +
-      (seeAmt ? (!amt && !ro ? '<div class="full">' + UI.alert('You can add bookings, but setting the prices needs the "Edit amounts" access. The prices come from the car.', 'pri') + '</div>' : '') +
-        money('rate', 'Daily rate', true) + money('hourly', 'Hourly rate', true) + money('dep', 'Deposit', true) + money('disc', 'Discount', true) +
-        UI.select({ key: 'pkg', label: 'Damage cover', options: pkgOpts, value: v.pkg, disabled: !amt, style: 'grid-column:span 2' }) +
-        '<div class="bkx-man full" ' + (v.pkg === 'manual' ? '' : 'hidden') + '><div class="bkx-g3">' + UI.input({ key: 'covName', label: 'Coverage name', value: v.covName, readonly: !amt }) + UI.input({ key: 'covDaily', label: 'Coverage per day', type: 'number', value: v.covDaily, readonly: !amt, prefix: 'RM' }) + UI.input({ key: 'covMax', label: 'Max coverage', type: 'number', value: v.covMax, readonly: !amt, prefix: 'RM' }) + '</div></div>' +
-        money('deliv', 'Delivery') + money('ret', 'Return') + money('others', 'Others') : '<div class="full b2">Amounts are hidden for you.</div>') + '</div>');
-    h += sect('Pick-up and return', 'map-pin', '<div class="bkx-g">' + UI.select({ key: 'startOpt', label: 'Start of rental', options: bkLocOpts(true), value: v.startOpt, style: 'grid-column:span 2' }) + UI.select({ key: 'endOpt', label: 'End of rental', options: bkLocOpts(false), value: v.endOpt, style: 'grid-column:span 2' }) +
-      UI.input({ key: 'delNote', label: 'Delivery / pick-up note', value: v.delNote, style: 'grid-column:span 2', placeholder: 'For example: hotel lobby, call on arrival' }) + UI.input({ key: 'retNote', label: 'Return / drop-off note', value: v.retNote, style: 'grid-column:span 2' }) + '</div>');
-    if (seeAmt) h += sect('Calculated charges', 'calculator', '<div class="bkx-g">' + UI.input({ key: 'calcDur', label: 'Rental Duration', readonly: true, attrs: { 'data-nosave': 1 } }) + UI.input({ key: 'calcRent', label: 'Total Rent (RM)', readonly: true }) + UI.input({ key: 'calcCover', label: 'Damage cover (RM)', readonly: true }) + UI.input({ key: 'calcPay', label: 'Total Payable Amount (RM)', readonly: true }) + '<p class="b2 full">Under 24 hours: hourly rate x hours. Otherwise full days x daily rate + the hours left x hourly rate. Payable = rent + deposit + damage cover per started day + delivery + return + others - discount.</p></div>', { coll: true });
-    if (x) { var sm = d.summons.filter(function (z) { return z.booking === x.code; }); if (sm.length && can('summons.view')) h += sect('Summons on this booking (' + sm.length + ')', 'gavel', '<div class="bkx-sum">' + sm.map(function (z) { return '<button type="button" class="bkx-sumr" data-bkx-sum="' + z.id + '"><span class="grow"><b>' + esc(z.authority) + ' ' + esc(z.notice) + '</b><small>' + esc(z.offence) + ' · ' + UI.fmt.dateTime(z.at) + '</small></span>' + UI.money(z.fine) + UI.status('summons', z.status, null, { sm: true }) + '</button>'; }).join('') + '</div>'); }
+    if (isNew && can('customers.check_ic')) h += sect('Check the customer first', 'shield-search', checkerHtml(), { id: 'bkx-s-chk' });
+    /* 1. customer */
+    h += sect('Customer', 'user', (isNew && !ro ? '<div class="bkx-cpick" id="bkx-cpick"></div>' : '') + '<div class="bkx-g">' +
+      UI.input({ key: 'name', label: 'Full Name', value: cust.name, required: true, style: 'grid-column:span 2', attrs: { autocomplete: 'off' } }) + UI.input({ key: 'phone', label: 'Phone', type: 'tel', value: cust.phone, required: true, placeholder: '+60 12 345 6789' }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: cust.email }) +
+      UI.input({ key: 'ic', label: 'IC / Passport no.', value: cuSeeIc() || isNew ? cust.ic : UI.fmt.ic(cust.ic), readonly: !cuSeeIc() && !isNew, help: !cuSeeIc() && !isNew ? 'Middle hidden for you' : '' }) + UI.input({ key: 'nat', label: 'Nationality', value: cust.nat, placeholder: 'Type to search', attrs: { list: 'bkx-nats' } }) +
+      UI.input({ key: 'licenceNo', label: 'Licence no.', value: cust.licenceNo }) + UI.dateField({ key: 'licenceExp', label: 'Licence expiry', value: cust.licenceExp, chips: false }) +
+      UI.input({ key: 'address', label: 'Residential Address', value: cust.address, style: 'grid-column:1 / -1' }) +
+      '<datalist id="bkx-nats">' + LISTS.nationalities.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>' +
+      '<div class="bkx-subh">' + i('phone-call') + 'Emergency contact</div><div class="bkx-g3">' + UI.input({ key: 'emName', label: 'Name', value: cust.emName }) + UI.input({ key: 'emPhone', label: 'Phone', type: 'tel', value: cust.emPhone }) + UI.input({ key: 'emRel', label: 'Relationship', value: cust.emRel, attrs: { list: 'bkx-rels' }, placeholder: 'Relative, Sibling, Colleague' }) + '<datalist id="bkx-rels">' + LISTS.relationships.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>', { id: 'bkx-s-cust' });
     if (p && can('customer_notes.view')) h += '<section class="bkx-sec" id="bkx-notes"></section>';
-    h += sect('Payment & status', 'credit-card', '<div class="bkx-g3">' + UI.select({ key: 'method', label: 'Payment Method', required: true, options: LISTS.methods, value: v.method }) +
-      UI.select({ key: 'pay', label: 'Payment Status', options: [['', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s]; })), value: v.pay, disabled: !chSt }) + UI.select({ key: 'status', label: 'Booking Status', options: LISTS.bookingStatus, value: v.status, disabled: !chSt }) + '</div>' + (chSt ? '' : '<p class="b2">Changing a status needs the "Change status" access.</p>'));
-    h += sect('Authority & admin', 'signature', '<div class="bkx-g3"><div class="bkx-sigsel">' + UI.select({ key: 'signature', label: 'Authority Signature', options: [['', 'No signature']].concat(d.signatures.map(function (s) { return [s.id, s.name]; })), value: v.signature, disabled: !can('signatures.use_on_booking') }) + '<span class="bkx-sigimg"></span></div>' +
-      UI.switch({ key: 'filledByAdmin', label: 'Filled by Admin', help: 'Staff typed the customer details', checked: v.filledByAdmin }) + UI.switch({ key: 'submitted', label: 'Is Submitted', help: 'The customer signed the booking form', checked: v.submitted }) + '</div>');
+    if (x && can('customers.check_ic')) h += sect('Check IC', 'id-badge-2', '<div id="bkx-ic"></div>', { coll: true, shut: true });
+    /* 2. car and dates */
+    h += sect('Car and dates', 'car', '<div class="bkx-g"><div class="full" id="bkx-carpick"></div>' +
+      UI.dateTimeField({ key: 'start', label: 'Rental start', value: v.start, required: true, style: 'grid-column:span 2', disabled: ro }) +
+      UI.dateTimeField({ key: 'end', label: 'Rental end', value: v.end, required: true, style: 'grid-column:span 2', chips: false, disabled: ro }) +
+      (ro ? '' : '<div class="full bkx-lens" role="group" aria-label="Rental length"><span class="b2">Length</span>' + BK_LENS.map(function (l) { return '<button type="button" class="ui-fchip" data-bkx-len="' + l[0] + '">' + l[1] + '</button>'; }).join('') + '<span class="bkx-durtx" id="bkx-durtx"></span></div>') +
+      '<div class="full" id="bkx-alerts"></div></div>', { id: 'bkx-s-car' });
+    /* 3. prices and cover */
+    if (seeAmt) h += sect('Prices and cover', 'calculator', '<div class="bkx-g">' + (!amt && !ro ? '<div class="full">' + UI.alert('You can add bookings, but setting the prices needs the "Edit amounts" access. The prices come from the car.', 'pri') + '</div>' : '') +
+      money('rate', 'Daily rate', true) + money('hourly', 'Hourly rate', true) + money('dep', 'Deposit', true) + money('disc', 'Discount') +
+      UI.select({ key: 'pkg', label: 'Damage cover', options: pkgOpts, value: v.pkg, disabled: !amt, style: 'grid-column:span 2' }) + money('others', 'Others') +
+      '<div class="bkx-man full" ' + (v.pkg === 'manual' ? '' : 'hidden') + '><div class="bkx-g3">' + UI.input({ key: 'covName', label: 'Coverage name', value: v.covName, readonly: !amt }) + UI.input({ key: 'covDaily', label: 'Coverage per day', type: 'number', value: v.covDaily, readonly: !amt, prefix: 'RM' }) + UI.input({ key: 'covMax', label: 'Max coverage', type: 'number', value: v.covMax, readonly: !amt, prefix: 'RM' }) + '</div></div>' +
+      '<div class="full bkx-calc" id="bkx-calc"></div></div>', { id: 'bkx-s-price' });
+    else h += '<p class="b2 bkx-hidamt">Amounts are hidden for you.</p>';
+    /* 4. pick-up and return */
+    h += sect('Pick-up and return', 'map-pin', '<div class="bkx-g">' + UI.select({ key: 'startOpt', label: 'Start of rental', options: bkHandoverOpts('start', v.startOpt), value: v.startOpt, style: 'grid-column:span 2' }) + UI.select({ key: 'endOpt', label: 'End of rental', options: bkHandoverOpts('end', v.endOpt), value: v.endOpt, style: 'grid-column:span 2' }) +
+      (seeAmt ? money('deliv', 'Delivery charge') + money('ret', 'Return charge') + '<p class="b2 bkx-feehint" style="grid-column:span 2">Picking a place fills its delivery or return charge from Settings.</p>' : '') +
+      UI.input({ key: 'delNote', label: 'Delivery / pick-up note', value: v.delNote, style: 'grid-column:span 2', placeholder: 'For example: hotel lobby, call on arrival' }) + UI.input({ key: 'retNote', label: 'Return / drop-off note', value: v.retNote, style: 'grid-column:span 2' }) + '</div>' +
+      (x ? '<div id="bkx-fees"></div>' : ''), { id: 'bkx-s-hand' });
+    if (x) { var sm = d.summons.filter(function (z) { return z.booking === x.code; }); if (sm.length && can('summons.view')) h += sect('Summons on this booking (' + sm.length + ')', 'gavel', '<div class="bkx-sum">' + sm.map(function (z) { return '<button type="button" class="bkx-sumr" data-bkx-sum="' + z.id + '"><span class="grow"><b>' + esc(z.authority) + ' ' + esc(z.notice) + '</b><small>' + esc(z.offence) + ' · ' + UI.fmt.dateTime(z.at) + '</small></span>' + UI.money(z.fine) + UI.status('summons', z.status, null, { sm: true }) + '</button>'; }).join('') + '</div>'); }
+    /* 5. payment and status */
+    var locked = !canPickRefunded({ end: v.end, pay: x ? x.pay : '' });
+    h += sect('Payment and status', 'credit-card', '<div class="bkx-g3">' + UI.select({ key: 'method', label: 'Payment Method', required: true, options: LISTS.bookingMethods || LISTS.methods, value: v.method }) +
+      bkLockRefunded(UI.select({ key: 'pay', label: 'Payment Status', options: bkPayOptions(locked), value: v.pay, disabled: !chSt }), locked) + UI.select({ key: 'status', label: 'Booking Status', options: LISTS.bookingStatus, value: v.status, disabled: !chSt }) + '</div><p class="b2 bkx-rule" id="bkx-rule"></p>' + (chSt ? '' : '<p class="b2">Changing a status needs the "Change status" access.</p>'), { id: 'bkx-s-pay' });
+    /* 6. admin */
+    h += sect('Admin', 'signature', '<div class="bkx-g3"><div class="bkx-sigsel">' + UI.select({ key: 'signature', label: 'Authority Signature', options: [['', 'No signature']].concat(d.signatures.map(function (s) { return [s.id, s.name]; })), value: v.signature, disabled: !can('signatures.use_on_booking') }) + '<span class="bkx-sigimg"></span></div>' +
+      UI.switch({ key: 'filledByAdmin', label: 'Filled by Admin', help: 'Staff typed the customer details', checked: v.filledByAdmin }) + UI.switch({ key: 'submitted', label: 'Is Submitted', help: 'The customer signed the booking form', checked: v.submitted }) + '</div>', { id: 'bkx-s-admin' });
     if (x) {
       var pk = x.pkg ? byId(d.damagePackages, x.pkg) : null, ro2 = function (k, l, val) { return UI.input({ key: 'ri-' + k, label: l, value: val, readonly: true }); };
       h += sect('Record info', 'history', '<div class="bkx-g">' + ro2('c', 'Created At', UI.fmt.dateTime(x.created)) + ro2('u', 'Updated At', UI.fmt.dateTime(x.updated || x.created)) + ro2('s', 'Submitted At', x.submittedAt ? UI.fmt.dateTime(x.submittedAt) : '-') + ro2('ip', 'IP Address', x.ip || '-') +
-        ro2('pk', 'Damage Package', pk ? pk.name : x.cov ? x.cov.name : '-') + ro2('pd', 'Damage Daily Rate', pk ? pk.daily.toFixed(2) : x.cov ? Number(x.cov.daily).toFixed(2) : '-') + ro2('pm', 'Max Coverage', pk ? pk.max.toFixed(2) : x.cov ? Number(x.cov.max).toFixed(2) : '-') + ro2('pt', 'Total Coverage', x.dmg ? x.dmg.toFixed(2) : '0.00') + '</div>', { coll: true, shut: true });
+        ro2('pk', 'Damage Package', pk ? pk.name : x.cov ? x.cov.name : '-') + ro2('pd', 'Damage Daily Rate', pk ? UI.fmt.money(pk.daily) : x.cov ? UI.fmt.money(x.cov.daily) : '-') + ro2('pm', 'Max Coverage', pk ? UI.fmt.money(pk.max) : x.cov ? UI.fmt.money(x.cov.max) : '-') + ro2('pt', 'Total Coverage', UI.fmt.money(x.dmg || 0)) + '</div>', { coll: true, shut: true });
     }
-    h += sect('Customer info', 'user', '<div class="bkx-g">' + UI.input({ key: 'name', label: 'Full Name', value: cust.name, required: true, style: 'grid-column:span 2' }) + UI.input({ key: 'phone', label: 'Phone', value: cust.phone, required: true, placeholder: '+60 12 345 6789' }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: cust.email }) +
-      UI.input({ key: 'address', label: 'Residential Address', value: cust.address, style: 'grid-column:span 2' }) + UI.input({ key: 'nat', label: 'Nationality', value: cust.nat, placeholder: 'Type to search', attrs: { list: 'bkx-nats' } }) +
-      UI.input({ key: 'ic', label: 'IC / Passport no.', value: cuSeeIc() || isNew ? cust.ic : UI.fmt.ic(cust.ic), readonly: !cuSeeIc() && !isNew, help: !cuSeeIc() && !isNew ? 'Middle hidden for you' : '' }) + UI.input({ key: 'licenceNo', label: 'Licence no.', value: cust.licenceNo }) + UI.input({ key: 'licenceExp', label: 'Licence expiry', type: 'date', value: cust.licenceExp }) +
-      '<datalist id="bkx-nats">' + LISTS.nationalities.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>', { coll: true });
-    h += sect('Emergency contact', 'phone-call', '<div class="bkx-g3">' + UI.input({ key: 'emName', label: 'Name', value: cust.emName }) + UI.input({ key: 'emPhone', label: 'Phone', value: cust.emPhone }) + UI.input({ key: 'emRel', label: 'Relationship', value: cust.emRel, attrs: { list: 'bkx-rels' }, placeholder: 'Relative, Sibling, Colleague' }) + '<datalist id="bkx-rels">' + LISTS.relationships.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>', { coll: true });
-    if (x && can('customers.check_ic')) h += sect('Check IC', 'id-badge-2', '<div id="bkx-ic"></div>');
-    if (can('bookings.view_documents')) h += sect('Customer documents', 'files', '<div id="bkx-docs"></div>', { coll: true });
+    /* 7. documents */
+    if (can('bookings.view_documents')) h += sect('Documents', 'files', '<div id="bkx-docs"></div>', { coll: true, shut: isNew, id: 'bkx-s-docs' });
     return h + '</div>';
+  }
+  /* handover fees recorded on this booking (from expenses): who recorded which fee */
+  function feesHtml() {
+    var cats = {}; d.expenseCats.forEach(function (c) { cats[c.id] = c; });
+    var list = d.expenses.filter(function (e) { return e.booking === x.code && cats[e.cat] && cats[e.cat].agentFee; }).sort(function (a, b) { return a.day - b.day; });
+    var canAdd = API.addExpense && (can('expenses.add') || can('expenses.add_business'));
+    return '<div class="bkx-fees"><div class="bkx-subh">' + i('coins') + 'Handover fees on this booking<span class="grow"></span>' + (canAdd ? UI.btn('Record a fee', { kind: 't', size: 'sm', icon: 'plus', attrs: { 'data-bs': 'fee' } }) : '') + '</div>' +
+      (list.length ? '<div class="bkx-feel">' + list.map(function (e) { var c = cats[e.cat]; return '<div class="bkx-feer">' + UI.avatar(staffName(e.by)) + '<span class="grow"><b>' + esc(staffName(e.by)) + '</b><small>' + esc(c.name) + ' · ' + UI.fmt.date(e.day) + '</small></span>' + (seeAmt ? UI.money(e.amount) : '') + '</div>'; }).join('') + '</div>'
+        : '<p class="b2">No handover fees recorded yet. The agent who hands the car over records theirs under Expenses.</p>') + '</div>';
   }
   /* the side column (existing bookings): status, money, documents and links, inspection, deposit, team */
   function sideHtml() {
@@ -457,154 +516,378 @@ function bkOpenBooking(code, prefill) {
     var ln = function (icon, label, sub, acts) { return '<div class="bkx-ln"><span class="bkx-ln-ic">' + i(icon) + '</span><div class="grow"><b>' + label + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><div class="bkx-ln-a">' + acts + '</div></div>'; };
     var ib = function (icon, label, act, val, dis) { return UI.iconBtn(icon, label, { size: 'sm', disabled: dis, attrs: { 'data-bs': act, 'data-v': val || '' } }); };
     var out = '<div class="bkx-card"><div class="bkx-card-h">Status</div><div class="bkx-sts">' + (chSt ? '<button type="button" class="bkx-stb" data-bs="st" title="Change the booking status">' + UI.status('booking', x.status) + i('chevron-down') + '</button><button type="button" class="bkx-stb" data-bs="pay" title="Change the payment status">' + UI.status('payment', x.pay || 'None') + i('chevron-down') + '</button>' : UI.status('booking', x.status) + UI.status('payment', x.pay || 'None')) + '</div>' +
-      (seeAmt && x.status !== 'Cancelled' ? '<div class="bkx-mon t-' + m.tone + '"><div><span>Total</span><b>' + UI.money(m.total) + '</b></div><div><span>Received</span><b>' + UI.money(m.rec) + '</b></div><div><span>' + (m.due > 0 ? 'Still due' : m.due < 0 ? 'Extra' : 'Paid') + '</span><b>' + (m.due === 0 ? 'Paid in full' : UI.money(Math.abs(m.due))) + '</b></div><i style="--w:' + m.pct + '%"></i></div>' : '') + '</div>';
+      (seeAmt && x.status !== 'Cancelled' ? bkMoneyBox(m) : '') + '</div>';
     out += '<div class="bkx-card"><div class="bkx-card-h">Documents</div>' +
-      ln('link', 'Booking form link', '<span class="ellip" title="' + esc(siteLink(x, '')) + '">' + esc(siteLink(x, '').replace('https://', '')) + '</span>', ib('copy', 'Copy Link', 'copy') + ib('external-link', 'Open the booking form', 'bf')) +
+      ln('link', 'Booking form link', '<span class="ellip" title="' + esc(siteLink(x, '')) + '">' + esc(siteLink(x, '').replace('https://', '')) + '</span>', ib('brand-whatsapp', 'Send the booking form', 'send') + ib('copy', 'Copy Link', 'copy') + ib('external-link', 'Open the booking form', 'bf')) +
       (can('bookings.view_documents') ? ln('file-certificate', 'Rental agreement', x.submitted ? 'Signed ' + UI.fmt.dateTime(x.submittedAt || x.created) : 'Not signed yet', ib('file-type-pdf', 'View PDF', 'pdf') + ib('copy', 'Copy agreement link', 'pdflink')) : '');
     if (can('billing.view') || can('billing.issue_invoice')) {
       out += inv ? ln('file-invoice', 'Invoice ' + inv.no, UI.fmt.date(inv.issued) + (inv.sent.length ? ' · sent ' + UI.fmt.ago(inv.sent[inv.sent.length - 1].at) : ' · not sent yet'), ib('eye', 'Preview ' + inv.no, 'doc', inv.no) + ib('file-type-pdf', 'Download PDF', 'docpdf', inv.no) + (can('billing.send') ? ib('send', 'Send invoice', 'docsend', inv.no) : ''))
         : ln('file-invoice', 'Invoice', 'No invoice yet', can('billing.issue_invoice') ? UI.btn('Create', { kind: 'tonal', size: 'sm', icon: 'plus', attrs: { 'data-bs': 'inv' } }) : '');
-      out += rcps.length ? rcps.map(function (r) { return ln('receipt', 'Receipt ' + r.no, UI.money(r.amount) + ' · ' + esc(r.kind), ib('eye', 'Preview ' + r.no, 'doc', r.no) + ib('file-type-pdf', 'Download PDF', 'docpdf', r.no) + (can('billing.send') ? ib('send', 'Send receipt', 'docsend', r.no) : '')); }).join('') : ln('receipt', 'Receipts', 'No receipts yet', '');
+      out += rcps.length ? rcps.map(function (r) { return ln('receipt', 'Receipt ' + r.no, UI.fmt.money(r.amount) + ' · ' + esc(r.kind), ib('eye', 'Preview ' + r.no, 'doc', r.no) + ib('file-type-pdf', 'Download PDF', 'docpdf', r.no) + (can('billing.send') ? ib('send', 'Send receipt', 'docsend', r.no) : '')); }).join('') : ln('receipt', 'Receipts', 'No receipts yet', '');
       out += '<div class="bkx-card-a">' + (can('billing.record_payment') ? UI.btn('Record payment', { kind: 'o', size: 'sm', icon: 'cash', attrs: { 'data-bs': 'recpay' } }) + UI.btn('Upload slip', { kind: 'o', size: 'sm', icon: 'upload', attrs: { 'data-bs': 'slip' } }) : '') + UI.btn('All billing', { kind: 't', size: 'sm', icon: 'list-details', attrs: { 'data-bs': 'allbill' } }) + '</div>';
     }
     out += '</div>';
     if (can('inspections.view')) out += '<div class="bkx-card"><div class="bkx-card-h">Inspection</div>' + ln(ins ? 'clipboard-check' : 'clipboard-x', ins ? 'Done' : 'Not done yet', ins ? (ins.custAt ? 'Customer ' + UI.fmt.dateTime(ins.custAt) : 'Customer photos missing') + ' · ' + plural(ins.photos.length, 'photo') : 'Send the links at handover', ib('eye', 'View Inspection Data', 'ins')) +
       '<div class="bkx-card-a">' + UI.btn('Agent link', { kind: 'o', size: 'sm', icon: 'user-scan', attrs: { 'data-bs': 'agentlink' } }) + UI.btn('Customer link', { kind: 'o', size: 'sm', icon: 'link', attrs: { 'data-bs': 'custlink' } }) + '</div></div>';
     var dep = '';
-    if (can('deposits.view')) dep = x.pay === 'Refund Pending' ? '<div class="bkx-dep warn">' + i('cash-banknote') + '<span class="grow">Deposit: waiting to be returned</span>' + UI.btn('Return the deposit', { kind: 'tonal', size: 'sm', attrs: { 'data-bs': 'dep' } }) + '</div>' : x.pay === 'Deposit Refunded' ? '<div class="bkx-dep ok">' + i('circle-check') + '<span class="grow">Deposit: returned to the customer</span>' + UI.btn('See details', { kind: 't', size: 'sm', attrs: { 'data-bs': 'dep' } }) + '</div>' : '';
+    if (can('deposits.view')) dep = x.pay === 'Refund Pending' ? '<div class="bkx-dep warn">' + i('cash-banknote') + '<span class="grow">Deposit: waiting to be returned</span>' + UI.btn('Return the deposit', { kind: 'tonal', size: 'sm', attrs: { 'data-bs': 'dep' } }) + '</div>' : x.pay === 'Deposit Refunded' ? '<div class="bkx-dep ok">' + i('circle-check') + '<span class="grow">Deposit: ' + (x.dep > 0 ? 'returned to the customer' : 'none was taken') + '</span>' + UI.btn('See details', { kind: 't', size: 'sm', attrs: { 'data-bs': 'dep' } }) + '</div>' : '';
     var ag = bkAgents(x);
     out += '<div class="bkx-card">' + dep + '<div class="bkx-card-h">Team</div>' + ln('users', ag.length ? ag.join(', ') : 'No agent yet', 'Agents on this booking\'s tasks', can('tasks.create') ? UI.btn('Assign task', { kind: 'tonal', size: 'sm', icon: 'calendar-plus', attrs: { 'data-bs': 'task' } }) : '') + '</div>';
     return out;
   }
 
   var dr = UI.drawer({
-    title: isNew ? (pre ? 'New Booking for ' + pre.name : 'New Booking') : (ro ? 'Booking - ' : 'Edit Booking - ') + x.code,
-    subtitle: isNew ? 'Fill in the car, the dates and the customer.' : x.cust.name + ' · ' + x.car.plate + ' · ' + carName(x.car), width: isNew ? 900 : 1180, data: { key: key },
+    title: isNew ? (pre ? 'New Booking for ' + pre.name : 'New Booking') : (ro ? 'Booking ' : 'Edit Booking ') + x.code,
+    subtitle: isNew ? 'Find the customer, then pick the car and the dates.' : x.cust.name + ' · ' + x.car.plate + ' · ' + carName(x.car), width: isNew ? 900 : 1180, data: { key: key },
     actions: x ? UI.iconBtn('copy', 'Copy the booking form link', { attrs: { 'data-bs': 'copy' } }) + (can('bookings.view_documents') ? UI.iconBtn('file-type-pdf', 'Agreement PDF', { attrs: { 'data-bs': 'pdf' } }) : '') + (can('bookings.delete') ? UI.iconBtn('trash', 'Delete this booking', { attrs: { 'data-bs': 'del' } }) : '') : '',
     body: function (el, ctl) {
       dr = ctl;
-      var banner = p ? cuBanner(p) : '';
-      el.innerHTML = '<div class="bkx-dl' + (x ? ' two' : '') + (banner ? ' hb' : '') + '">' + (banner ? '<div class="bkx-banner">' + banner + '</div>' : '') + (x ? '<aside class="bkx-side" id="bkx-side">' + sideHtml() + '</aside>' : '') + '<div class="bkx-main">' + formHtml() + '</div></div>';
-      var n = el.querySelector('#bkx-notes'); if (n) cuNotesMount(n, p, { onChange: function () { var b2 = el.querySelector('.bkx-banner'), nb = cuBanner(p); if (b2) b2.innerHTML = nb; } });
-      var ic = el.querySelector('#bkx-ic'); if (ic) cuIcMount(ic, p, { bookingName: function () { var f = el.querySelector('[data-key="name"]'); return f ? f.value : p.name; } });
-      var dc = el.querySelector('#bkx-docs');
-      if (dc) cuDocsMount(dc, docs, { readonly: ro, person: p, fromCustomer: isNew && pre ? pre.docs : null, onChange: function () { dirty = true; },
-        extra: x && can('deposits.view') ? '<div class="cu-doc" id="bkx-slip"><div class="cu-doc-h">Deposit refund slip</div>' + (x.refundSlip ? '<div class="cu-doc-f"><button type="button" class="cu-link ellip" data-bs="slipopen">' + esc(x.refundSlip.name) + '</button></div>' : x.pay === 'Refund Pending' ? '<label class="btn o sm cu-up">' + i('upload') + 'Upload refund slip<input type="file" accept="image/*,.pdf" hidden data-bs-slip></label>' : '<div class="cu-none">The deposit is not waiting to be returned yet. It can be recorded once the booking is Refund Pending.</div>') + '</div>' : '' });
+      el.innerHTML = '<div class="bkx-dl' + (x ? ' two hb' : '') + '"><div class="bkx-banner">' + (p && typeof cuBanner === 'function' ? cuBanner(p) : '') + '</div>' + (x ? '<aside class="bkx-side" id="bkx-side">' + sideHtml() + '</aside>' : '') + '<div class="bkx-main">' + formHtml() + '</div></div>';
+      var n = el.querySelector('#bkx-notes'); if (n && typeof cuNotesMount === 'function') cuNotesMount(n, p, { onChange: function () { drawBanner(); } });
+      var ic = el.querySelector('#bkx-ic'); if (ic && typeof cuIcMount === 'function') cuIcMount(ic, p, { bookingName: function () { var f = el.querySelector('[data-key="name"]'); return f ? f.value : p.name; } });
+      mountDocs(isNew && pre ? pre.docs : null);
+      var fe = el.querySelector('#bkx-fees'); if (fe) fe.innerHTML = feesHtml();
+      carCtl = UI.carPicker(el.querySelector('#bkx-carpick'), { key: 'car', label: 'Car', required: true, value: v.car, start: v.start, end: v.end, exceptId: x ? x.code : undefined, disabled: ro,
+        cars: d.cars.filter(function (c) { return c.fleet !== 'Sold' || (x && x.car === c); }), placeholder: 'Find the car by its plate',
+        onChange: function (id, car) { dirty = true; clearErr('car'); if (car) fillCarPrices(car); recalc(); } });
+      var cp = el.querySelector('#bkx-cpick');
+      if (cp) custCtl = UI.combo(cp, { key: 'custPick', label: 'Find a customer', placeholder: pre ? pre.name : 'Search by name, phone or IC', title: 'Find a customer', searchPlaceholder: 'Name, phone or IC', value: pre ? pre.id : '', recentKey: 'bk-cust-' + B().id,
+        help: 'Leave it empty for a new customer and type the details below.', emptyText: 'No customers yet.', noMatchHelp: 'No match. Type the details below to add a new customer.',
+        items: function () { return d.people.map(function (q) { return { value: q.id, label: q.name, sub: q.phone + (q.ic ? ' · ' + (cuSeeIc() ? q.ic : UI.fmt.ic(q.ic)) : ''), q: q, badge: q.blacklist ? { text: 'Blacklisted', tone: 'bad' } : cuFlags(q).vip ? { text: 'VIP', tone: 'info' } : null }; }); },
+        search: function (it, q) { var t = tidySearch(q), q2 = it.q; if (/^[+\d\s\-().]+$/.test(t)) t = t.replace(/\D/g, ''); if (/^\d{3,}$/.test(t) && phoneHas(q2.phone, t)) return 20; var icq = String(q).replace(/[\s-]/g, '').toUpperCase(); if (icq.length >= 4 && String(q2.ic || '').replace(/[\s-]/g, '').toUpperCase().indexOf(icq) >= 0) return 15; return UI.wordsMatch(q2.name + ' ' + q2.email, q) ? 5 : 0; },
+        onChange: function (id) { pickCustomer(id ? byId(d.people, id) : null); } });
       if (ro) el.querySelectorAll('.bkx-form input, .bkx-form select, .bkx-form textarea').forEach(function (f) { if (!f.closest('#bkx-notes') && !f.closest('#bkx-ic') && !f.closest('#bkx-docs')) f.disabled = true; });
-      recalc();
+      recalc(); liveRules();
     },
     dirty: function () { return dirty && !saved; },
     foot: ro ? [{ label: 'Close', kind: 'o' }] : [{ label: 'Cancel', kind: 'o' }, { label: isNew ? 'Create' : 'Update', icon: 'check', onClick: function () { return save(); } }],
-    onClose: function () { if (offData) offData(); if (onPage && S.page === 'bookings') CUR.ctx.setParams({ booking: '', action: '', customer: '', car: '', start: '', end: '' }); }
+    onClose: function () { if (offData) offData(); if (onPage && S.page === 'bookings') CUR.ctx.setParams({ booking: '', action: '', customer: '', cust: '', car: '', start: '', end: '' }); }
   });
   BK_DR = dr;
   if (onPage) CUR.ctx.setParams(isNew ? { action: 'add' } : { booking: x.code, action: '' });
-  if (x) offData = on('data', function (ev) { if (dr.closed) return; if (ev && ev.coll === 'bookings' && ev.op === 'remove' && ev.rec === x) { dr.close(true); return; } var s = dr.body.querySelector('#bkx-side'); if (s) s.innerHTML = sideHtml(); });
+  if (x) offData = on('data', function (ev) {
+    if (dr.closed) return; if (ev && ev.coll === 'bookings' && ev.op === 'remove' && ev.rec === x) { dr.close(true); return; }
+    var s = dr.body.querySelector('#bkx-side'); if (s) s.innerHTML = sideHtml();
+    var fe = dr.body.querySelector('#bkx-fees'); if (fe && ev && ev.coll === 'expenses') fe.innerHTML = feesHtml();
+  });
 
   function form() { return UI.form(dr.body.querySelector('.bkx-form')); }
+  function field(k) { return dr.body.querySelector('.bkx-form [data-key="' + k + '"]'); }
+  function setVal(k, val) { var el = field(k); if (el && val != null) el.value = val; }
+  function drawBanner() { var b2 = dr.body.querySelector('.bkx-banner'); if (b2) b2.innerHTML = p && typeof cuBanner === 'function' ? cuBanner(p) : ''; }
+  function mountDocs(fromCustomer) {
+    var dc = dr.body.querySelector('#bkx-docs'); if (!dc || typeof cuDocsMount !== 'function') return;
+    cuDocsMount(dc, docs, { readonly: ro, person: p, fromCustomer: fromCustomer || null, onChange: function () { dirty = true; },
+      extra: x && can('deposits.view') ? '<div class="cu-doc" id="bkx-slip"><div class="cu-doc-h">Deposit refund slip</div>' + (x.refundSlip ? '<div class="cu-doc-f"><button type="button" class="cu-link ellip" data-bs="slipopen">' + esc(x.refundSlip.name) + '</button></div>' : x.pay === 'Refund Pending' ? '<label class="btn o sm cu-up">' + i('upload') + 'Upload refund slip<input type="file" accept="image/*,.pdf" hidden data-bs-slip></label>' : '<div class="cu-none">The deposit is not waiting to be returned yet. It can be recorded once the booking is Refund Pending.</div>') + '</div>' : '' });
+  }
+  function fillCarPrices(c) {
+    if (amt) { setVal('rate', c.rate); setVal('hourly', c.hourly); setVal('dep', c.deposit); }
+    else { v.rate = c.rate; v.hourly = c.hourly; v.dep = c.deposit; ['rate', 'hourly', 'dep'].forEach(function (f2) { setVal(f2, v[f2]); }); }
+  }
+  /* a customer picked from the list fills every field and their documents; cleared = a new customer, empty fields */
+  function pickCustomer(q) {
+    p = q; dirty = true;
+    var c = custOf(q);
+    ['name', 'phone', 'email', 'address', 'nat', 'ic', 'licenceNo', 'emName', 'emPhone', 'emRel'].forEach(function (k) { setVal(k, c[k]); clearErr(k); });
+    var le = field('licenceExp'); if (le) UI.setDateField(le, c.licenceExp ? new Date(c.licenceExp) : null, true);
+    CU_DOCS.forEach(function (dc) { var k = dc[0]; if (q && q.docs && q.docs[k] && !docs[k]) docs[k] = Object.assign({}, q.docs[k]); if (!q && docs[k] && docs[k].fromCust) docs[k] = null; });
+    if (q) CU_DOCS.forEach(function (dc) { if (docs[dc[0]] && q.docs && q.docs[dc[0]] && docs[dc[0]].name === q.docs[dc[0]].name) docs[dc[0]].fromCust = true; });
+    mountDocs(q ? q.docs : null); drawBanner(); recalc();
+    if (q) UI.toast('Filled in ' + q.name.split(' ')[0] + '\'s details' + (CU_DOCS.some(function (dc) { return q.docs && q.docs[dc[0]]; }) ? ' and documents' : '') + '.', { ms: 2500 });
+  }
+
+  /* ---- prices, availability and warnings ---- */
   function calcNow() {
-    var f = form(), pk = f.pkg && f.pkg !== 'manual' ? byId(d.damagePackages, f.pkg) : null, s = UI.parseDate(f.start), e = UI.parseDate(f.end);
+    var f = form(), pk = f.pkg && f.pkg !== 'manual' ? byId(d.damagePackages, f.pkg) : null, s = f.start ? UI.parseDate(f.start) : null, e = f.end ? UI.parseDate(f.end) : null;
     var num = function (k) { return f[k] == null ? +v[k] || 0 : +f[k] || 0; };
     return { f: f, s: s, e: e, pk: pk, c: s && e ? bkCalc({ start: s, end: e, rate: num('rate'), hourly: num('hourly'), dep: num('dep'), disc: num('disc'), deliv: num('deliv'), ret: num('ret'), others: num('others'), covDaily: pk ? pk.daily : f.pkg === 'manual' ? +f.covDaily || 0 : 0 }) : null, num: num };
   }
+  function durText(c) { if (!c || !(c.hrs > 0)) return ''; var h = Math.round(c.remHours * 100) / 100; return (c.fullDays ? plural(c.fullDays, 'day') : '') + (c.fullDays && h ? ', ' : '') + (h ? (h % 1 ? h.toFixed(2).replace(/0$/, '') : h) + ' hour' + (h === 1 ? '' : 's') : ''); }
   function recalc() {
-    var r = calcNow(), f = r.f, body = dr.body, set = function (k, val) { var el = body.querySelector('[data-key="' + k + '"]'); if (el) el.value = val; };
-    if (r.c) { set('calcDur', r.c.dur); set('calcRent', r.c.rent.toFixed(2)); set('calcCover', r.c.cover.toFixed(2)); set('calcPay', r.c.payable.toFixed(2)); }
+    var r = calcNow(), f = r.f, body = dr.body, c = r.c;
+    var cb = body.querySelector('#bkx-calc');
+    if (cb) {
+      var row = function (l, val, cls) { return '<div class="bkx-cr' + (cls ? ' ' + cls : '') + '"><span>' + l + '</span><b class="num">' + val + '</b></div>'; };
+      cb.innerHTML = !c || !(c.hrs > 0) ? '<p class="b2">Pick the dates to see the charges.</p>' :
+        '<div class="bkx-crs">' + row('Rental duration', durText(c) || '0 hours') +
+        row('Rent', UI.fmt.money(c.rent) + '<small>' + (c.hrs < 24 ? Math.round(c.hrs * 100) / 100 + ' h x ' + UI.fmt.money(r.num('hourly')) : c.fullDays + ' x ' + UI.fmt.money(r.num('rate')) + (c.remHours > 0 ? ' + ' + Math.round(c.remHours * 100) / 100 + ' h x ' + UI.fmt.money(r.num('hourly')) : '')) + '</small>') +
+        row('Deposit', UI.fmt.money(r.num('dep'))) + (c.cover ? row('Damage cover', UI.fmt.money(c.cover) + '<small>' + c.days + ' day' + (c.days === 1 ? '' : 's') + '</small>') : '') +
+        (r.num('deliv') || r.num('ret') ? row('Delivery and return', UI.fmt.money(r.num('deliv') + r.num('ret'))) : '') + (r.num('others') ? row('Others', UI.fmt.money(r.num('others'))) : '') + (r.num('disc') ? row('Discount', '-' + UI.fmt.money(r.num('disc'))) : '') +
+        row('Total payable', UI.fmt.money(c.payable), 'tot') + '</div><p class="b2">Under 24 hours: hours x hourly rate. Otherwise full days x daily rate + the hours left x hourly rate, rounded to whole ringgit.</p>';
+    }
+    var dt = body.querySelector('#bkx-durtx'); if (dt) dt.textContent = c && c.hrs > 0 ? durText(c) : '';
     var man = body.querySelector('.bkx-man'); if (man) man.hidden = f.pkg !== 'manual';
     var al = [], bad = false;
-    if (r.s && r.e && r.e <= r.s) { al.push(UI.alert('Rental end cannot be before rental start.', 'bad')); bad = true; }
-    else if (f.car && r.s && r.e) { var cl = bkClash(f.car, r.s, r.e, x && x.code); if (cl.length) { bad = true; al.push(UI.alert('This car is not available for the selected dates. ' + (cl[0].fleet ? 'The car is marked ' + cl[0].fleet + '.' : 'It is booked on ' + cl.map(function (z) { return z.code + ' (' + bkWhen(z.start) + ' to ' + bkWhen(z.end) + ')'; }).join(', ') + '.'), 'bad')); } else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + 'The car is free for these dates.</div>'); }
-    var nm = (f.name || '').trim().toLowerCase(), icn = (f.ic || '').replace(/[\s-]/g, ''), ph = (f.phone || '').replace(/\D/g, '');
-    var bl = d.people.filter(function (q) { return q.blacklist && q !== (x && x.cust) && ((nm && q.name.toLowerCase() === nm) || (icn.length > 5 && q.ic.replace(/[\s-]/g, '') === icn) || (ph.length > 6 && q.phone.replace(/\D/g, '') === ph)); })[0];
+    if (r.s && r.e && r.e <= r.s) { al.push(UI.alert('Rental end cannot be before rental start.', 'bad')); bad = true; setErr('end', 'Rental end cannot be before rental start', true); }
+    else { clearErr('end'); if (f.car && r.s && r.e) {
+      /* the availability check runs again only when the car or the dates really changed */
+      var k2 = f.car + '|' + +r.s + '|' + +r.e;
+      if (avail.key !== k2) { avail.key = k2; avail.res = bkClash(f.car, r.s, r.e, x && x.code); if (carCtl) carCtl.setDates(r.s, r.e, x ? x.code : undefined); }
+      var b = avail.res;
+      /* like the reference backend: a new booking is always checked; an existing one only when its car or dates change,
+         or it goes from Completed or Cancelled back to an active status. Completed and Cancelled never block. */
+      var stNow = f.status || (x ? x.status : 'Pending'), nonBlock = stNow === 'Completed' || stNow === 'Cancelled', mn = function (t) { return Math.floor(+t / 6e4); };
+      var need = !x || (!nonBlock && (x.status === 'Completed' || x.status === 'Cancelled' || f.car !== x.car.id || mn(r.s) !== mn(x.start) || mn(r.e) !== mn(x.end)));
+      if (!b.free && need) { bad = true; al.push(UI.alert(bkBusyText(b), 'bad', { html: true })); }
+      else if (!b.free) { if (!nonBlock && !ro) al.push(UI.alert(bkBusyText(b) + ' You can still save, because the car and the dates did not change.', 'warn', { html: true })); }
+      else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + (b.soon ? 'The car is free for these dates. ' + esc(b.soon) + ', so plan the cleaning.' : 'The car is free for these dates.') + '</div>');
+    } else if (r.s && r.e && carCtl) { var k3 = '|' + +r.s + '|' + +r.e; if (avail.key !== k3) { avail.key = k3; carCtl.setDates(r.s, r.e, x ? x.code : undefined); } } }
+    var nm = (f.name || '').trim().toLowerCase(), icn = (f.ic || '').replace(/[\s-]/g, ''), ph = normPhone(f.phone || '');
+    var bl = d.people.filter(function (q) { return q.blacklist && q !== (x && x.cust) && ((nm && q.name.toLowerCase() === nm) || (icn.length > 5 && String(q.ic).replace(/[\s-]/g, '') === icn) || (ph.length > 6 && normPhone(q.phone) === ph)); })[0];
     if (bl || (p && p.blacklist && isNew)) al.push(UI.alert('Warning: This customer matches a blacklisted customer record. Please verify before proceeding.', 'bad', { icon: 'ban' }));
     var ab = body.querySelector('#bkx-alerts'); if (ab) ab.innerHTML = al.join('');
     var sg = body.querySelector('.bkx-sigimg'), sig = byId(d.signatures, f.signature); if (sg) sg.innerHTML = sig ? '<img src="' + sig.img + '" alt="' + esc(sig.name) + '">' : '';
+    /* Deposit Refunded follows the end date (lock date rule) */
+    var ps = field('pay'); if (ps) { var o2 = ps.querySelector('option[value="Deposit Refunded"]'), lk = refLocked(); if (o2 && ps.value !== 'Deposit Refunded') { o2.disabled = lk; o2.textContent = lk ? BK_REF_OFF : 'Deposit Refunded'; } }
     var btn = dr.el.querySelector('.ui-drw-f button:last-child'); if (btn && !ro) { btn.disabled = bad; btn.title = bad ? 'Fix the dates or pick a free car first' : ''; }
     return !bad;
   }
+  /* what the status rules will do on save, said under the selects (and moved there at once for the signed switch and Car Returned) */
+  function liveRules(trigger) {
+    if (!chSt) return; var f = form(), rl = dr.body.querySelector('#bkx-rule'); if (!rl) return;
+    var r = applyStatusRules(x || { status: 'Pending', pay: '' }, { status: f.status, pay: f.pay, submitted: f.submitted, dep: calcNow().num('dep') });
+    if (trigger && (trigger === 'status' || trigger === 'submitted')) { if (r.status && r.status !== f.status) setVal('status', r.status); if (r.pay != null && r.pay !== f.pay) setVal('pay', r.pay); }
+    rl.textContent = (r.notes || []).join(' ');
+  }
+
+  /* ---- required fields: red outline, a message under the field, open its section and scroll to the first ---- */
+  function wrapOf(k) { if (k === 'car') return dr.body.querySelector('#bkx-carpick'); var f = field(k); return f ? f.closest('.inp') : null; }
+  function setErr(k, msg, keepFocus) {
+    if (k === 'car' && carCtl) { carCtl.setError(msg); return; }
+    var w = wrapOf(k); if (!w) return; w.classList.add('bad');
+    var e2 = w.querySelector('.ui-err'); if (!e2) { e2 = document.createElement('span'); e2.className = 'ui-err'; var hp = w.querySelector('.help'); w.insertBefore(e2, hp || null); } e2.textContent = msg;
+  }
+  function clearErr(k) {
+    if (k === 'car') { if (carCtl && carCtl.options.error) carCtl.setError(''); return; }
+    var w = wrapOf(k); if (!w || !w.classList.contains('bad')) return; w.classList.remove('bad'); var e2 = w.querySelector('.ui-err'); if (e2) e2.remove();
+  }
+  function validate(r) {
+    var f = r.f, miss = [];
+    if (!(f.name || '').trim()) miss.push(['name', 'Type the customer\'s full name']);
+    if (!(f.phone || '').trim()) miss.push(['phone', 'Type a phone number']);
+    else if (bkTidyPhone(f.phone).replace('+', '').length < 8) miss.push(['phone', 'This phone number looks too short']);
+    if (!f.car) miss.push(['car', 'Choose a car']);
+    if (!r.s) miss.push(['start', 'Pick the rental start']); if (!r.e) miss.push(['end', 'Pick the rental end']);
+    if (!f.method) miss.push(['method', 'Pick how the customer pays']);
+    if (seeAmt && amt && !r.num('rate')) miss.push(['rate', 'Type the daily rate']);
+    return miss;
+  }
+  function showErrors(miss) {
+    miss.forEach(function (m) { setErr(m[0], m[1]); });
+    var first = miss[0], w = wrapOf(first[0]); if (!w) return;
+    var sec = w.closest('.bkx-sec'); if (sec) sec.classList.remove('shut');
+    try { w.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) { w.scrollIntoView(); }
+    var fo = first[0] === 'car' ? w.querySelector('.ui-cbx-btn') : w.querySelector('input:not([type="hidden"]),select');
+    if (fo) setTimeout(function () { try { fo.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 300);
+  }
   function save() {
     var r = calcNow(), f = r.f;
-    if (!recalc()) { UI.toast('The car is not free for these dates, or the dates are wrong.', { tone: 'warn' }); return false; }
-    var miss = [];
-    if (!f.car) miss.push('the car'); if (!r.s || !r.e) miss.push('the dates'); if (!f.name.trim()) miss.push('the full name'); if (!f.phone.trim()) miss.push('the phone'); if (!f.method) miss.push('the payment method');
-    if (seeAmt && amt && (!r.num('rate') || r.num('hourly') < 0)) miss.push('the daily rate');
-    if (miss.length) { UI.toast('Fill in ' + miss.join(', ') + '.', { tone: 'warn' }); var first = dr.body.querySelector('[data-key="' + (!f.car ? 'car' : !f.name.trim() ? 'name' : 'phone') + '"]'); if (first) { var sec = first.closest('.bkx-sec'); if (sec) sec.classList.remove('shut'); first.focus(); } return false; }
+    var miss = validate(r);
+    if (miss.length) {
+      var nameOrPhone = miss.filter(function (m) { return m[0] === 'name' || m[0] === 'phone'; });
+      UI.toast(nameOrPhone.length ? 'Add the customer\'s full name and phone number.' : miss.length === 1 ? miss[0][1] + '.' : 'Fill in the fields marked in red.', { tone: 'warn' });
+      showErrors(miss); return false;
+    }
+    if (!recalc()) { UI.toast(r.e <= r.s ? 'Rental end cannot be before rental start.' : 'The car is not free for these dates. Pick another car or other dates.', { tone: 'warn' }); showErrors([[r.e <= r.s ? 'end' : 'car', r.e <= r.s ? 'Rental end cannot be before rental start' : 'Not free for these dates']]); return false; }
     var car = carById(f.car), c = r.c, pk = r.pk, so = (f.startOpt || 'Not chosen').split('|'), eo = (f.endOpt || 'Not chosen').split('|');
-    /* the customer: same person when the IC or phone matches */
-    var icIn = !cuSeeIc() && !isNew ? (p ? p.ic : '') : f.ic.trim();
-    var person = p || d.people.filter(function (q) { return (icIn && q.ic.replace(/[\s-]/g, '') === icIn.replace(/[\s-]/g, '')) || q.phone.replace(/\D/g, '') === f.phone.replace(/\D/g, ''); })[0];
-    var pPatch = { name: f.name.trim(), phone: f.phone.trim(), email: f.email, address: f.address, nat: f.nat || 'Malaysian', ic: icIn || (person ? person.ic : ''), licenceNo: f.licenceNo, licenceExp: f.licenceExp ? UI.parseDate(f.licenceExp) : null, emergency: { name: f.emName, phone: f.emPhone, rel: f.emRel } };
-    if (!person) person = DB.add('people', Object.assign({ id: 'cus-' + (d.people.length + 1) + '-' + Date.now().toString(36), i: d.people.length, since: NOW(), flag: '', docs: {}, blacklist: null, notes: [], icCheck: check.results ? { at: NOW(), by: DB.actor(), valid: true, results: check.results } : null }, pPatch), { where: 'Customer', text: DB.actor() + ' added customer ' + pPatch.name });
+    var sOpt = handoverOptions('start').filter(function (o) { return o.value === f.startOpt; })[0], eOpt = handoverOptions('end').filter(function (o) { return o.value === f.endOpt; })[0];
+    var phone = f.phone.trim();
+    /* the customer: the one picked, else the same person when the IC or phone matches */
+    var icIn = !cuSeeIc() && !isNew ? (p ? p.ic : '') : (f.ic || '').trim();
+    var person = p || d.people.filter(function (q) { return (icIn && String(q.ic).replace(/[\s-]/g, '') === icIn.replace(/[\s-]/g, '')) || normPhone(q.phone) === normPhone(phone); })[0];
+    var pPatch = { name: f.name.trim(), phone: phone, email: f.email, address: f.address, nat: f.nat || 'Malaysian', ic: icIn || (person ? person.ic : ''), licenceNo: f.licenceNo, licenceExp: f.licenceExp ? UI.parseDate(f.licenceExp) : null, emergency: { name: f.emName, phone: f.emPhone, rel: f.emRel } };
+    if (!person) person = DB.add('people', Object.assign({ id: 'cus-' + (d.people.length + 1) + '-' + Date.now().toString(36), i: d.people.length, since: NOW(), flag: '', docs: {}, blacklist: null, notes: [], icCheck: check.results ? { at: NOW(), by: DB.actor(), valid: !!check.valid, results: check.results, cardName: check.read ? check.read.name : '' } : null }, pPatch), { where: 'Customer', text: DB.actor() + ' added customer ' + pPatch.name });
     else DB.update('people', person, pPatch, { silent: true });
     if (isNew) { CU_DOCS.forEach(function (dc) { if (!docs[dc[0]] && person.docs && person.docs[dc[0]]) docs[dc[0]] = Object.assign({}, person.docs[dc[0]]); else if (docs[dc[0]] && person.docs && !person.docs[dc[0]]) person.docs[dc[0]] = docs[dc[0]]; }); }
+    Object.keys(docs).forEach(function (k) { if (docs[k]) delete docs[k].fromCust; });
     var rec = { car: car, start: r.s, end: r.e, days: c.days, rate: r.num('rate'), hourly: r.num('hourly'), dep: r.num('dep'), disc: r.num('disc'), deliv: r.num('deliv'), ret: r.num('ret'), others: r.num('others'), rent: c.rent, dmg: c.cover, payable: c.payable,
       pkg: pk ? pk.id : null, cov: f.pkg === 'manual' ? { name: f.covName || 'Cover', daily: +f.covDaily || 0, max: +f.covMax || 0 } : null,
-      startOpt: so[0], pickup: so[1] || (x ? x.pickup : (B().locations[0] || {}).n), endOpt: eo[0], drop: eo[1] || (x ? x.drop : (B().locations[0] || {}).n), delNote: f.delNote, retNote: f.retNote,
+      startOpt: so[0], pickup: so[1] || (x ? x.pickup : (B().locations[0] || {}).n), startPlace: sOpt && sOpt.place ? sOpt.place : null, endOpt: eo[0], drop: eo[1] || (x ? x.drop : (B().locations[0] || {}).n), endPlace: eOpt && eOpt.place ? eOpt.place : null, delNote: f.delNote, retNote: f.retNote,
       method: f.method, signature: f.signature || null, filledByAdmin: !!f.filledByAdmin, submitted: !!f.submitted, cust: person, docs: docs, updated: NOW() };
-    if (!seeAmt || !amt) { if (x) ['rate', 'hourly', 'dep', 'disc', 'deliv', 'ret', 'others'].forEach(function (k) { if (!amt) rec[k] = x[k]; }); if (!amt) { var c2 = bkCalc({ start: r.s, end: r.e, rate: rec.rate, hourly: rec.hourly, dep: rec.dep, disc: rec.disc, deliv: rec.deliv, ret: rec.ret, others: rec.others, covDaily: pk ? pk.daily : 0 }); rec.rent = c2.rent; rec.payable = c2.payable; rec.dmg = c2.cover; } }
-    if (chSt) { rec.pay = f.pay; rec.status = f.status; }
+    if (!amt) { if (x) ['rate', 'hourly', 'dep', 'disc', 'deliv', 'ret', 'others'].forEach(function (k) { rec[k] = x[k]; }); var c2 = bkCalc({ start: r.s, end: r.e, rate: rec.rate, hourly: rec.hourly, dep: rec.dep, disc: rec.disc, deliv: rec.deliv, ret: rec.ret, others: rec.others, covDaily: pk ? pk.daily : 0 }); rec.rent = c2.rent; rec.payable = c2.payable; rec.dmg = c2.cover; rec.days = c2.days; }
+    rec.status = chSt ? f.status : (x ? x.status : 'Pending'); rec.pay = chSt ? f.pay : (x ? x.pay : '');
+    if (chSt && rec.pay === 'Deposit Refunded' && !(x && x.pay === 'Deposit Refunded') && !canPickRefunded({ end: r.e, pay: x ? x.pay : '' })) rec.pay = x ? x.pay : '';
+    var rules = applyStatusRules(x, rec), notes = rules.notes || []; rec.status = rules.status; rec.pay = rules.pay;
     if (rec.submitted && !(x && x.submittedAt)) rec.submittedAt = NOW();
     saved = true;
-    if (x) { DB.update('bookings', x, rec, { text: DB.actor() + ' changed booking ' + x.code }); UI.toast('Booking ' + x.code + ' updated'); return true; }
+    var tail2 = notes.length ? ' ' + notes.join(' ') : '';
+    if (x) { DB.update('bookings', x, rec, { text: DB.actor() + ' changed booking ' + x.code }); UI.toast('Booking ' + x.code + ' updated.' + tail2, { ms: notes.length ? 6000 : 3500 }); return true; }
     var n = Math.max.apply(0, d.bookings.map(function (z) { return z.n; }).concat([B().startNo || 0])) + 1, code2 = B().code + '-' + String(n).padStart(5, '0'), hx = function () { return Math.random().toString(16).slice(2, 10); };
-    var nb = Object.assign({ n: n, code: code2, id: code2, received: 0, status: 'Pending', pay: '', agent: '', created: NOW(), inspected: false, formId: B().id.slice(0, 3) + '-' + hx(), agentToken: 'agt-' + hx(), submittedAt: rec.submitted ? NOW() : null, ip: '', agentIds: [] }, rec);
+    var nb = Object.assign({ n: n, code: code2, id: code2, received: 0, agent: '', created: NOW(), inspected: false, formId: B().id.slice(0, 3) + '-' + hx(), agentToken: 'agt-' + hx(), submittedAt: rec.submitted ? NOW() : null, ip: '', agentIds: [] }, rec);
     if (nb.submitted) nb.custSig = { typed: person.name };
     DB.add('bookings', nb, { text: DB.actor() + ' created booking ' + code2 + ' (' + car.plate + ')' });
-    UI.toast('Booking ' + code2 + ' created. Send the booking form link to ' + person.name.split(' ')[0] + '.', { action: { label: 'Copy link', run: function () { bkLinkCopy(nb, ''); } } });
+    UI.toast('Booking ' + code2 + ' created.' + tail2 + ' Send the booking form to ' + person.name.split(' ')[0] + '.', { ms: 6000, action: { label: 'Send form', run: function () { bkSendForm(nb); } } });
     return true;
   }
 
   /* ---- events ---- */
-  dr.el.addEventListener('input', function (ev) { if (ev.target.closest('.bkx-form') && !ev.target.closest('#bkx-notes,#bkx-ic')) { dirty = true; recalc(); } });
+  dr.el.addEventListener('input', function (ev) { var t = ev.target; if (t.closest('.bkx-form') && !t.closest('#bkx-notes,#bkx-ic')) { dirty = true; var k = t.getAttribute('data-key'); if (k) clearErr(k); if (k !== 'start' && k !== 'end') recalc(); } });
+  dr.el.addEventListener('paste', function (ev) {
+    var t = ev.target; if (!t.matches || !t.matches('[data-key="phone"],[data-key="emPhone"]')) return;
+    var txt = (ev.clipboardData || window.clipboardData).getData('text'); if (!txt) return;
+    ev.preventDefault(); t.value = bkTidyPhone(txt); t.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   dr.el.addEventListener('change', function (ev) {
     var t = ev.target, k = t.getAttribute('data-key');
-    if (t.closest('.bkx-form') && !t.closest('#bkx-notes,#bkx-ic,#bkx-docs')) dirty = true;
-    if (k === 'car' && amt) { var c = carById(t.value); if (c) ['rate', 'hourly', 'dep'].forEach(function (f2, j) { var el = dr.body.querySelector('[data-key="' + f2 + '"]'); if (el) el.value = [c.rate, c.hourly, c.deposit][j]; }); }
-    if (k === 'car' && !amt) { var c3 = carById(t.value); if (c3) { v.rate = c3.rate; v.hourly = c3.hourly; v.dep = c3.deposit; ['rate', 'hourly', 'dep'].forEach(function (f2) { var el = dr.body.querySelector('[data-key="' + f2 + '"]'); if (el) el.value = v[f2]; }); } }
-    if (t.matches('[data-bkx-chk]') && t.files[0]) bkCheckFile(t.getAttribute('data-bkx-chk'), t.files[0]);
-    if (t.matches('[data-bs-slip]') && t.files[0]) UI.readImage(t.files[0]).then(function (r2) { DB.update('bookings', x, { refundSlip: { name: r2.name, size: r2.size, dataUrl: r2.dataUrl } }, { text: DB.actor() + ' added the deposit refund slip of ' + x.code }); var sl = dr.body.querySelector('#bkx-slip'); if (sl) sl.innerHTML = '<div class="cu-doc-h">Deposit refund slip</div><div class="cu-doc-f"><button type="button" class="cu-link ellip" data-bs="slipopen">' + esc(r2.name) + '</button></div>'; UI.toast('Refund slip saved. Record the refund on Deposit refunds.', { action: { label: 'Open', run: function () { API.openDeposit(x.code); } } }); });
+    if (!t.closest('.bkx-form') || t.closest('#bkx-notes,#bkx-ic')) { if (t.matches('[data-bs-slip]')) slipUp(t); return; }
+    if (!t.closest('#bkx-docs')) dirty = true;
+    if (k) clearErr(k);
+    /* the end follows the start: same end day with the start's time (kept after the start when it would fall before it) */
+    if (k === 'start' || k === 'end') {
+      var s = UI.dateFieldValue(field('start')), e = UI.dateFieldValue(field('end'));
+      if (k === 'start' && s && e) { var ne = new Date(e); ne.setHours(s.getHours(), s.getMinutes(), 0, 0); if (ne <= s) { var len = prevEnd - (v.lastStart || v.start); if (!(len > 0)) len = DAY; ne = new Date(s.getTime() + len); } if (+ne !== +e) UI.setDateField(field('end'), ne, true); e = ne; }
+      if (k === 'end' && s && e && prevEnd && prevEnd.toDateString() !== e.toDateString()) { var ne2 = new Date(e); ne2.setHours(s.getHours(), s.getMinutes(), 0, 0); if (+ne2 !== +e) { UI.setDateField(field('end'), ne2, true); e = ne2; } }
+      prevEnd = e; v.lastStart = s;
+    }
+    if (k === 'startOpt' || k === 'endOpt') {
+      var o = handoverOptions(k === 'startOpt' ? 'start' : 'end').filter(function (z) { return z.value === t.value; })[0], fk = k === 'startOpt' ? 'deliv' : 'ret';
+      if (o && amt && (o.kind === 'place' || o.kind === 'office')) { setVal(fk, o.fee || 0); if (o.kind === 'place') UI.toast((k === 'startOpt' ? 'Delivery' : 'Return') + ' charge set to ' + UI.fmt.money(o.fee) + ' for ' + o.label.replace(/ \(RM.*$/, '') + '.', { ms: 2500 }); }
+    }
+    if (t.matches('[data-bkx-chk]') && t.files[0]) { bkCheckFile(t.getAttribute('data-bkx-chk'), t.files[0]); t.value = ''; }
+    if (t.matches('[data-bs-slip]')) slipUp(t);
     recalc();
+    if (k === 'status' || k === 'submitted' || k === 'pay' || k === 'dep') liveRules(k);
   });
+  function slipUp(t) {
+    if (!t.files[0]) return;
+    UI.readImage(t.files[0]).then(function (r2) { DB.update('bookings', x, { refundSlip: { name: r2.name, size: r2.size, dataUrl: r2.dataUrl } }, { text: DB.actor() + ' added the deposit refund slip of ' + x.code }); var sl = dr.body.querySelector('#bkx-slip'); if (sl) sl.innerHTML = '<div class="cu-doc-h">Deposit refund slip</div><div class="cu-doc-f"><button type="button" class="cu-link ellip" data-bs="slipopen">' + esc(r2.name) + '</button></div>'; UI.toast('Refund slip saved. Record the refund on Deposit refunds.', { action: { label: 'Open', run: function () { API.openDeposit(x.code); } } }); });
+  }
   dr.el.addEventListener('click', function (ev) {
     var t = ev.target, b2;
     if ((b2 = t.closest('[data-bkx-tog]'))) { b2.parentNode.classList.toggle('shut'); return; }
     if ((b2 = t.closest('[data-bkx-sum]'))) { API.openSummons(b2.getAttribute('data-bkx-sum')); return; }
+    if ((b2 = t.closest('[data-bkx-len]'))) {
+      var s = UI.dateFieldValue(field('start')), e = UI.dateFieldValue(field('end')), L = b2.getAttribute('data-bkx-len'); if (!s) { UI.toast('Pick the rental start first.', { tone: 'warn' }); return; }
+      var ne = L === 'h12' ? new Date((e && e > s ? e : s).getTime() + DAY / 2) : new Date(s.getTime() + (+L) * DAY);
+      UI.setDateField(field('end'), ne, true); prevEnd = ne; dirty = true; clearErr('end'); recalc(); return;
+    }
+    if ((b2 = t.closest('[data-bkx-fill]'))) { applyPatch(icPatch()); return; }
+    if ((b2 = t.closest('[data-bkx-unfile]'))) { var sl = b2.getAttribute('data-bkx-unfile'); docs[sl] = null; check.files = check.files.filter(function (z) { return z[2] !== sl; }); mountDocs(); drawCheck(); return; }
     if (!(b2 = t.closest('[data-bs]'))) return;
     var a = b2.getAttribute('data-bs'), val = b2.getAttribute('data-v');
     ({
       st: function () { bkStatusDialog(x, 'st'); }, pay: function () { bkStatusDialog(x, 'pay'); },
-      copy: function () { bkLinkCopy(x, ''); }, bf: function () { dr.close(true).then(function () { A.sec('bf'); }); },
+      send: function () { bkSendForm(x); }, copy: function () { bkLinkCopy(x, ''); }, bf: function () { dr.close(true).then(function () { A.sec('bf'); }); },
       pdf: function () { bkAgreement(x); }, pdflink: function () { bkLinkCopy(x, 'pdf'); },
       doc: function () { bkDocPreview(val); }, docpdf: function () { bkDocPdf(val); }, docsend: function () { bkDocSend(val); }, inv: function () { bkCreateInvoice(x.code); },
       recpay: function () { API.recordPayment(x.code); }, slip: function () { API.uploadSlips(x.code); }, allbill: function () { go('invoices', { tab: 'payments', q: x.code }); },
       ins: function () { bkInspection(x.code); }, agentlink: function () { bkLinkCopy(x, 'agent'); }, custlink: function () { bkLinkCopy(x, 'customer'); },
       dep: function () { API.openDeposit(x.code); }, task: function () { API.newTask({ booking: x.code }); },
+      fee: function () { var fk = feeKindFor(x, x.end < NOW() ? 'end' : 'start'); API.addExpense({ booking: x.code, cat: fk ? fk.id : '', car: x.car.id }); },
       del: function () { bkDelete([x.code]); }, slipopen: function () { cuShowFile(x.refundSlip, 'Deposit refund slip'); }
     }[a] || function () {})();
   });
-  /* CHECK THE CUSTOMER FIRST: read a card picture (made-up reading), check it, keep the file with the booking */
+
+  /* ---- CHECK THE CUSTOMER FIRST: read the IC (made-up reading), check it at the sites, fill the form when nothing is
+     flagged; a passport or licence fills its own fields; pictures are kept only when no site flagged the person ---- */
+  function icPatch() { return check.read ? { name: check.read.name, ic: check.read.ic, nat: check.read.passport ? null : 'Malaysian' } : {}; }
+  function applyPatch(pt) {
+    var words = [];
+    if (pt.name) { setVal('name', pt.name); words.push('name'); clearErr('name'); }
+    if (pt.ic) { setVal('ic', pt.ic); words.push('IC / passport number'); }
+    if (pt.nat) { setVal('nat', pt.nat); words.push('nationality'); }
+    if (pt.licenceNo) { setVal('licenceNo', pt.licenceNo); words.push('licence number'); }
+    if (pt.licenceExp) { UI.setDateField(field('licenceExp'), pt.licenceExp, true); words.push('licence expiry'); }
+    check.filled = words.join(', '); dirty = true; recalc(); drawCheck();
+  }
   function bkCheckFile(kind, file) {
-    var out = dr.body.querySelector('#bkx-chk-out'), slot = { ic: 'icFront', icBack: 'icBack', passport: 'icFront', dl: 'dl', poa: 'poa', other: 'other' }[kind];
+    var slot = { ic: 'icFront', icBack: 'icBack', passport: docs.icFront && !check.files.some(function (z) { return z[0] === 'ic'; }) ? 'icFront' : 'icFront', dl: 'dl', poa: 'poa', other: 'other' }[kind];
+    if (kind === 'passport' && check.files.some(function (z) { return z[0] === 'ic'; })) slot = 'other';
+    var out = dr.body.querySelector('#bkx-chk-out');
+    if (/^(ic|passport|dl)$/.test(kind)) out.innerHTML = '<div class="bkx-chk-res bkx-busy">' + i('loader-2', 'spin') + (kind === 'ic' ? 'Reading the IC and asking the check sites...' : 'Reading the picture...') + '</div>';
     UI.readImage(file, { max: 1400 }).then(function (r) {
-      docs[slot] = { name: r.name, size: r.size, dataUrl: r.dataUrl, added: NOW() }; check.files.push([kind, r.name]); dirty = true;
-      var dm = dr.body.querySelector('#bkx-docs'); if (dm) cuDocsMount(dm, docs, { person: p, onChange: function () { dirty = true; } });
-      if ((kind === 'ic' || kind === 'passport') && !/^image\//.test(file.type)) { UI.toast('The picture could not be read. Type the details.', { tone: 'warn' }); draw(); return; }
-      if (kind === 'ic' || kind === 'passport') {
-        var rd = cuFakeRead(file.size + file.name.length, kind === 'passport'), set = function (k2, val) { var el = dr.body.querySelector('[data-key="' + k2 + '"]'); if (el && val) el.value = val; };
-        check.read = rd; set('name', rd.name); set('ic', rd.ic); if (kind === 'passport') set('nat', 'Other');
-        check.results = cuOnlineCheck(rd.ic, rd.name); recalc();
+      check.error = ''; check.notes = [];
+      var keep = function () { docs[slot] = { name: r.name, size: r.size, dataUrl: r.dataUrl, added: NOW() }; check.files = check.files.filter(function (z) { return z[2] !== slot; }); check.files.push([kind, r.name, slot]); dirty = true; mountDocs(); };
+      if (!/^(ic|passport|dl)$/.test(kind)) { keep(); drawCheck(); return; }
+      if (!/^image\//.test(file.type)) { check.error = 'The picture could not be read. Type the details.'; drawCheck(); return; }
+      setTimeout(function () {
+        if (dr.closed) return;
+        var seed = file.size + file.name.length;
+        if (kind === 'ic') {
+          var rd = cuFakeRead(seed, false); check.read = rd; check.filled = ''; check.nameBefore = ((field('name') || {}).value || '').trim();
+          var pr = cuIcParse(rd.ic); check.valid = !!pr.ok; check.facts = pr;
+          check.results = pr.ok ? cuOnlineCheck(rd.ic, rd.name) : null;
+          var flagged = check.results && check.results.some(function (z) { return z[1] === 'Flagged'; }), err = check.results && check.results.some(function (z) { return z[1] === 'Could not check'; });
+          var asked = check.results ? check.results.filter(function (z) { return z[0] !== 'Our blacklist' && z[1] !== 'Could not check'; }) : [];
+          check.fill = pr.ok && !flagged && !err;
+          check.why = !pr.ok ? 'This is not a valid IC number. Fix it first.' : flagged ? 'A site flagged this person. Nothing was filled in.' : err ? 'A site could not be checked just now. Try again, or fill in anyway.' : !asked.length ? 'No online site is set up yet, so only the number itself was checked.' : '';
+          if (!flagged) keep(); else check.notes.push('The pictures were not kept with the booking because a site flagged this person.');
+          if (flagged) { ['icFront', 'dl'].forEach(function (sl) { if (check.files.some(function (z) { return z[2] === sl; })) { docs[sl] = null; check.files = check.files.filter(function (z) { return z[2] !== sl; }); } }); mountDocs(); }
+          DB.log('Checked', 'Customer', '', DB.actor() + ' checked IC ' + UI.fmt.ic(rd.ic) + ' before a new booking');
+          if (check.fill) { applyPatch(icPatch()); return; }
+          recalc(); drawCheck(); return;
+        }
+        var R = rng(seed), ri = function (a2, b3) { return a2 + Math.floor(R() * (b3 - a2 + 1)); }, cur = (field('name') || {}).value || '';
+        var flaggedNow = check.results && check.results.some(function (z) { return z[1] === 'Flagged'; });
+        if (!flaggedNow) keep(); else check.notes.push('The picture was not kept because a site flagged this person.');
+        if (kind === 'passport') { var rp = cuFakeRead(seed, true); check.read = check.read || { name: rp.name, ic: rp.ic, passport: true }; var pt = { ic: rp.ic, nat: 'Other' }; if (!cur.trim()) pt.name = rp.name; applyPatch(pt); return; }
+        var exp = new Date(NOW().getFullYear() + ri(1, 4), ri(0, 11), ri(1, 28)), lno = String(ri(10000000, 99999999)) + ' ' + String.fromCharCode(65 + ri(0, 25)) + String.fromCharCode(65 + ri(0, 25));
+        var pt2 = { licenceNo: lno, licenceExp: exp }; if (!cur.trim()) pt2.name = cuFakeRead(seed, false).name;
+        if (exp < new Date(NOW().getFullYear(), NOW().getMonth() + 2, 1)) check.notes.push('This licence expires on ' + UI.fmt.date(exp) + ', soon after the rental. Ask for the renewed one.');
+        applyPatch(pt2);
+      }, 650);
+    }, function (err) { check.error = err.message; drawCheck(); });
+  }
+  function drawCheck() {
+    var out = dr.body.querySelector('#bkx-chk-out'); if (!out) return;
+    var c = check, h = '', chip = function (z) { return UI.chip(z[0] + ': ' + z[1], z[1] === 'Clear' ? 'ok' : z[1] === 'Flagged' ? 'bad' : 'warn', { title: z[2] }); };
+    var slotName = { icFront: 'ID Card Front', icBack: 'ID Card Back', dl: 'Driving Licence', poa: 'Proof of Address', other: 'Other Files' };
+    if (c.files.length) h += '<div class="row wrap gap6">' + c.files.map(function (z) { return '<span class="chip ok bkx-fchip">' + i('paperclip') + esc(slotName[z[2]] + ': ' + z[1]) + '<button type="button" class="bkx-fx" data-bkx-unfile="' + z[2] + '" aria-label="Take off ' + esc(z[1]) + '">' + i('x') + '</button></span>'; }).join('') + '</div>';
+    if (c.error) h += UI.alert(c.error, 'bad');
+    if (c.read && !c.read.passport && c.facts) {
+      var pr = c.facts;
+      if (pr.ok) h += '<div class="bkx-facts">' + UI.chip('IC ' + UI.fmt.ic(c.read.ic) + ' looks valid', 'ok', { icon: 'circle-check' }) + '<dl><dt>Born</dt><dd>' + UI.fmt.date(pr.born) + ' (age ' + pr.age + ')</dd><dt>Place of birth</dt><dd>' + esc(pr.state) + '</dd><dt>Sex</dt><dd>' + pr.sex + '</dd></dl><span class="b2">Read from the card: ' + esc(c.read.name.toUpperCase()) + ' (sample reading, check it against the card)</span></div>';
+      else h += UI.alert((pr.why || 'This is not a valid IC number.') + ' Type the number in the form below, or upload a clearer picture.', 'warn');
+      if (c.results) {
+        var nm = c.nameBefore, mt = nm ? cuNameMatch(c.read.name, nm) : null;
+        h += '<div class="row wrap gap6">' + c.results.map(chip).join('') + (mt ? UI.chip(mt === 'match' ? 'Name matches' : mt === 'close' ? 'Name is close' : 'Name differs', mt === 'match' ? 'ok' : mt === 'close' ? 'warn' : 'bad') : '') + '</div>';
+        h += c.results.filter(function (z) { return z[1] === 'Could not check'; }).map(function (z) { return '<span class="ui-err">' + esc(z[0] + ': ' + z[2]) + '</span>'; }).join('');
+        if (c.results.some(function (z) { return z[1] === 'Flagged'; })) h += UI.alert('A site has flagged this person. This is a warning for you to weigh up. It does not stop the booking.', 'warn');
       }
-      draw();
-    }, function (err) { UI.toast(err.message, { tone: 'bad' }); });
-    function draw() {
-      var flagged = check.results && check.results.some(function (z) { return z[1] === 'Flagged'; }), pr = check.read ? cuIcParse(check.read.ic) : null;
-      out.innerHTML = '<div class="bkx-chk-res">' + (check.read ? '<div class="row wrap gap6">' + UI.chip(pr && pr.ok ? (pr.passport ? 'Passport ' : 'IC ') + UI.fmt.ic(check.read.ic) + ' looks valid' : 'This is not a valid IC number.', pr && pr.ok ? 'ok' : 'bad', { icon: pr && pr.ok ? 'circle-check' : 'alert-circle' }) + '<span class="b2">Read: ' + esc(check.read.name.toUpperCase()) + ' (sample reading, check it against the card)</span></div>' : '') +
-        (check.results ? '<div class="row wrap gap6">' + check.results.map(function (z) { return UI.chip(z[0] + ': ' + z[1], z[1] === 'Clear' ? 'ok' : z[1] === 'Flagged' ? 'bad' : 'warn'); }).join('') + '</div>' : '') +
-        (flagged ? UI.alert('A site has flagged this person. This is a warning for you to weigh up. It does not stop the booking.', 'warn') : '') +
-        '<div class="row wrap gap6">' + check.files.map(function (z) { return UI.chip(z[1], 'grey', { icon: 'paperclip' }); }).join('') + '</div></div>';
+      if (c.why) h += UI.alert(c.why, c.fill ? 'pri' : 'warn');
+      if (!c.fill && c.read.ic && c.valid !== null && !c.filled) h += '<div>' + UI.btn('Fill in the name and IC anyway', { kind: 'c', size: 'sm', cls: 'bkx-warnbtn', attrs: { 'data-bkx-fill': 1 } }) + '</div>';
     }
+    if (c.filled) h += UI.alert('Filled in: ' + c.filled + '. Check them in the form below.', 'ok');
+    (c.notes || []).forEach(function (nt) { h += UI.alert(nt, 'warn'); });
+    out.innerHTML = h ? '<div class="bkx-chk-res">' + h + '</div>' : '';
   }
   return dr;
+}
+
+/* ---------------- send the booking form (WhatsApp message, made-up send) ---------------- */
+function bkSendForm(x) {
+  var first = x.cust.name.split(' ')[0], link = siteLink(x, '');
+  var msg = 'Hi ' + first + ', thank you for booking with ' + B().name + '. Please fill in and sign your booking form for ' + x.code + ' (' + x.car.plate + ', ' + bkWhen(x.start) + ' to ' + bkWhen(x.end) + '): ' + link;
+  UI.dialog({ title: 'Send the booking form', text: 'To ' + x.cust.name + ', ' + x.cust.phone, width: 'sm',
+    body: UI.textarea({ key: 'msg', label: 'Message', value: msg, rows: 5 }) + '<p class="b2">The link opens the booking form where ' + esc(first) + ' checks the details and signs.</p>',
+    buttons: [{ label: 'Copy message', kind: 'o', onClick: function (dl) { UI.copy(UI.form(dl.body).msg, { label: 'Message copied' }); return false; } },
+      { label: 'Send on WhatsApp', icon: 'brand-whatsapp', onClick: function (dl) {
+        var text = UI.form(dl.body).msg;
+        DB.log('Sent', 'Booking', x.code, DB.actor() + ' sent the booking form of ' + x.code + ' to ' + x.cust.name + ' on WhatsApp');
+        if (x.status === 'Pending' || x.status === 'Confirmed') DB.update('bookings', x, { status: 'Agreement Sent' }, { text: DB.actor() + ' sent the booking form of ' + x.code + ', so it is now Agreement Sent' });
+        UI.toast('Booking form sent to ' + first + ' on WhatsApp (' + x.cust.phone + ').', { action: { label: 'Copy link', run: function () { bkLinkCopy(x, ''); } } });
+        void text;
+      } }] });
+}
+/* the money box: total, received, still due, with a bar */
+function bkMoneyBox(m) {
+  return '<div class="bkx-mon t-' + m.tone + '"><div><span>Total</span><b>' + UI.money(m.total) + '</b></div><div><span>Received</span><b>' + UI.money(m.rec) + '</b></div><div><span>' + (m.due > 0 ? 'Still due' : m.due < 0 ? 'Extra' : 'Paid') + '</span><b>' + (m.due === 0 ? 'Paid in full' : UI.money(Math.abs(m.due))) + '</b></div><i style="--w:' + m.pct + '%"></i></div>';
+}
+/* ---------------- the read-only summary a phone card opens ---------------- */
+function bkSummary(x) {
+  var seeAmt = can('bookings.see_amounts') || can('bookings.edit_amounts'), chSt = can('bookings.change_status'), m = bkMoney(x), c = bkCalc({ start: x.start, end: x.end });
+  var row = function (icon, main, sub) { return '<div class="bkx-smr">' + i(icon) + '<div class="grow"><b>' + main + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div></div>'; };
+  var dur = (c.fullDays ? plural(c.fullDays, 'day') : '') + (c.remHours ? (c.fullDays ? ', ' : '') + plural(Math.round(c.remHours * 10) / 10, 'hour') : '');
+  var dl = UI.dialog({ title: x.code, text: plural(x.days, 'day') + ' · created ' + UI.fmt.date(x.created), width: 'sm',
+    body: '<div class="bkx-sm">' + '<div class="bkx-sts">' + (chSt ? '<button type="button" class="bkx-stb" data-sm="st">' + UI.status('booking', x.status) + i('chevron-down') + '</button><button type="button" class="bkx-stb" data-sm="pay">' + UI.status('payment', x.pay || 'None') + i('chevron-down') + '</button>' : UI.status('booking', x.status) + UI.status('payment', x.pay || 'None')) + '</div>' +
+      row('user', esc(x.cust.name), UI.phone(x.cust.phone, { wa: true })) +
+      row('car', esc(x.car.plate) + ' · ' + esc(carName(x.car)), esc(x.car.color)) +
+      row('calendar', UI.fmt.dt(x.start) + ' to ' + UI.fmt.dt(x.end), esc(dur)) +
+      row('map-pin', esc((x.startOpt || 'Not chosen').replace('Pick-up from our location', 'Pick-up at ' + (x.pickup || 'our location'))), esc((x.endOpt || 'Not chosen').replace('Drop-off at our location', 'Drop-off at ' + (x.drop || 'our location')))) +
+      (seeAmt && x.status !== 'Cancelled' ? bkMoneyBox(m) : '') + '</div>',
+    buttons: [{ label: 'Close', kind: 'g' }, { label: can('bookings.edit') ? 'Edit' : 'Open', icon: can('bookings.edit') ? 'pencil' : 'eye', onClick: function () { setTimeout(function () { bkOpenBooking(x.code); }, 0); } }] });
+  UI.on(dl.el, 'click', '[data-sm]', function (ev, el) { var k = el.getAttribute('data-sm'); dl.close(true); bkStatusDialog(x, k); });
+  return dl;
 }
 
 /* ---------------- the Bookings page ---------------- */
@@ -622,30 +905,41 @@ PAGES['bookings'] = {
       late: function (x) { return x.status === 'Car Delivered' && x.end < now; },
       due: function (x) { return x.status !== 'Cancelled' && x.status !== 'Pending' && bkMoney(x).due > 0; }
     };
+    /* search: a booking code in any form gives that booking exactly; a pasted phone matches any format; plates ignore spaces */
+    function matcher(raw) {
+      var q = tidySearch(raw); if (!q) return function () { return true; };
+      var codeLike = /^[a-z]{0,5}[\s\-#]*\d{1,5}$/i.test(q) && d.bookings.some(function (z) { return matchBookingCode(q, z.code); });
+      if (codeLike) return function (x) { return matchBookingCode(q, x.code); };
+      var np = normPlate(q);
+      return function (x) {
+        if (/^\d{3,}$/.test(q) && phoneHas(x.cust.phone, q)) return true;
+        if (np.length >= 3 && normPlate(x.car.plate).indexOf(np) >= 0) return true;
+        return UI.wordsMatch(x.code + ' ' + x.cust.name + ' ' + (x.cust.email || '') + ' ' + x.car.plate, q);
+      };
+    }
     function rowsFor() {
-      var f = st.f, q = (f.q || '').toLowerCase().trim(), qd = q.replace(/\D/g, ''), from = f.from ? UI.parseDate(f.from) : null, to = f.to ? UI.parseDate(f.to) : from;
+      var f = st.f, from = f.from ? UI.parseDate(f.from) : null, to = f.to ? UI.parseDate(f.to) : null, matches = matcher(f.q);
       return d.bookings.filter(function (x) {
         if (f.status && x.status !== f.status) return false;
         if (f.pay && (x.pay || 'None') !== f.pay) return false;
         if (f.car && x.car.id !== f.car) return false;
         if (f.quick && f.quick !== 'all' && quick[f.quick] && !quick[f.quick](x)) return false;
-        if (from) { var s = new Date(x.start.getFullYear(), x.start.getMonth(), x.start.getDate()); if (s < from || s > to) return false; }
-        if (!q) return true;
-        return (x.code + ' ' + x.cust.name + ' ' + x.cust.email + ' ' + x.cust.phone + ' ' + x.car.plate).toLowerCase().indexOf(q) >= 0 || (qd.length >= 3 && x.cust.phone.replace(/\D/g, '').indexOf(qd) >= 0);
+        if ((from || to) && !overlaps(x, from, to)) return false;
+        return matches(x);
       }).sort(function (a, b) { return b.n - a.n; });
     }
     var rows = rowsFor();
-    root.innerHTML = '<div class="pg-h bkx-pgh"><div><h1>Bookings</h1><p id="bkx-count">' + plural(rows.length, 'booking') + (rows.length !== d.bookings.length ? ' of ' + d.bookings.length : '') + '</p></div><div class="acts" id="bkx-acts"></div></div>' +
+    var countTxt = function (r) { return plural(r.length, 'booking') + (r.length !== d.bookings.length ? ' of ' + d.bookings.length : ''); };
+    root.innerHTML = '<div class="pg-h bkx-pgh"><div><h1>Bookings</h1><p id="bkx-count">' + countTxt(rows) + '</p></div><div class="acts" id="bkx-acts"></div></div>' +
       '<div class="card bkx-list"><div id="bkx-f"></div><div id="bkx-t"></div></div>';
 
     var acts = root.querySelector('#bkx-acts');
+    function exportOff() { return st.f.status === 'Pending' || st.f.status === 'Cancelled'; }
     function drawActs() {
-      var sel = Object.keys(st.sel).filter(function (k) { return st.sel[k]; }), one = sel.length === 1, nf = st.f.status === 'Pending' || st.f.status === 'Cancelled';
-      var edit = can2('bookings.edit') ? 'Edit Booking' : 'View Booking';
-      acts.innerHTML = (can2('reports.export_excel') ? UI.btn('Export to Excel', { kind: 'o', icon: 'file-spreadsheet', disabled: nf, title: nf ? 'Pending and cancelled bookings are not income, so they are not in the Excel file. Pick another status.' : 'Download the bookings as an Excel file', attrs: { 'data-act': 'export' } }) : '') +
-        '<span class="bkx-tip" title="' + (one ? '' : sel.length ? 'Tick only one booking to ' + edit.split(' ')[0].toLowerCase() + ' it.' : 'Tick one booking in the list to ' + edit.split(' ')[0].toLowerCase() + ' it.') + '">' + UI.btn(edit, { kind: 'o', icon: can2('bookings.edit') ? 'edit' : 'eye', disabled: !one, attrs: { 'data-act': 'edit' } }) + '</span>' +
-        (can2('bookings.delete') ? '<span class="bkx-tip" title="' + (sel.length ? '' : 'Tick the bookings to delete') + '">' + UI.btn(sel.length > 1 ? 'Delete ' + sel.length : 'Delete', { kind: 'o', icon: 'trash', cls: 'bkx-del', disabled: !sel.length, attrs: { 'data-act': 'delete' } }) + '</span>' : '') +
-        (can2('bookings.create') ? UI.btn('New Booking', { icon: 'plus', attrs: { 'data-act': 'new' } }) : '');
+      var nf = exportOff();
+      acts.innerHTML = (can2('bookings.create') ? UI.btn('New Booking', { icon: 'plus', attrs: { 'data-act': 'new' } }) : '') +
+        (can2('reports.export_excel') ? '<span class="bkx-wide">' + UI.btn('Export to Excel', { kind: 'o', icon: 'file-spreadsheet', disabled: nf, title: nf ? 'Pending and cancelled bookings are not income, so they are not in the Excel file. Pick another status.' : 'Download the bookings as an Excel file', attrs: { 'data-act': 'export' } }) + '</span>' +
+          '<span class="bkx-narrow">' + UI.iconBtn('dots-vertical', 'More', { attrs: { 'data-act': 'more' } }) + '</span>' : '');
     }
 
     var stChip = function (x, kind) {
@@ -655,13 +949,13 @@ PAGES['bookings'] = {
     var amount = function (x) {
       if (x.status === 'Cancelled') return '<span class="faint">Cancelled</span>';
       var m = bkMoney(x), tip = 'Total ' + UI.fmt.money(m.total) + ' · Received ' + UI.fmt.money(m.rec) + ' · ' + (m.due > 0 ? 'Still due ' + UI.fmt.money(m.due) : m.due < 0 ? 'Paid in full, ' + UI.fmt.money(-m.due) + ' extra' : 'Paid in full');
-      return '<div class="bkx-amt t-' + m.tone + '" title="' + tip + '"><b class="num">' + UI.fmt.money(m.total) + '</b><span class="bkx-bar"><i style="width:' + m.pct + '%"></i></span><small class="num">' + (m.due > 0 ? UI.fmt.money(m.due, { dp: m.due % 1 ? 2 : 0 }) + ' due' : m.due < 0 ? UI.fmt.money(-m.due, { dp: 0 }) + ' extra' : 'Paid') + '</small></div>';
+      return '<div class="bkx-amt t-' + m.tone + '" title="' + tip + '"><b class="num">' + UI.fmt.money(m.total) + '</b><span class="bkx-bar"><i style="width:' + m.pct + '%"></i></span><small class="num">' + bkDueText(m) + '</small></div>';
     };
     var docsCell = function (x) {
       var inv = bkInvoice(x.code), nr = bkReceipts(x.code).length;
-      return '<div class="bkx-ics">' + UI.iconBtn('copy', 'Copy Link (booking form)', { size: 'sm', attrs: { 'data-bk': 'copy' } }) +
+      return UI.iconBtn('copy', 'Copy Link (booking form)', { size: 'sm', attrs: { 'data-bk': 'copy' } }) +
         (can2('bookings.view_documents') ? UI.iconBtn('file-type-pdf', x.submitted ? 'View PDF (signed agreement)' : 'Agreement not signed yet', { size: 'sm', cls: x.submitted ? '' : 'bkx-dim', attrs: { 'data-bk': 'pdf' } }) : '') +
-        UI.iconBtn('file-invoice', 'Invoice and receipts' + (inv ? ': ' + inv.no : ': no invoice yet') + (nr ? ', ' + plural(nr, 'receipt') : ''), { size: 'sm', cls: inv ? 'bkx-has' : '', attrs: { 'data-bk': 'bill' } }) + '</div>';
+        UI.iconBtn('file-invoice', 'Invoice and receipts' + (inv ? ': ' + inv.no : ': no invoice yet') + (nr ? ', ' + plural(nr, 'receipt') : ''), { size: 'sm', cls: inv ? 'bkx-has' : '', attrs: { 'data-bk': 'bill' } });
     };
     var insCell = function (x) { var ok = d.inspections.some(function (z) { return z.booking === x.code; }); return '<button type="button" class="bkx-ins' + (ok ? ' done' : '') + '" data-bk="ins" title="Inspection: view the data, copy the agent or customer link">' + i(ok ? 'circle-check' : 'circle-dashed') + (ok ? 'Done' : 'Links') + i('chevron-down', 'bkx-caret') + '</button>'; };
     var cols = [
@@ -669,39 +963,61 @@ PAGES['bookings'] = {
       { key: 'cust', label: 'Customer', sort: function (x) { return x.cust.name; }, render: function (x) { var fl = (x.cust.blacklist ? 'bad' : cuFlags(x.cust).careful ? 'warn' : cuFlags(x.cust).vip ? 'info' : ''); return '<div class="bkx-cu"><b class="ellip" title="' + esc(x.cust.name) + '">' + (fl && can2('customer_notes.view') ? '<span class="bkx-fl ' + fl + '" title="' + (fl === 'bad' ? 'Blacklisted' : fl === 'warn' ? 'Be careful' : 'VIP') + '"></span>' : '') + esc(x.cust.name) + '</b>' + UI.phone(x.cust.phone) + '</div>'; } },
       { key: 'car', label: 'Car & period', sort: function (x) { return x.start; }, render: function (x) { return '<div class="bkx-car"><div><b>' + esc(x.car.plate) + '</b> <span>' + esc(x.car.model.split(' ')[0]) + ' · ' + esc(x.car.color) + '</span></div><div class="bkx-per" title="Pick-up ' + UI.fmt.dateTime(x.start) + ', return ' + UI.fmt.dateTime(x.end) + '">' + bkWhen(x.start) + i('arrow-right') + bkWhen(x.end) + '</div></div>'; } },
       { key: 'status', label: 'Status', sort: function (x) { return LISTS.bookingStatus.indexOf(x.status); }, render: function (x) { return '<div class="bkx-sts2">' + stChip(x, 'st') + stChip(x, 'pay') + '</div>'; } },
-      { key: 'payable', label: 'Amount', align: 'right', sort: true, hidden: !seeAmt, render: amount },
+      { key: 'payable', label: 'Amount', money: true, sort: true, hidden: !seeAmt, render: amount },
       { key: 'agent', label: 'Handover', sort: function (x) { return bkAgents(x).join(', '); }, render: function (x) { var a = bkAgents(x); return '<div class="bkx-ho">' + (can2('inspections.view') ? insCell(x) : '') + (a.length ? '<span class="bkx-ag ellip" title="Agent: ' + esc(a.join(', ')) + '">' + i('user') + esc(a.map(function (n) { return n.split(' ')[0]; }).join(', ')) + '</span>' : '<span class="bkx-ag faint">' + i('user') + 'No agent yet</span>') + '</div>'; } },
-      { key: 'docs', label: 'Documents', render: function (x) { return docsCell(x).replace(/<\/div>$/, '') + (can2('tasks.create') ? UI.iconBtn('calendar-plus', 'Assign Task', { size: 'sm', attrs: { 'data-bk': 'task' } }) : '') + '</div>'; } }
+      { key: 'docs', label: 'Documents', render: function (x) { return '<div class="bkx-ics">' + docsCell(x) + (can2('tasks.create') ? UI.iconBtn('calendar-plus', 'Assign Task', { size: 'sm', attrs: { 'data-bk': 'task' } }) : '') + '</div>'; } }
     ];
     var t = UI.table(root.querySelector('#bkx-t'), {
-      columns: cols, rows: rows, rowKey: 'code', minWidth: 1080, selectable: true, selected: st.sel, noun: 'booking',
+      columns: cols, rows: rows, rowKey: 'code', minWidth: 1080, selectable: can2('bookings.edit') || can2('bookings.delete') || can2('bookings.view'), selected: st.sel, noun: 'booking',
       sort: st.sort, onSort: function (s) { st.sort = s; }, page: st.page, onPage: function (pg) { st.page = pg; }, pageSize: st.size || 10, pageSizes: [10, 25, 50, 100], maxHeight: 'min(74vh,900px)',
-      onSelect: function () { drawActs(); }, rowClass: function (x) { return 'bkx-r' + (x.status === 'Cancelled' ? ' bkx-cx' : ''); },
-      bulk: function (keys) { return (can2('bookings.delete') ? UI.btn('Delete', { kind: 'err', size: 'sm', icon: 'trash', attrs: { 'data-act': 'delete' } }) : ''); },
-      onRowClick: function (x) { bkOpenBooking(x.code); },
+      rowClass: function (x) { return 'bkx-r' + (x.status === 'Cancelled' ? ' bkx-cx' : ''); },
+      /* Edit and Delete only show here, once rows are ticked */
+      bulk: function (keys) {
+        var one = keys.length === 1, ed = can2('bookings.edit');
+        return '<span class="bkx-tip" title="' + (one ? '' : 'Tick only one booking to ' + (ed ? 'edit' : 'view') + ' it.') + '">' + UI.btn(ed ? 'Edit' : 'View', { kind: 'o', size: 'sm', icon: ed ? 'pencil' : 'eye', disabled: !one, attrs: { 'data-act': 'edit' } }) + '</span>' +
+          (can2('bookings.delete') ? UI.btn(keys.length > 1 ? 'Delete ' + keys.length : 'Delete', { kind: 'err', size: 'sm', icon: 'trash', attrs: { 'data-act': 'delete' } }) : '');
+      },
+      onRowClick: function (x) { if (bkIsPhone()) bkSummary(x); else bkOpenBooking(x.code); },
       empty: { icon: 'calendar-off', title: 'No bookings match', text: 'Clear the search or the filters.' },
       card: function (x) {
+        var m = bkMoney(x);
         return '<div class="bkx-cd"><div class="bkx-cd-h"><b class="bkx-id">' + x.code + '</b><span class="bkx-sts2 row">' + stChip(x, 'st') + stChip(x, 'pay') + '</span></div>' +
           '<div class="bkx-cd-r"><span class="ellip t1c fw5">' + esc(x.cust.name) + '</span>' + UI.phone(x.cust.phone) + '</div>' +
           '<div class="bkx-cd-r"><span><b class="t1c">' + esc(x.car.plate) + '</b> ' + esc(x.car.model.split(' ')[0]) + '</span><span class="bkx-per">' + bkWhen(x.start) + i('arrow-right') + bkWhen(x.end) + '</span></div>' +
-          '<div class="bkx-cd-f">' + (seeAmt ? amount(x) : '<span></span>') + '<div class="bkx-ics">' + docsCell(x).replace('<div class="bkx-ics">', '').replace(/<\/div>$/, '') + (can2('inspections.view') ? UI.iconBtn('clipboard-check', 'Inspection', { size: 'sm', attrs: { 'data-bk': 'ins' } }) : '') + (can2('tasks.create') ? UI.iconBtn('calendar-plus', 'Assign Task', { size: 'sm', attrs: { 'data-bk': 'task' } }) : '') + '</div></div></div>';
+          (seeAmt && x.status !== 'Cancelled' ? '<div class="bkx-cd-m t-' + m.tone + '"><span class="num"><b>' + UI.fmt.money(m.total) + '</b></span><span class="bkx-bar"><i style="width:' + m.pct + '%"></i></span><small class="num">' + bkDueText(m) + '</small></div>' : '') +
+          '<div class="bkx-cd-f">' + UI.btn('Send form', { kind: 'o', size: 'sm', icon: 'brand-whatsapp', attrs: { 'data-bk': 'send' } }) +
+          (can2('billing.record_payment') && x.status !== 'Cancelled' ? UI.btn('Record payment', { kind: 'tonal', size: 'sm', icon: 'cash', attrs: { 'data-bk': 'recpay' } }) : '') +
+          '<span class="grow"></span>' + UI.iconBtn('dots-vertical', 'More for ' + x.code, { attrs: { 'data-bk': 'more' } }) + '</div></div>';
       }
     });
     var count = function (fn) { return d.bookings.filter(fn).length; };
     UI.filters(root.querySelector('#bkx-f'), {
       values: st.f,
       fields: [
-        { type: 'search', key: 'q', placeholder: 'Search bookings: code, name, email, phone, plate' },
+        { type: 'search', key: 'q', placeholder: 'Search: booking number, name, phone, plate' },
         { type: 'select', key: 'status', label: 'Status', options: LISTS.bookingStatus, all: 'All Statuses' },
         { type: 'select', key: 'pay', label: 'Payment Status', options: [['None', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s]; })), all: 'All Payment Statuses' },
         { type: 'select', key: 'car', label: 'Car', options: d.cars.map(function (c) { return [c.id, bkCarLabel(c)]; }), all: 'All Cars', width: 220 },
-        { type: 'daterange', from: 'from', to: 'to', label: 'Pick-up' },
+        { type: 'daterange', from: 'from', to: 'to', label: 'Rental dates' },
         { type: 'chips', key: 'quick', label: 'Quick', options: [['all', 'All', d.bookings.length], ['out', 'Out now', count(quick.out)], ['soon', 'Going out in 3 days', count(quick.soon)], ['back', 'Back in 3 days', count(quick.back)], ['late', 'Late', count(quick.late), 'bad'], ['due', 'Money due', count(quick.due)]] }
       ],
-      onChange: function (v2, k) { var r = rowsFor(); t.setRows(r); st.page = 1; root.querySelector('#bkx-count').textContent = plural(r.length, 'booking') + (r.length !== d.bookings.length ? ' of ' + d.bookings.length : ''); if (k === 'status' || k === '*') drawActs(); }
+      /* every filter change goes back to page 1 */
+      onChange: function (v2, k) { var r = rowsFor(); st.page = 1; t.setRows(r); root.querySelector('#bkx-count').textContent = countTxt(r); if (k === 'status' || k === '*') drawActs(); }
     });
     drawActs();
 
+    function moreMenu(el, x) {
+      UI.menu(el, [
+        { label: can2('bookings.edit') ? 'Edit booking' : 'Open booking', icon: can2('bookings.edit') ? 'pencil' : 'eye', onClick: function () { bkOpenBooking(x.code); } },
+        { label: 'Copy booking form link', icon: 'copy', onClick: function () { bkLinkCopy(x, ''); } },
+        can2('bookings.view_documents') ? { label: x.submitted ? 'Agreement PDF' : 'Agreement PDF (not signed yet)', icon: 'file-type-pdf', onClick: function () { bkAgreement(x); } } : null,
+        { label: 'Invoice and receipts', icon: 'file-invoice', onClick: function () { bkBillingMenu(el, x); } },
+        can2('inspections.view') ? { label: 'Inspection', icon: 'clipboard-check', onClick: function () { bkInspMenu(el, x); } } : null,
+        can2('tasks.create') ? { label: 'Assign task', icon: 'calendar-plus', onClick: function () { API.newTask({ booking: x.code }); } } : null,
+        can2('bookings.delete') ? { divider: true } : null,
+        can2('bookings.delete') ? { label: 'Delete', icon: 'trash', danger: true, onClick: function () { bkDelete([x.code]); } } : null
+      ].filter(Boolean), { width: 260 });
+    }
     UI.on(root, 'click', '[data-bk]', function (ev, el) {
       var host = el.closest('[data-k]'); if (!host) return;
       var x = findBooking(host.getAttribute('data-k')); if (!x) return;
@@ -712,13 +1028,18 @@ PAGES['bookings'] = {
       else if (a === 'bill') bkBillingMenu(el, x);
       else if (a === 'ins') bkInspMenu(el, x);
       else if (a === 'task') API.newTask({ booking: x.code });
+      else if (a === 'send') bkSendForm(x);
+      else if (a === 'recpay') API.recordPayment(x.code);
+      else if (a === 'more') moreMenu(el, x);
     });
+    function doExport(el) { if (exportOff()) { UI.toast('Pending and cancelled bookings are not income, so they are not in the Excel file. Pick another status.', { tone: 'warn' }); return; } if (st.f.from) { var fr = UI.parseDate(st.f.from), to = st.f.to ? UI.parseDate(st.f.to) : fr; if ((to - fr) / DAY > 366) UI.toast('Choose a period of at most 366 days.', { tone: 'warn' }); else bkExport(fr, to, st.f); } else bkExportPop(el, st.f); }
     UI.on(root, 'click', '[data-act]', function (ev, el) {
       var a = el.getAttribute('data-act'), sel = t.selected();
       if (a === 'new') bkOpenBooking(null, {});
       else if (a === 'edit' && sel.length === 1) bkOpenBooking(sel[0]);
-      else if (a === 'delete' && sel.length) bkDelete(sel, function (gone) { gone.forEach(function (c) { delete st.sel[c]; }); });
-      else if (a === 'export') { if (st.f.from) { var fr = UI.parseDate(st.f.from), to = st.f.to ? UI.parseDate(st.f.to) : fr; if ((to - fr) / DAY > 366) UI.toast('Choose a period of at most 366 days.', { tone: 'warn' }); else bkExport(fr, to, st.f); } else bkExportPop(el, st.f); }
+      else if (a === 'delete' && sel.length) bkDelete(sel, function (gone) { gone.forEach(function (c) { delete st.sel[c]; }); t.refresh(); });
+      else if (a === 'export') doExport(el);
+      else if (a === 'more') UI.menu(el, [{ label: 'Export to Excel', icon: 'file-spreadsheet', disabled: exportOff(), hint: exportOff() ? 'Not for Pending or Cancelled' : '', onClick: function () { doExport(el); } }], { width: 240 });
     });
     var pr = ctx.params;
     if (pr.action === 'add') setTimeout(function () { bkOpenBooking(null, pr); }, 0);

@@ -1,0 +1,31 @@
+/* Income page styles (prefix every rule with .pg-income) */
+.pg-income .inc-head{border-left:4px solid var(--primary);padding:2px 0 2px 14px;margin-bottom:20px}
+.pg-income .inc-head h1{margin:0;font-size:24px;font-weight:500;color:var(--text)}
+.pg-income .inc-head p{margin:4px 0 0;color:var(--text2);font-size:14px}
+.pg-income .inc-card0{border-top:3px solid var(--primary);padding:20px 22px 24px}
+.pg-income .inc-bar{display:grid;grid-template-columns:repeat(3,minmax(0,200px));gap:12px;padding-bottom:18px;border-bottom:1px solid var(--divider);margin-bottom:18px}
+.pg-income .inc-bar > *{min-width:0}
+.pg-income .inc-bad{display:flex;gap:6px;align-items:center;color:var(--error-text, var(--error));margin:0 0 12px;font-size:14px}
+.pg-income .inc-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.pg-income .inc-k{display:flex;flex-direction:column;gap:3px;text-align:left;padding:14px 16px;border:1px solid var(--divider);border-top:3px solid var(--text);border-radius:6px;background:var(--paper);color:var(--text);font:inherit;min-width:0}
+.pg-income .inc-k > span{font-size:12px;letter-spacing:.4px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-income .inc-k b{font-size:17px;font-weight:600}
+.pg-income .inc-k small{font-size:12.5px;color:var(--text3)}
+.pg-income .inc-k.hero{border-top-color:var(--primary);background:rgb(var(--primary-rgb) / .06)}
+.pg-income .inc-k.hero b{font-size:22px;color:var(--primary-text)}
+.pg-income .inc-k.person{border-top-color:var(--divider);cursor:pointer;min-height:44px}
+.pg-income .inc-k.person:hover{border-color:var(--primary)}
+.pg-income .inc-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;min-height:36px}
+.pg-income .inc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.2fr);gap:22px;align-items:start}
+.pg-income .inc-grid section{min-width:0}
+.pg-income .inc-h{margin:0 0 10px;font-size:12.5px;font-weight:500;letter-spacing:.5px;color:var(--text);border-left:3px solid var(--primary);padding-left:8px;line-height:1.2}
+.pg-income .inc-sm{display:block;font-size:12px;color:var(--text3);margin-top:2px}
+@media (max-width:1100px){.pg-income .inc-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){
+  .pg-income{padding-bottom:40px}
+  .pg-income .inc-card0{padding:16px 14px 20px}
+  .pg-income .inc-bar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .pg-income .inc-bar > :nth-child(3){grid-column:1 / -1}
+  .pg-income .inc-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .pg-income .inc-k.hero{grid-column:1 / -1}
+}

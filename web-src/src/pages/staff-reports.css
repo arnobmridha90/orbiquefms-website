@@ -1,0 +1,37 @@
+/* Staff income and expenses page styles (prefix every rule with .pg-staff-reports) */
+.pg-staff-reports .sr-head{border-left:4px solid var(--primary);padding:2px 0 2px 14px;margin-bottom:20px}
+.pg-staff-reports .sr-head h1{margin:0;font-size:24px;font-weight:500;color:var(--text)}
+.pg-staff-reports .sr-head p{margin:4px 0 0;color:var(--text2);font-size:14px}
+.pg-staff-reports .sr-card0{border-top:3px solid var(--primary);padding:20px 22px 24px}
+.pg-staff-reports .sr-bar{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--divider);margin-bottom:18px}
+.pg-staff-reports .sr-dates{display:grid;grid-template-columns:repeat(3,minmax(0,200px));gap:12px;flex:1 1 520px;min-width:0}
+.pg-staff-reports .sr-dates > *{min-width:0}
+.pg-staff-reports .sr-acts{display:flex;flex-wrap:wrap;gap:8px}
+.pg-staff-reports .sr-bad{display:flex;gap:6px;align-items:center;color:var(--error-text, var(--error));margin:0 0 12px;font-size:14px}
+.pg-staff-reports .sr-k{margin-bottom:22px}
+.pg-staff-reports .sr-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;min-height:36px}
+.pg-staff-reports .sr-tabs{margin-bottom:14px}
+.pg-staff-reports .sr-h{margin:0 0 10px;font-size:12.5px;font-weight:500;letter-spacing:.5px;color:var(--text);border-left:3px solid var(--primary);padding-left:8px;line-height:1.2}
+.pg-staff-reports .sr-tip{margin:10px 0 0;color:var(--text3)}
+.pg-staff-reports .sr-neg{color:var(--error-text, var(--error))}
+.pg-staff-reports .sr-in{color:var(--success-text, var(--success))}
+.pg-staff-reports .sr-out{color:var(--text)}
+.pg-staff-reports .sr-sm{display:block;font-size:12px;color:var(--text3);margin-top:2px;line-height:1.35}
+.pg-staff-reports .sr-card .row,.pg-staff-reports .sr-pc .row{display:flex;gap:10px;align-items:flex-start}
+.pg-staff-reports .sr-amt{display:flex;flex-direction:column;align-items:flex-end;text-align:right;white-space:nowrap;gap:2px}
+.pg-staff-reports .sr-amt small{font-size:12px;color:var(--text3)}
+.pg-staff-reports .sr-pg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin-top:10px;font-size:13px}
+.pg-staff-reports .sr-pg span{display:flex;justify-content:space-between;gap:6px;min-width:0}
+.pg-staff-reports .sr-pg small{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-staff-reports .sr-bih{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pg-staff-reports .sr-bih p{margin:0}
+.pg-staff-reports .sr-void{text-decoration:line-through;color:var(--text3)}
+@media (max-width:760px){
+  .pg-staff-reports{padding-bottom:40px}
+  .pg-staff-reports .sr-card0{padding:16px 14px 20px}
+  .pg-staff-reports .sr-dates{grid-template-columns:minmax(0,1fr) minmax(0,1fr);flex-basis:100%}
+  .pg-staff-reports .sr-dates > :nth-child(3){grid-column:1 / -1}
+  .pg-staff-reports .sr-acts{width:100%}
+  .pg-staff-reports .sr-acts .btn{flex:1 1 0;min-height:44px}
+  .pg-staff-reports .sr-pg{grid-template-columns:minmax(0,1fr)}
+}

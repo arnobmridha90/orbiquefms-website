@@ -93,3 +93,40 @@
 .pg-settings .set-ic{border:1px solid var(--divider);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:16px}
 .pg-settings .set-ic-words{align-items:flex-end}
 .pg-settings .set-ic-words .inp{flex:1 1 260px}
+/* W4: places, handover fees, bank, card, fleet, assistant */
+.pg-settings .set-loc{flex-wrap:wrap}
+.pg-settings .set-loc-ag{flex:1 1 100%;min-width:0;max-width:560px}
+.pg-settings .set-places{display:flex;flex-direction:column;gap:8px}
+.pg-settings .set-pl{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 40px;gap:8px;align-items:center}
+.pg-settings .set-pl-h{padding:0 2px}
+.pg-settings .set-pl .inp{margin:0}
+.pg-settings .set-tg{font-weight:600;color:var(--text);margin:18px 0 8px;font-size:14px}
+.pg-settings .set-tg:first-child{margin-top:0}
+.pg-settings .set-fees{display:flex;flex-direction:column;border:1px solid var(--divider);border-radius:10px}
+.pg-settings .set-fee{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-bottom:1px solid var(--divider)}
+.pg-settings .set-fee:last-child{border-bottom:0}
+.pg-settings .set-fee-h{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.pg-settings .set-fee-h .grow{min-width:200px}
+.pg-settings .set-fee-amt{display:flex;gap:8px;align-items:center}
+.pg-settings .set-fee-amt .inp{width:150px;margin:0}
+.pg-settings .set-rate{display:inline-flex;align-items:center;gap:4px}
+.pg-settings .set-x{border:0;background:none;color:inherit;cursor:pointer;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;padding:0}
+.pg-settings .set-x:hover{background:var(--hover)}
+.pg-settings .set-rate-add{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.pg-settings .set-rate-who{flex:1 1 220px;min-width:200px}
+.pg-settings .set-rate-add .inp{width:150px}
+.pg-settings .set-pvbox{margin-top:16px;padding:12px 14px;border:1px dashed var(--divider);border-radius:10px}
+.pg-settings .set-ex{margin:12px 0 0}
+.pg-settings .grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pg-settings .set-tiers{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.pg-settings .set-tier{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pg-settings .set-tier .inp{width:130px;margin:0}
+@media (max-width:760px){
+  .pg-settings .grid.g3{grid-template-columns:minmax(0,1fr)}
+  .pg-settings .set-pl{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px}
+  .pg-settings .set-pl > .inp:first-child{grid-column:1 / -1}
+  .pg-settings .set-pl-h{display:none}
+  .pg-settings .set-fee-amt{width:100%}
+  .pg-settings .set-fee-amt .inp{flex:1;width:auto}
+  .pg-settings .set-rate-add .inp{flex:1 1 120px;width:auto}
+}

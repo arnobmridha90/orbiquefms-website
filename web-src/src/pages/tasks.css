@@ -1,6 +1,6 @@
 /* ============================================================ Tasks (builder 4) */
 .pg-tasks .tsk-card{overflow:hidden}
-.pg-tasks .tsk-flt{padding:16px 20px 4px}
+.pg-tasks .tsk-flt{padding:0}
 .tsk-rows select{min-width:70px}
 .pg-tasks .ui-pager label{display:none}
 .tsk-name{display:flex;flex-direction:column;gap:2px;min-width:0;max-width:300px;white-space:normal}
@@ -84,3 +84,28 @@
 /* dark: the theme sets --primary-text for light paper only, so lift it here */
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pg-tasks,:root:not([data-theme="light"]) .ui-ov:has(.tsk-form,.tsk-wa,.tsk-big){--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}}
 :root[data-theme="dark"] .pg-tasks,:root[data-theme="dark"] .ui-ov:has(.tsk-form,.tsk-wa,.tsk-big){--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}
+/* W4: filters behind a button, phone cards, captions, auto-assign */
+.pg-tasks .tsk-flt .ui-fmore{display:inline-flex}
+.pg-tasks .tsk-flt .ui-fb:not(.open) .ui-fx{display:none}
+.pg-tasks .tsk-flt .ui-fb:not(.open) .ui-fsel:nth-child(2){display:block}
+.pg-tasks .tsk-narrow{display:none}
+@media (max-width:640px){.pg-tasks .tsk-wide{display:none}.pg-tasks .tsk-narrow{display:inline-grid}.pg-tasks .tsk-flt .ui-fb:not(.open) .ui-fsel:nth-child(2){flex:1 1 130px;min-width:130px}}
+.tsk-dots{display:flex;flex-wrap:wrap;gap:4px 12px}
+.tsk-ad{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text)}
+.tsk-sd{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--text3,#999)}
+.tsk-sd.info{background:var(--info,#16b1ff)}.tsk-sd.warn{background:var(--warning,#ffb400)}.tsk-sd.ok{background:var(--success,#56ca00)}.tsk-sd.bad{background:var(--error,#ff4c51)}
+.tsk-c .b2 i{font-size:14px;vertical-align:-2px}
+.tsk-cap{width:100%;min-height:34px;border:1px solid var(--divider);border-radius:6px;padding:4px 8px;font:inherit;font-size:12.5px;background:var(--paper);color:var(--text)}
+.tsk-waph{margin:0;display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:var(--text2);max-width:84px}
+.tsk-rules{display:flex;flex-direction:column;gap:2px;margin:12px 0}
+.tsk-rule{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--divider)}
+.tsk-rule.off .tsk-rule-t{opacity:.6}
+.tsk-rule-t{flex:1 1 180px;min-width:160px;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.tsk-rule-t b{color:var(--text)}
+.tsk-rule-s{flex:1 1 260px;min-width:220px}
+.tsk-addrule{display:flex;flex-direction:column;gap:8px;padding-top:6px}
+.tsk-addrow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.tsk-addrow > .inp,.tsk-addrow > div{flex:1 1 200px;min-width:180px}
+.tsk-addrow > .btn{flex:0 0 auto;min-height:40px}
+.tsk-hrow{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--divider);border-radius:10px}
+@media (max-width:640px){.pg-tasks .pg-h .acts{flex-direction:row;flex-wrap:nowrap;gap:8px;align-items:center}.pg-tasks .pg-h .acts .btn{flex:1 1 auto}}

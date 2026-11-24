@@ -78,7 +78,8 @@
 
 /* ---------- Bookings: the booking drawer ---------- */
 .bkx-dl{gap:24px}
-.bkx-dl.two{grid-template-columns:minmax(0,1fr) 370px;gap:28px}
+@media (min-width:1101px){.bkx-dl.two{grid-template-columns:minmax(0,1fr) 370px;gap:28px}}
+@media (max-width:1100px){.bkx-dl.two{grid-template-columns:minmax(0,1fr)}}
 .bkx-dl.two .bkx-side{gap:20px}
 .bkx-form{gap:22px}
 .bkx-sec{border-radius:12px}

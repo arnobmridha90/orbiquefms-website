@@ -52,12 +52,13 @@ var UI = (function () {
     return parts.join(' ');
   }
   U.fmt = {
-    /* "RM 1,234.50"; {dp:0} for "RM 1,235"; negative "- RM 20.00" */
-    money: function (v, o) { o = o || {}; var n = Number(v) || 0, dp = o.dp == null ? 2 : o.dp; return (n < 0 ? '- ' : '') + 'RM ' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }); },
+    /* "RM 1,234.50" (always 2 decimals); negative "-RM 20.00"; {dp:0} for "RM 1,235" where a page really wants whole RM */
+    money: function (v, o) { o = o || {}; var n = Number(v) || 0, dp = o.dp == null ? 2 : o.dp; if (Math.abs(n) < Math.pow(10, -dp) / 2) n = 0; return (n < 0 ? '-' : '') + 'RM ' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }); },
     num: function (v, dp) { return Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 }); },
     pct: function (v, dp) { return (Number(v) || 0).toFixed(dp || 0) + '%'; },
     date: function (d) { return d ? d.getDate() + ' ' + MON[d.getMonth()] + ' ' + d.getFullYear() : ''; },            /* 17 Oct 2026 */
     dateTime: function (d) { return d ? U.fmt.date(d) + ', ' + tm(d) : ''; },                                          /* 17 Oct 2026, 9:00 AM */
+    dt: function (d) { return d ? U.fmt.date(d) + ', ' + tm(d) : ''; },                                                /* same as dateTime */
     dmy: function (d) { return d ? dNum(d) : ''; },                                                                      /* 17/10/2026 */
     time: function (d) { return d ? tm(d) : ''; },                                                                       /* 9:00 AM */
     short: function (d) { return d ? dShort(d) : ''; },                                                                  /* Sat 17 Oct */
@@ -184,12 +185,12 @@ var UI = (function () {
       var head = '<tr>' + (o.selectable ? '<th class="ui-ck"><label class="cb" data-stop><input type="checkbox" data-ui-all aria-label="Tick every row on this page"' + (allOn ? ' checked' : '') + '><span class="box">' + i('check') + '</span></label></th>' : '') +
         cols.map(function (c) {
           var sorted = st.sort && st.sort.key === c.key;
-          return '<th' + (c.width ? ' style="width:' + c.width + (typeof c.width === 'number' ? 'px' : '') + '"' : '') + ' class="' + (c.align === 'right' ? 'r' : c.align === 'center' ? 'c' : '') + (c.sort ? ' ui-sortable' : '') + '"' + (c.sort ? ' data-ui-sort="' + e(c.key) + '" tabindex="0" aria-sort="' + (sorted ? (st.sort.dir === 'desc' ? 'descending' : 'ascending') : 'none') + '"' : '') + '>' + (c.labelHtml || e(c.label || '')) + (c.sort ? i(sorted ? (st.sort.dir === 'desc' ? 'arrow-down' : 'arrow-up') : 'arrows-sort', 'ui-si') : '') + '</th>';
+          return '<th' + (c.width ? ' style="width:' + c.width + (typeof c.width === 'number' ? 'px' : '') + '"' : '') + ' class="' + (c.money ? 'c ui-mny' : c.align === 'right' ? 'r' : c.align === 'center' ? 'c' : '') + (c.sort ? ' ui-sortable' : '') + '"' + (c.sort ? ' data-ui-sort="' + e(c.key) + '" tabindex="0" aria-sort="' + (sorted ? (st.sort.dir === 'desc' ? 'descending' : 'ascending') : 'none') + '"' : '') + '>' + (c.labelHtml || e(c.label || '')) + (c.sort ? i(sorted ? (st.sort.dir === 'desc' ? 'arrow-down' : 'arrow-up') : 'arrows-sort', 'ui-si') : '') + '</th>';
         }).join('') + '</tr>';
       var body = shown.map(function (r, k) {
         var key = keyOf(r);
         return '<tr data-k="' + e(key) + '" class="' + (o.onRowClick ? 'click ' : '') + (st.sel[key] ? 'on ' : '') + (o.rowClass ? o.rowClass(r) || '' : '') + '"' + (o.onRowClick ? ' tabindex="0"' : '') + '>' + (o.selectable ? '<td class="ui-ck"><label class="cb" data-stop><input type="checkbox" data-ui-row="' + e(key) + '" aria-label="Tick this row"' + (st.sel[key] ? ' checked' : '') + '><span class="box">' + i('check') + '</span></label></td>' : '') +
-          cols.map(function (c) { var v = c.render ? c.render(r, k) : e(r[c.key] == null ? '' : r[c.key]); return '<td class="' + (c.align === 'right' ? 'r num' : c.align === 'center' ? 'c' : '') + (c.nowrap ? ' nw' : '') + (c.cls ? ' ' + c.cls : '') + '">' + v + '</td>'; }).join('') + '</tr>';
+          cols.map(function (c) { var v = c.render ? c.render(r, k) : c.money ? (r[c.key] == null || r[c.key] === '' ? '<span class="faint">-</span>' : U.fmt.money(r[c.key])) : e(r[c.key] == null ? '' : r[c.key]); return '<td class="' + (c.money ? 'c nw num ui-mny' : c.align === 'right' ? 'r num' : c.align === 'center' ? 'c' : '') + (c.nowrap ? ' nw' : '') + (c.cls ? ' ' + c.cls : '') + '">' + v + '</td>'; }).join('') + '</tr>';
       }).join('');
       var emptyHtml = U.empty(o.empty || { icon: 'database-off', title: 'Nothing here yet', text: 'Try clearing the search or the filters.' });
       var other = selKeys.filter(function (k) { return pageKeys.indexOf(k) < 0; }).length;
@@ -254,8 +255,8 @@ var UI = (function () {
       o.fields.forEach(function (f) {
         if (f.type === 'search') main += '<div class="inp srch ui-fsearch">' + i('search') + '<input type="search" data-f="' + e(f.key) + '" data-key="flt-' + e(f.key) + '" placeholder="' + e(f.placeholder || 'Search') + '" aria-label="' + e(f.placeholder || 'Search') + '" value="' + e(v[f.key] || '') + '"></div>';
         else if (f.type === 'select') main += '<div class="inp ui-fsel ui-fx"' + (f.width ? ' style="width:' + f.width + 'px"' : '') + '><select data-f="' + e(f.key) + '" aria-label="' + e(f.label || f.key) + '">' + (f.all !== false ? '<option value="">' + e(f.all || 'All') + '</option>' : '') + U.options(f.options, v[f.key]) + '</select></div>';
-        else if (f.type === 'date') main += '<div class="inp ui-fdate ui-fx"><input type="date" data-f="' + e(f.key) + '" aria-label="' + e(f.label || f.key) + '" title="' + e(f.label || '') + '" value="' + e(v[f.key] || '') + '"></div>';
-        else if (f.type === 'daterange') main += '<div class="ui-frange ui-fx" role="group" aria-label="' + e(f.label || 'Dates') + '">' + (f.label ? '<span class="b2">' + e(f.label) + '</span>' : '') + '<span class="inp"><input type="date" data-f="' + e(f.from) + '" aria-label="From" value="' + e(v[f.from] || '') + '"></span><span class="faint">to</span><span class="inp"><input type="date" data-f="' + e(f.to) + '" aria-label="To" value="' + e(v[f.to] || '') + '"' + (v[f.from] ? ' min="' + e(v[f.from]) + '"' : '') + '></span></div>';
+        else if (f.type === 'date') main += '<div class="ui-fdate ui-fx">' + U.dateField({ key: 'flt-' + f.key, aria: f.label || f.key, value: v[f.key] || '', compact: true, chips: false, placeholder: f.label || 'Any day', attrs: { 'data-f': f.key } }) + '</div>';
+        else if (f.type === 'daterange') main += '<div class="ui-frange ui-fx" role="group" aria-label="' + e(f.label || 'Dates') + '">' + (f.label ? '<span class="b2">' + e(f.label) + '</span>' : '') + U.dateField({ key: 'flt-' + f.from, aria: 'From', value: v[f.from] || '', compact: true, chips: false, placeholder: 'From', attrs: { 'data-f': f.from } }) + '<span class="faint">to</span>' + U.dateField({ key: 'flt-' + f.to, aria: 'To', value: v[f.to] || '', compact: true, chips: false, placeholder: 'To', min: v[f.from] || null, attrs: { 'data-f': f.to } }) + '</div>';
         else if (f.type === 'toggle') main += '<label class="ui-ftog ui-fx row gap6 b2"><span class="sw"><input type="checkbox" data-f="' + e(f.key) + '"' + (v[f.key] ? ' checked' : '') + '><span></span></span>' + e(f.label) + '</label>';
         else if (f.type === 'chips') chips += '<div class="ui-fchips" role="group" aria-label="' + e(f.label || f.key) + '">' + (f.label ? '<span class="b2">' + e(f.label) + '</span>' : '') + f.options.map(function (op) { var val = Array.isArray(op) ? op[0] : op, lb = Array.isArray(op) ? op[1] : op, n = Array.isArray(op) ? op[2] : null, tone = Array.isArray(op) ? op[3] : null; var on = String(v[f.key] == null ? (f.default != null ? f.default : (Array.isArray(f.options[0]) ? f.options[0][0] : f.options[0])) : v[f.key]) === String(val); return '<button type="button" class="ui-fchip' + (tone ? ' ' + tone : '') + '" data-fc="' + e(f.key) + '" data-v="' + e(val) + '" aria-pressed="' + on + '">' + e(lb) + (n != null ? '<span class="n">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>';
       });
@@ -365,7 +366,7 @@ var UI = (function () {
     U.closePops();
     var el = document.createElement('div'); el.className = 'ui-pop ' + (o.cls || ''); el.setAttribute('role', o.role || 'dialog');
     if (o.width) el.style.width = typeof o.width === 'number' ? 'min(' + o.width + 'px, calc(100vw - 16px))' : o.width;
-    var pop = { el: el, close: function () { if (pop.closed) return; pop.closed = true; el.remove(); pops.splice(pops.indexOf(pop), 1); document.removeEventListener('mousedown', outside, true); window.removeEventListener('resize', pop.close); if (anchor && anchor.setAttribute) anchor.setAttribute('aria-expanded', 'false'); if (o.onClose) o.onClose(); }, place: place, refresh: function () { fill(); place(); } };
+    var pop = { el: el, close: function () { if (pop.closed) return; pop.closed = true; el.remove(); pops.splice(pops.indexOf(pop), 1); document.removeEventListener('mousedown', outside, true); window.removeEventListener('resize', pop.close); window.removeEventListener('resize', place); if (anchor && anchor.setAttribute) anchor.setAttribute('aria-expanded', 'false'); if (o.onClose) o.onClose(); }, place: place, refresh: function () { fill(); place(); } };
     function fill() { if (typeof content === 'function') { var r = content(el, pop); if (typeof r === 'string') el.innerHTML = r; } else el.innerHTML = content; }
     function place() {
       var r = anchor.getBoundingClientRect(), vw = document.documentElement.clientWidth, vh = window.innerHeight, w = el.offsetWidth, h = el.offsetHeight;
@@ -377,7 +378,7 @@ var UI = (function () {
     fill(); layer().appendChild(el); place();
     if (anchor.setAttribute) anchor.setAttribute('aria-expanded', 'true');
     setTimeout(function () { document.addEventListener('mousedown', outside, true); }, 0);
-    window.addEventListener('resize', pop.close);
+    window.addEventListener('resize', o.keepOnResize ? place : pop.close);
     pops.push(pop);
     return pop;
   };
@@ -589,6 +590,359 @@ var UI = (function () {
     if ((x = ev.target.closest('[data-ui-choice] [data-v]'))) { var g = x.parentNode; g.querySelectorAll('[data-v]').forEach(function (z) { z.setAttribute('aria-checked', z === x); }); var hid = g.querySelector('input[type=hidden]'); hid.value = x.getAttribute('data-v'); hid.dispatchEvent(new Event('change', { bubbles: true })); }
   });
   document.addEventListener('keydown', function (ev) { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('[data-ui-toggle]')) { ev.preventDefault(); ev.target.click(); } });
+
+  /* ===================================================================
+     Searchable pickers (parity build). Mounted parts: put an empty element in your HTML, then
+       var cp = UI.carPicker(el, {key: 'car', label: 'Car', start, end, exceptId, value, onChange});
+     Each picker writes its value into a hidden <input data-key="..."> so UI.form(el) reads it, and fires 'change' on it.
+     Under 640px the list opens as a full-height sheet; on bigger screens as a dropdown under the field.
+     =================================================================== */
+  var lc = function (s) { return String(s == null ? '' : s).toLowerCase(); };
+  var recentGet = function (k) { try { return JSON.parse(localStorage.getItem('fms.recent.' + k) || '[]'); } catch (err) { return []; } };
+  var recentAdd = function (k, v) { if (!k || v == null || v === '') return; try { var l = recentGet(k).filter(function (x) { return x !== v; }); l.unshift(v); localStorage.setItem('fms.recent.' + k, JSON.stringify(l.slice(0, 5))); } catch (err) { /* private window: no recents */ } };
+  var badgeHtml = function (b) { if (!b) return ''; if (typeof b === 'string') return b; return '<span class="chip ' + (b.tone || 'grey') + ' ui-cbx-badge">' + e(b.text) + '</span>'; };
+  /* default search: every typed word must appear in the label, the sub line or kw */
+  U.wordsMatch = function (text, q) { var t = lc(text); return lc(q).split(/\s+/).filter(Boolean).every(function (w) { return t.indexOf(w) >= 0; }); };
+
+  /* UI.combo(el, {key, label, required, help, error, placeholder, value | values (multi), multi, items: [] | function (state) -> [],
+       item: {value, label, sub, badge: {text, tone} | html, icon, html (whole row), kw (extra search words), group, disabled, hint},
+       search: function (item, q) -> false | true | number (higher shows first), recentKey, title, emptyText, clearable,
+       toggles: [{key, label, value}] (switches under the list; their values reach items(state) as state.toggles[key]),
+       onChange: function (value, item, ctrl), disabled})
+     -> {el, value(), item(), set(value, silent), open(q), close(), refresh(), setItems(items), state} */
+  U.combo = function (el, o) {
+    o = o || {};
+    var id = fid(o), st = { value: o.multi ? (o.values || o.value || []).slice() : (o.value == null ? '' : o.value), toggles: {}, open: false, active: 0, list: [] };
+    (o.toggles || []).forEach(function (t) { st.toggles[t.key] = !!t.value; });
+    var allItems = function () { return (typeof o.items === 'function' ? o.items(st) : o.items) || []; };
+    var findItem = function (v) { var l = allItems(); for (var k = 0; k < l.length; k++) if (String(l[k].value) === String(v)) return l[k]; return null; };
+    var pop = null, dlg = null;
+    function fieldHtml() {
+      var inner;
+      if (o.multi) {
+        var picked = st.value.map(findItem).filter(Boolean);
+        inner = picked.length ? '<span class="ui-cbx-chips">' + picked.map(function (it) { return '<span class="ui-cbx-chip">' + e(it.label) + '<span role="button" tabindex="-1" class="ui-cbx-unpick" data-cbx-unpick="' + e(it.value) + '" aria-label="Remove ' + e(it.label) + '">' + i('x') + '</span></span>'; }).join('') + '</span>' : '<span class="ui-cbx-ph">' + e(o.placeholder || 'Choose') + '</span>';
+      } else {
+        var it = st.value !== '' && st.value != null ? findItem(st.value) : null;
+        inner = it ? '<span class="ui-cbx-val"><b>' + e(it.label) + '</b>' + (it.sub ? '<small>' + e(it.sub) + '</small>' : '') + '</span>' + badgeHtml(it.badge) : (st.value !== '' && st.value != null ? '<span class="ui-cbx-val"><b>' + e(st.value) + '</b></span>' : '<span class="ui-cbx-ph">' + e(o.placeholder || 'Choose') + '</span>');
+      }
+      var canClear = o.clearable !== false && !o.required && !o.disabled && (o.multi ? st.value.length : st.value !== '' && st.value != null);
+      return lab(o, id) + '<div class="ui-cbx-f' + (o.disabled ? ' dis' : '') + '"><button type="button" class="ui-cbx-btn" id="' + id + '" aria-haspopup="listbox" aria-expanded="false"' + (o.disabled ? ' disabled' : '') + (o.label ? '' : ' aria-label="' + e(o.aria || o.placeholder || o.key || 'Choose') + '"') + '>' + inner + '<span class="grow"></span>' + i('chevron-down', 'ui-cbx-chev') + '</button>' +
+        (canClear ? '<button type="button" class="ui-cbx-x" data-cbx-clear aria-label="Clear">' + i('x') + '</button>' : '') + '</div>' +
+        '<input type="hidden" data-key="' + e(o.key || '') + '" value="' + e(o.multi ? st.value.join(',') : st.value) + '"' + U.attrs(o.attrs) + '>' + tail(o);
+    }
+    function drawField() { el.classList.add('inp', 'ui-cbx'); if (o.error) el.classList.add('bad'); if (o.full) el.classList.add('full'); el.innerHTML = fieldHtml(); }
+    function score(it, q) {
+      if (!q) return 1;
+      if (o.search) { var r = o.search(it, q); return r === true ? 1 : r || 0; }
+      return U.wordsMatch(it.label + ' ' + (it.sub || '') + ' ' + (it.kw || ''), q) ? 1 : 0;
+    }
+    function compute(q) {
+      var items = allItems(), out = [];
+      if (q) { items.forEach(function (it, k) { var sc = score(it, q); if (sc) out.push({ it: it, sc: sc, k: k }); }); out.sort(function (a, b) { return b.sc - a.sc || a.k - b.k; }); return out.map(function (x) { return x.it; }); }
+      var rec = o.recentKey ? recentGet(o.recentKey) : [], recent = [];
+      if (rec.length) { rec.forEach(function (v) { var it = items.filter(function (x) { return String(x.value) === String(v) && !x.disabled; })[0]; if (it) recent.push(Object.assign({}, it, { group: 'Recent' })); }); }
+      var used = recent.map(function (x) { return String(x.value); });
+      return recent.concat(items.filter(function (x) { return used.indexOf(String(x.value)) < 0; }).map(function (x) { return recent.length && !x.group ? Object.assign({}, x, { group: o.allLabel || 'All' }) : x; }));
+    }
+    function rowHtml(it, k) {
+      var on = o.multi ? st.value.map(String).indexOf(String(it.value)) >= 0 : String(it.value) === String(st.value);
+      return '<button type="button" role="option" class="ui-cbx-o' + (k === st.active ? ' act' : '') + (on ? ' on' : '') + '" data-cbx-k="' + k + '" id="' + id + '-o' + k + '" aria-selected="' + on + '"' + (it.disabled ? ' aria-disabled="true"' : '') + '>' +
+        (o.multi ? '<span class="cb"><span class="box">' + i('check') + '</span></span>' : '') + (it.icon ? i(it.icon, 'ui-cbx-ic') : '') +
+        (it.html || '<span class="ui-cbx-t"><b>' + e(it.label) + '</b>' + (it.sub ? '<small>' + e(it.sub) + '</small>' : '') + (it.hint ? '<small class="ui-cbx-hint">' + e(it.hint) + '</small>' : '') + '</span>') +
+        badgeHtml(it.badge) + (!o.multi && on ? i('check', 'ui-cbx-tick') : '') + '</button>';
+    }
+    function panelHtml() {
+      return '<div class="ui-cbx-p"><div class="ui-cbx-s">' + i('search') + '<input type="text" autocomplete="off" spellcheck="false" placeholder="' + e(o.searchPlaceholder || 'Type to search') + '" aria-label="Search" role="combobox" aria-expanded="true" aria-controls="' + id + '-lb"></div>' +
+        ((o.toggles || []).length ? '<div class="ui-cbx-tg">' + o.toggles.map(function (t) { return '<label class="row gap6 b2"><span class="sw"><input type="checkbox" data-cbx-tg="' + e(t.key) + '"' + (st.toggles[t.key] ? ' checked' : '') + '><span></span></span>' + e(t.label) + '</label>'; }).join('') + '</div>' : '') +
+        '<div class="ui-cbx-l" role="listbox" id="' + id + '-lb"' + (o.multi ? ' aria-multiselectable="true"' : '') + '></div>' +
+        '<div class="ui-cbx-pf"><span class="b2 ui-cbx-n"></span><span class="grow"></span>' + (o.multi ? '<button type="button" class="btn c sm" data-cbx-done>Done</button>' : '') + '</div></div>';
+    }
+    var box = null, inp = null;
+    function drawList() {
+      if (!box) return;
+      var q = inp.value.trim(); st.list = compute(q);
+      if (st.active >= st.list.length) st.active = Math.max(0, st.list.length - 1);
+      var g = null, html = '';
+      st.list.forEach(function (it, k) { if (it.group && it.group !== g) { g = it.group; html += '<div class="ui-cbx-g" role="presentation">' + e(g) + '</div>'; } html += rowHtml(it, k); });
+      var lb = box.querySelector('.ui-cbx-l'), hidden = 0, offT = (o.toggles || []).filter(function (t) { return !st.toggles[t.key]; });
+      if (!st.list.length && q && offT.length) { var keep = Object.assign({}, st.toggles); offT.forEach(function (t) { st.toggles[t.key] = true; }); hidden = compute(q).length; st.toggles = keep; }
+      lb.innerHTML = st.list.length ? html : '<div class="ui-cbx-none">' + i('mood-empty') + '<b>' + e(q ? 'Nothing matches "' + q + '"' : (o.emptyText || 'Nothing to choose yet')) + '</b>' +
+        (hidden ? '<span class="b2">' + hidden + (hidden === 1 ? ' match is' : ' matches are') + ' hidden: ' + e(offT.map(function (t) { return t.label.charAt(0).toLowerCase() + t.label.slice(1); }).join(', ')) + ' is off.</span><button type="button" class="btn tonal sm" data-cbx-tgon>Show ' + (hidden === 1 ? 'it' : 'them') + '</button>' : q ? '<span class="b2">' + e(o.noMatchHelp || 'Check the spelling, or type fewer words.') + '</span>' : '') + '</div>';
+      box.querySelector('.ui-cbx-n').textContent = q ? st.list.length + (st.list.length === 1 ? ' match' : ' matches') : st.list.filter(function (x) { return x.group !== 'Recent'; }).length + ' to choose from';
+      inp.setAttribute('aria-activedescendant', st.list.length ? id + '-o' + st.active : '');
+      var a = lb.querySelector('.act'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' });
+    }
+    function pick(it) {
+      if (!it || it.disabled) return;
+      if (o.multi) {
+        var k = st.value.map(String).indexOf(String(it.value));
+        if (k >= 0) st.value.splice(k, 1); else st.value.push(it.value);
+        drawList(); commit(it); return;
+      }
+      st.value = it.value; recentAdd(o.recentKey, it.value); close(); commit(it);
+    }
+    function commit(it) {
+      drawField();
+      var h = el.querySelector('input[type="hidden"]');
+      if (h) { h.dispatchEvent(new Event('input', { bubbles: true })); h.dispatchEvent(new Event('change', { bubbles: true })); }
+      if (o.onChange) o.onChange(o.multi ? st.value.slice() : st.value, o.multi ? st.value.map(findItem).filter(Boolean) : it || findItem(st.value), ctrl);
+    }
+    function wire(container) {
+      box = container; inp = box.querySelector('.ui-cbx-s input');
+      inp.addEventListener('input', function () { st.active = 0; drawList(); });
+      inp.addEventListener('keydown', function (ev) {
+        if (ev.key === 'ArrowDown') { ev.preventDefault(); st.active = Math.min(st.list.length - 1, st.active + 1); drawList(); }
+        else if (ev.key === 'ArrowUp') { ev.preventDefault(); st.active = Math.max(0, st.active - 1); drawList(); }
+        else if (ev.key === 'Home' && !inp.value) { ev.preventDefault(); st.active = 0; drawList(); }
+        else if (ev.key === 'End' && !inp.value) { ev.preventDefault(); st.active = st.list.length - 1; drawList(); }
+        else if (ev.key === 'Enter') { ev.preventDefault(); pick(st.list[st.active]); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); close(); }
+        else if (ev.key === 'Tab' && !dlg) { close(); }
+      });
+      box.addEventListener('click', function (ev) {
+        var x;
+        if ((x = ev.target.closest('[data-cbx-k]'))) { st.active = +x.getAttribute('data-cbx-k'); pick(st.list[st.active]); return; }
+        if (ev.target.closest('[data-cbx-done]')) { close(); return; }
+        if (ev.target.closest('[data-cbx-tgon]')) { (o.toggles || []).forEach(function (t) { st.toggles[t.key] = true; }); box.querySelectorAll('[data-cbx-tg]').forEach(function (x) { x.checked = true; }); st.active = 0; drawList(); try { inp.focus({ preventScroll: true }); } catch (err) { /* ignore */ } return; }
+      });
+      box.addEventListener('change', function (ev) { var t = ev.target.getAttribute && ev.target.getAttribute('data-cbx-tg'); if (t) { st.toggles[t] = ev.target.checked; st.active = 0; drawList(); var tg = (o.toggles || []).filter(function (z) { return z.key === t; })[0]; if (tg && tg.onChange) tg.onChange(ev.target.checked); } });
+      box.addEventListener('mousedown', function (ev) { if (ev.target.closest('[data-cbx-k]')) ev.preventDefault(); });
+    }
+    function open(q) {
+      if (o.disabled || st.open) return;
+      st.open = true; st.active = 0;
+      var btn = el.querySelector('.ui-cbx-btn'); if (btn) btn.setAttribute('aria-expanded', 'true');
+      var phone = window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+      if (phone) {
+        dlg = U.dialog({ title: o.title || o.label || 'Choose', width: 'md', body: panelHtml(), onClose: function () { dlg = null; box = null; st.open = false; var b2 = el.querySelector('.ui-cbx-btn'); if (b2) { b2.setAttribute('aria-expanded', 'false'); try { b2.focus({ preventScroll: true }); } catch (err) { /* ignore */ } } } });
+        dlg.el.classList.add('ui-cbx-sheet'); dlg.el.parentNode.classList.add('ui-cbx-sheet-ov');
+        wire(dlg.body.querySelector('.ui-cbx-p'));
+      } else {
+        var anchor = el.querySelector('.ui-cbx-f');
+        var follow = function (ev) { if (pop && !pop.el.contains(ev.target)) pop.place(); };
+        document.addEventListener('scroll', follow, true);
+        pop = U.popover(anchor, panelHtml(), { width: Math.max(anchor.offsetWidth, o.popWidth || 340), align: 'start', cls: 'ui-cbx-pop', role: 'presentation', keepOnResize: true, onClose: function () { document.removeEventListener('scroll', follow, true); pop = null; box = null; st.open = false; var b2 = el.querySelector('.ui-cbx-btn'); if (b2) b2.setAttribute('aria-expanded', 'false'); } });
+        wire(pop.el.querySelector('.ui-cbx-p'));
+      }
+      if (q) inp.value = q;
+      if (!q && !o.multi && st.value !== '') { var l0 = compute(''); var k0 = -1; l0.forEach(function (x, k) { if (k0 < 0 && String(x.value) === String(st.value)) k0 = k; }); if (k0 >= 0) st.active = k0; }
+      drawList(); if (pop) pop.place();
+      setTimeout(function () { try { inp.focus({ preventScroll: true }); var n = inp.value.length; inp.setSelectionRange(n, n); } catch (err) { /* ignore */ } }, 20);
+    }
+    function close() {
+      if (pop) { var p = pop; pop = null; p.close(); }
+      if (dlg) { var d = dlg; dlg = null; d.close(true); }
+      box = null; st.open = false;
+      var btn = el.querySelector('.ui-cbx-btn'); if (btn) { btn.setAttribute('aria-expanded', 'false'); if (!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches)) try { btn.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }
+    }
+    el.addEventListener('click', function (ev) {
+      var x;
+      if ((x = ev.target.closest('[data-cbx-unpick]'))) { ev.stopPropagation(); var v = x.getAttribute('data-cbx-unpick'); st.value = st.value.filter(function (z) { return String(z) !== v; }); commit(null); return; }
+      if (ev.target.closest('[data-cbx-clear]')) { st.value = o.multi ? [] : ''; commit(null); return; }
+      if (ev.target.closest('.ui-cbx-btn')) { if (st.open) close(); else open(); }
+    });
+    el.addEventListener('keydown', function (ev) {
+      if (!ev.target.closest('.ui-cbx-btn')) return;
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); open(); }
+      else if (ev.key.length === 1 && /\S/.test(ev.key) && !ev.ctrlKey && !ev.metaKey && !ev.altKey) { ev.preventDefault(); open(ev.key); }
+      else if ((ev.key === 'Delete' || ev.key === 'Backspace') && o.clearable !== false && !o.required) { ev.preventDefault(); st.value = o.multi ? [] : ''; commit(null); }
+    });
+    var ctrl = {
+      el: el, state: st,
+      value: function () { return o.multi ? st.value.slice() : st.value; },
+      item: function () { return o.multi ? st.value.map(findItem).filter(Boolean) : findItem(st.value); },
+      set: function (v, silent) { st.value = o.multi ? [].concat(v || []) : (v == null ? '' : v); if (silent) drawField(); else commit(null); },
+      open: open, close: close,
+      refresh: function () { drawField(); if (box) drawList(); },
+      setItems: function (items) { o.items = items; ctrl.refresh(); },
+      setError: function (msg) { o.error = msg || ''; el.classList.toggle('bad', !!msg); drawField(); },
+      options: o
+    };
+    drawField();
+    return ctrl;
+  };
+  var mountArgs = function (el, o) { if (el && !(el.nodeType === 1) && typeof el === 'object') { o = el; el = o.el; } if (typeof el === 'string') el = document.querySelector(el); return [el, o || {}]; };
+
+  /* UI.carPicker(el, {key:'car', label:'Car', start, end, exceptId (booking code to ignore), value (car id), onChange(id, car),
+       cars (list, default every car), hideInactive, badges (default true), required, placeholder})
+     Rows: plate in bold, then model and colour, then a badge: Free / Booked KLT-x until 21 Oct / In workshop / Not in use / Sold.
+     With dates, free cars come first. Matching ignores spaces and dashes in the plate ('vkp4418' finds VKP 4418).
+     ctrl.setDates(start, end, exceptId) re-checks the badges. */
+  U.carPicker = function (el, o) {
+    var a = mountArgs(el, o); el = a[0]; o = a[1];
+    var opts = Object.assign({ key: 'car', label: 'Car', placeholder: 'Choose a car', title: 'Choose a car', searchPlaceholder: 'Plate, model or colour', recentKey: 'car-' + B().id, emptyText: 'No cars yet. Add one on the Cars page.', noMatchHelp: 'Try the numbers of the plate, or the model.' }, o);
+    opts.items = function () {
+      var cars = (o.cars || D().cars).filter(function (c) { return !o.hideInactive || c.fleet === 'Active' || c.id === opts.value; });
+      var rows = cars.map(function (c) {
+        var b = busy(c, opts.start || null, opts.end || null, opts.exceptId), badge = null, rank = 0;
+        if (o.badges !== false) {
+          if (b.kind === 'fleet') { badge = { text: b.reason, tone: 'grey' }; rank = 3; }
+          else if (b.kind === 'workshop') { badge = { text: b.reason, tone: 'warn' }; rank = 2; }
+          else if (b.kind === 'booking') { badge = { text: b.reason, tone: 'bad' }; rank = 1; }
+          else if (opts.start) badge = { text: b.soon ? 'Free, ' + b.soon.replace(/^Back/, 'back') : 'Free', tone: b.soon ? 'warn' : 'ok' };
+        }
+        return { value: c.id, label: c.plate, sub: carName(c) + ' · ' + c.color, badge: badge, kw: normPlate(c.plate) + ' ' + c.make + ' ' + c.model + ' ' + c.color + ' ' + c.type + ' #' + c.serial, rank: rank, car: c, busy: b,
+          html: '<span class="ui-cbx-t"><b class="ui-plate">' + e(c.plate) + '</b><small>' + e(carName(c)) + ' · ' + e(c.color) + '</small></span>' };
+      });
+      if (opts.start) rows.sort(function (x, y) { return x.rank - y.rank || x.car.serial - y.car.serial; });
+      return rows;
+    };
+    opts.search = function (it, q) {
+      var np = normPlate(q);
+      if (np && normPlate(it.car.plate) === np) return 10;
+      if (np.length >= 2 && normPlate(it.car.plate).indexOf(np) >= 0) return 5;
+      return U.wordsMatch(it.label + ' ' + it.sub + ' ' + it.kw, q) ? 1 : 0;
+    };
+    var userChange = o.onChange;
+    opts.onChange = function (v, it, c) { opts.value = v; if (userChange) userChange(v, v ? carById(v) : null, c); };
+    var ctrl = U.combo(el, opts);
+    ctrl.setDates = function (start, end, exceptId) { opts.start = start; opts.end = end; if (exceptId !== undefined) opts.exceptId = exceptId; ctrl.refresh(); };
+    ctrl.car = function () { var v = ctrl.value(); return v ? carById(v) : null; };
+    ctrl.busy = function () { var c = ctrl.car(); return c ? busy(c, opts.start || null, opts.end || null, opts.exceptId) : null; };
+    return ctrl;
+  };
+
+  /* UI.bookingPicker(el, {key:'booking', label:'Booking', value (code), filter(b) -> bool, onChange(code, booking), showCancelled,
+       required, placeholder, bookings (list)})
+     Finds a booking by its code in any form ('3', '00003', 'KLT 3'), customer name words, phone digits (any format) or plate.
+     Every match shows (no cap). A switch shows cancelled bookings. */
+  U.bookingPicker = function (el, o) {
+    var a = mountArgs(el, o); el = a[0]; o = a[1];
+    var opts = Object.assign({ key: 'booking', label: 'Booking', placeholder: 'Choose a booking', title: 'Choose a booking', searchPlaceholder: 'Booking ID, name, phone or plate', recentKey: 'booking-' + B().id, emptyText: 'No bookings to choose from.', noMatchHelp: 'Try the booking number, part of the name, the phone or the plate.' }, o);
+    opts.toggles = [{ key: 'cancelled', label: 'Show cancelled bookings', value: !!o.showCancelled }];
+    opts.items = function (st) {
+      var list = (o.bookings || D().bookings).filter(function (b) { return (st.toggles.cancelled || b.status !== 'Cancelled' || b.code === opts.value) && (!o.filter || o.filter(b) || b.code === opts.value); });
+      return list.slice().sort(function (x, y) { return y.start - x.start; }).map(function (b) {
+        return { value: b.code, label: b.code, sub: b.cust.name + ' · ' + b.car.plate + ' · ' + U.fmt.date(b.start) + ' to ' + U.fmt.date(b.end), badge: '<span class="ui-cbx-badge">' + schip(b.status, BOOKING_COLORS[b.status] || '#94a3b8') + '</span>', b: b,
+          html: '<span class="ui-cbx-t"><b>' + e(b.code) + ' <span class="ui-cbx-nm">' + e(b.cust.name) + '</span></b><small>' + e(b.car.plate) + ' · ' + e(carName(b.car)) + ' · ' + e(U.fmt.date(b.start)) + ' to ' + e(U.fmt.date(b.end)) + '</small></span>' };
+      });
+    };
+    opts.search = function (it, q) {
+      var b = it.b, t = tidySearch(q);
+      if (matchBookingCode(t, b.code)) return 100;
+      if (/^\d{3,}$/.test(t) && phoneHas(b.cust.phone, t)) return 20;
+      var np = normPlate(t); if (np.length >= 3 && normPlate(b.car.plate).indexOf(np) >= 0) return 15;
+      if (lc(b.code).indexOf(lc(t)) >= 0 && t.length >= 2) return 10;
+      return U.wordsMatch(b.cust.name + ' ' + b.code + ' ' + b.car.plate + ' ' + b.car.make + ' ' + b.car.model, t) ? 5 : 0;
+    };
+    var userChange = o.onChange;
+    opts.onChange = function (v, it, c) { opts.value = v; if (userChange) userChange(v, v ? findBooking(v) : null, c); };
+    var ctrl = U.combo(el, opts);
+    ctrl.booking = function () { var v = ctrl.value(); return v ? findBooking(v) : null; };
+    return ctrl;
+  };
+
+  /* UI.staffPicker(el, {key, label, value | values, multi, source: 'users' (logins, default) | 'employees' (field agents),
+       includeInactive, exclude: [ids], me: true (marks the person signed in as "Me"), onChange(value, person | people), required})
+     Values are user ids (usr-1) or employee ids (emp-1). */
+  U.staffPicker = function (el, o) {
+    var a = mountArgs(el, o); el = a[0]; o = a[1];
+    var opts = Object.assign({ key: 'staff', label: o.multi ? 'Staff' : 'Person', placeholder: o.multi ? 'Choose people' : 'Choose a person', title: o.multi ? 'Choose people' : 'Choose a person', searchPlaceholder: 'Name', recentKey: o.multi ? null : 'staff-' + (o.source || 'users') + '-' + B().id }, o);
+    opts.items = function () {
+      var emp = o.source === 'employees', list = emp ? D().employees : D().users, my = me();
+      return list.filter(function (p) { return (o.includeInactive || p.active || (o.multi ? (opts.values || []).indexOf(p.id) >= 0 : p.id === opts.value)) && (o.exclude || []).indexOf(p.id) < 0; }).map(function (p) {
+        var role = !emp ? byId(D().roles, p.role) : null, isMe = o.me !== false && my && (emp ? p.login === my.id : p.id === my.id);
+        return { value: p.id, label: p.name + (isMe ? ' (Me)' : ''), sub: emp ? (p.wa || '') : (p.superAdmin ? 'Owner' : role ? role.name : ''), kw: isMe ? 'me' : '', badge: p.active ? null : { text: 'Switched off', tone: 'grey' },
+          html: '<span class="row gap8" style="min-width:0">' + U.avatar(p.name) + '<span class="ui-cbx-t"><b>' + e(p.name) + (isMe ? ' <span class="chip pri">Me</span>' : '') + '</b><small>' + e(emp ? (p.wa || '') : (p.superAdmin ? 'Owner' : role ? role.name : '')) + '</small></span></span>' };
+      });
+    };
+    var userChange = o.onChange, src = o.source === 'employees' ? 'employees' : 'users';
+    opts.onChange = function (v, it, c) { if (o.multi) opts.values = v; else opts.value = v; if (userChange) userChange(v, o.multi ? v.map(function (x) { return byId(D()[src], x); }) : (v ? byId(D()[src], v) : null), c); };
+    return U.combo(el, opts);
+  };
+
+  /* ===================================================================
+     Date fields that always read '19 Oct 2026' (and '3:00 PM'), whatever the browser's language.
+     UI.dateField({key, label, value (Date or 'YYYY-MM-DD'), required, min, max, chips (default Today and Tomorrow; false for
+       none; or [{label, days}] / [{label, run: function (current) -> Date}]), help, error, disabled, placeholder, compact})
+     UI.dateTimeField({... value (Date or 'YYYY-MM-DDTHH:MM'), step: 15 (minutes)}) adds a time list in 15-minute steps.
+     Both return HTML (like UI.input). The value sits in a hidden <input data-key> ('YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM', read it
+     with UI.parseDate) that fires 'input' and 'change' when it changes. UI.setDateField(el, date) sets one from code;
+     UI.dateFieldValue(el) gives a Date (el = the field, anything inside it, or the hidden input).
+     =================================================================== */
+  var timeLabel = function (h, m) { return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM'); };
+  var toDate = function (v) { return v instanceof Date ? v : v ? U.parseDate(v) : null; };
+  function dtfHtml(o, withTime) {
+    var id = fid(o), d = toDate(o.value), step = o.step || 15;
+    var iso = d ? (withTime ? U.isoDateTime(d) : U.isoDate(d)) : '';
+    var chips = o.chips === false ? [] : Array.isArray(o.chips) ? o.chips : [{ label: 'Today', days: 0 }, { label: 'Tomorrow', days: 1 }];
+    var time = '';
+    if (withTime) {
+      var opts = [], hh = d ? d.getHours() : null, mm = d ? d.getMinutes() : null, found = false;
+      for (var t = 0; t < 1440; t += step) { var h = Math.floor(t / 60), m = t % 60; if (hh === h && mm === m) found = true; opts.push([String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'), timeLabel(h, m), h * 60 + m]); }
+      if (d && !found) { opts.push([String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'), timeLabel(hh, mm), hh * 60 + mm]); opts.sort(function (x, y) { return x[2] - y[2]; }); }
+      var cur = d ? String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') : '';
+      time = '<span class="ui-dtf-tm"><select data-ui-dtf-time aria-label="' + e((o.label || o.aria || 'Date') + ', time') + '"' + (o.disabled ? ' disabled' : '') + '>' + (d ? '' : '<option value="">Time</option>') + opts.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === cur ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></span>';
+    }
+    return '<div class="inp ui-dtf' + (o.compact ? ' compact' : '') + (o.error ? ' bad' : '') + (o.full ? ' full' : '') + '" data-ui-dtf="' + (withTime ? 'dt' : 'd') + '"' + (o.style ? ' style="' + o.style + '"' : '') + '>' + lab(o, id) +
+      '<div class="ui-dtf-row"><span class="ui-dtf-d"><span class="ui-dtf-show' + (d ? '' : ' ph') + '" aria-hidden="true">' + i('calendar') + '<span data-ui-dtf-txt data-ph="' + e(o.placeholder || 'Choose a day') + '">' + e(d ? U.fmt.date(d) : (o.placeholder || 'Choose a day')) + '</span></span>' +
+      '<input type="date" id="' + id + '" class="ui-dtf-native" data-ui-dtf-native value="' + (d ? U.isoDate(d) : '') + '"' + (o.min ? ' min="' + e(String(o.min instanceof Date ? U.isoDate(o.min) : o.min).slice(0, 10)) + '"' : '') + (o.max ? ' max="' + e(String(o.max instanceof Date ? U.isoDate(o.max) : o.max).slice(0, 10)) + '"' : '') + (o.required ? ' required' : '') + (o.disabled ? ' disabled' : '') + (o.label ? '' : ' aria-label="' + e(o.aria || o.placeholder || 'Date') + '"') + '></span>' + time + '</div>' +
+      (chips.length && !o.disabled ? '<div class="ui-dtf-chips">' + chips.map(function (c, k) { return '<button type="button" class="ui-fchip" data-ui-dtf-chip="' + k + '"' + (c.days != null ? ' data-days="' + c.days + '"' : '') + '>' + e(c.label) + '</button>'; }).join('') + '</div>' : '') +
+      '<input type="hidden" data-key="' + e(o.key || '') + '" value="' + iso + '"' + U.attrs(o.attrs) + '>' + tail(o) + '</div>';
+  }
+  U.dateField = function (o) { return dtfHtml(o || {}, false); };
+  U.dateTimeField = function (o) { return dtfHtml(o || {}, true); };
+  var dtfRoot = function (el) { return el && el.closest ? el.closest('[data-ui-dtf]') : null; };
+  U.dateFieldValue = function (el) { var r = dtfRoot(el) || el; var h = r && r.querySelector ? r.querySelector('input[type="hidden"][data-key]') : null; return h && h.value ? U.parseDate(h.value) : null; };
+  /* write a Date into a date field and fire 'change' (silent: true to skip the events) */
+  U.setDateField = function (el, d, silent) {
+    var r = dtfRoot(el) || el; if (!r || !r.querySelector) return;
+    var withTime = r.getAttribute('data-ui-dtf') === 'dt', h = r.querySelector('input[type="hidden"][data-key]'), nat = r.querySelector('[data-ui-dtf-native]'), txt = r.querySelector('[data-ui-dtf-txt]'), sel = r.querySelector('[data-ui-dtf-time]');
+    if (d && withTime && sel) {
+      var hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      if (!sel.querySelector('option[value="' + hm + '"]')) { var op = document.createElement('option'); op.value = hm; op.textContent = timeLabel(d.getHours(), d.getMinutes()); var after = [].slice.call(sel.options).filter(function (x) { return x.value && x.value > hm; })[0]; sel.insertBefore(op, after || null); }
+      sel.value = hm; var blank = sel.querySelector('option[value=""]'); if (blank) blank.remove();
+    }
+    nat.value = d ? U.isoDate(d) : '';
+    txt.textContent = d ? U.fmt.date(d) : (txt.getAttribute('data-ph') || 'Choose a day'); txt.parentNode.classList.toggle('ph', !d);
+    h.value = d ? (withTime ? U.isoDateTime(d) : U.isoDate(d)) : '';
+    if (!silent) { h.dispatchEvent(new Event('input', { bubbles: true })); h.dispatchEvent(new Event('change', { bubbles: true })); }
+  };
+  var dtfChipRun = {};
+  document.addEventListener('change', function (ev) {
+    var t = ev.target; if (!t.matches) return;
+    if (t.matches('[data-ui-dtf-native]') || t.matches('[data-ui-dtf-time]')) {
+      var r = dtfRoot(t), withTime = r.getAttribute('data-ui-dtf') === 'dt', nat = r.querySelector('[data-ui-dtf-native]'), sel = r.querySelector('[data-ui-dtf-time]');
+      var day = nat.value ? U.parseDate(nat.value) : null;
+      if (!day && withTime && t === sel) { var cur = U.dateFieldValue(r); day = cur || new Date(NOW().getFullYear(), NOW().getMonth(), NOW().getDate()); }
+      if (day && withTime) { var hm = (sel.value || '10:00').split(':'); day.setHours(+hm[0], +hm[1], 0, 0); }
+      U.setDateField(r, day);
+    }
+  });
+  document.addEventListener('click', function (ev) {
+    var t = ev.target, x;
+    if ((x = t.closest && t.closest('[data-ui-dtf-native]'))) { try { if (x.showPicker) x.showPicker(); } catch (err) { /* the browser opens its own picker */ } return; }
+    if ((x = t.closest && t.closest('[data-ui-dtf-chip]'))) {
+      var r = dtfRoot(x), cur = U.dateFieldValue(r), n = NOW(), base = new Date(n.getFullYear(), n.getMonth(), n.getDate()), days = x.getAttribute('data-days');
+      var d = days != null ? new Date(base.getTime() + (+days) * DAY) : null;
+      if (d && r.getAttribute('data-ui-dtf') === 'dt') d.setHours(cur ? cur.getHours() : 10, cur ? cur.getMinutes() : 0, 0, 0);
+      if (d) U.setDateField(r, d);
+    }
+  });
+
+  /* ===================================================================
+     Sideways-scrolling rows (tabs, chips): a fade shows on the side that has more. Applied by itself to .tabs, .ptabs,
+     .ui-fchips, .ui-choice and [data-srow]. UI.scrollRow(el) also adds arrow buttons (wraps el in .ui-srow).
+     =================================================================== */
+  function srowCheck(el) {
+    var more = el.scrollWidth > el.clientWidth + 2, l = more && el.scrollLeft > 2, r = more && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    el.classList.toggle('ui-sl', l); el.classList.toggle('ui-sr', r);
+    var w = el.parentNode && el.parentNode.classList && el.parentNode.classList.contains('ui-srow') ? el.parentNode : null;
+    if (w) { w.classList.toggle('l', l); w.classList.toggle('r', r); }
+  }
+  function srowWatch(el) { if (el._srow) { srowCheck(el); return; } el._srow = true; el.addEventListener('scroll', function () { srowCheck(el); }, { passive: true }); srowCheck(el); }
+  U.scrollRow = function (el) {
+    if (!el || el.parentNode && el.parentNode.classList.contains('ui-srow')) { if (el) srowCheck(el); return el; }
+    var w = document.createElement('div'); w.className = 'ui-srow'; el.parentNode.insertBefore(w, el); w.appendChild(el);
+    w.insertAdjacentHTML('beforeend', '<button type="button" class="ui-srow-a l" tabindex="-1" aria-hidden="true">' + i('chevron-left') + '</button><button type="button" class="ui-srow-a r" tabindex="-1" aria-hidden="true">' + i('chevron-right') + '</button>');
+    w.addEventListener('click', function (ev) { var b = ev.target.closest('.ui-srow-a'); if (!b) return; el.scrollBy({ left: (b.classList.contains('l') ? -1 : 1) * Math.max(120, el.clientWidth * .7), behavior: 'smooth' }); });
+    srowWatch(el); return el;
+  };
+  var srowSel = '.tabs,.ptabs,.ui-fchips,.ui-choice,[data-srow]', srowT = null;
+  function srowScan() { srowT = null; document.querySelectorAll(srowSel).forEach(srowWatch); }
+  if (window.MutationObserver) new MutationObserver(function () { if (!srowT) srowT = setTimeout(srowScan, 60); }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', function () { document.querySelectorAll(srowSel).forEach(srowCheck); });
 
   return U;
 })();

@@ -91,13 +91,13 @@ PAGES['damage-packages'] = {
       onRowClick: function (p) { dpOpen(p.id); },
       columns: [
         { key: 'name', label: 'Name', sort: true, render: function (p) { return '<div class="dp-name"><span class="dp-ic">' + i('shield-check') + '</span><b class="t1c">' + esc(p.name) + '</b></div>'; } },
-        { key: 'daily', label: 'Daily Rate (RM)', align: 'right', sort: true, nowrap: true, render: function (p) { return '<span class="num">' + dpMoney(p.daily) + '</span>'; } },
-        { key: 'max', label: 'Max Coverage (RM)', align: 'right', sort: true, nowrap: true, render: function (p) { return '<div class="dp-max"><span class="num">' + dpMoney(p.max) + '</span><span class="dp-bar"><i style="width:' + Math.round(p.max / maxMax * 100) + '%"></i></span></div>'; } },
-        { key: 'uses', label: 'Bookings', align: 'right', sort: function (p) { return dpUses(p, d).length; }, render: function (p) { var n = dpUses(p, d).length; return n ? '<span class="num">' + n + '</span>' : '<span class="faint">0</span>'; } },
+        { key: 'daily', label: 'Daily Rate', money: true, sort: true, nowrap: true, render: function (p) { return UI.money(p.daily); } },
+        { key: 'max', label: 'Max Coverage', money: true, sort: true, nowrap: true, render: function (p) { return '<div class="dp-max">' + UI.money(p.max) + '<span class="dp-bar"><i style="width:' + Math.round(p.max / maxMax * 100) + '%"></i></span></div>'; } },
+        { key: 'uses', label: 'Bookings', align: 'center', sort: function (p) { return dpUses(p, d).length; }, render: function (p) { var n = dpUses(p, d).length; return n ? '<span class="num">' + n + '</span>' : '<span class="faint">0</span>'; } },
         { key: 'act', label: 'Actions', align: 'right', render: acts }
       ],
       empty: { icon: 'shield-off', title: 'No damage packages found.', text: st.f.q ? 'Try another name.' : 'Add the cover options staff can offer on a booking.', action: !st.f.q && ctx.can('damage_packages.create') ? UI.btn('New Package', { icon: 'plus', attrs: { 'data-dp-new': 1 } }) : '' },
-      card: function (p) { return '<div class="dp-card"><div class="dp-name"><span class="dp-ic">' + i('shield-check') + '</span><b>' + esc(p.name) + '</b></div><div class="dp-card-n"><span><small>Daily Rate</small><b class="num">RM ' + dpMoney(p.daily) + '</b></span><span><small>Max Coverage</small><b class="num">RM ' + dpMoney(p.max) + '</b></span><span><small>Bookings</small><b class="num">' + dpUses(p, d).length + '</b></span></div>' + acts(p) + '</div>'; }
+      card: function (p) { return '<div class="dp-card"><div class="dp-name"><span class="dp-ic">' + i('shield-check') + '</span><b>' + esc(p.name) + '</b></div><div class="dp-card-n"><span><small>Daily Rate</small><b class="num">' + UI.fmt.money(p.daily) + '</b></span><span><small>Max Coverage</small><b class="num">' + UI.fmt.money(p.max) + '</b></span><span><small>Bookings</small><b class="num">' + dpUses(p, d).length + '</b></span></div>' + acts(p) + '</div>'; }
     });
     UI.filters(root.querySelector('#dp-f'), { values: st.f, fields: [{ type: 'search', key: 'q', placeholder: 'Search...' }], onChange: function () { t.setRows(rowsFor()); }, extra: '<span class="grow"></span><span class="b2">' + plural(d.damagePackages.length, 'package') + '</span>' });
     UI.on(root, 'click', '[data-dp-new]', function () { dpOpen(null); });

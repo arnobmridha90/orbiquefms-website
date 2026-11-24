@@ -1,0 +1,63 @@
+/* deposits screens (M4). Shared classes live in base.css. */
+.dep-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 4px; }
+.dep-sheet .sec { margin-top: 16px; }
+.dep-sheet .sec button { display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 4px; }
+.dep-sheet .sec button svg { width: 16px; height: 16px; }
+.dep-typed { padding: 12px 14px 2px; }
+.dep-typed .banner { margin-bottom: 10px; }
+.dep-line { min-height: 60px; }
+.dep-ic { width: 38px; height: 38px; border-radius: 11px; background: var(--tint); color: var(--brand-ink); display: grid; place-items: center; flex: none; }
+.dep-ic svg { width: 19px; height: 19px; }
+.dep-ic.used { background: var(--t-blue-bg); color: var(--t-blue); }
+.thumb.dep-th { width: 38px; height: 38px; border-radius: 11px; }
+.dep-line .c2-end { color: var(--t-red); }
+.dep-none { padding: 18px 16px; line-height: 1.45; }
+.btn.dep-addbig { width: 100%; margin-top: 10px; }
+.dep-net { margin-top: 14px; padding: 14px; }
+.dep-net-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 650; }
+.dep-net-row b { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.dep-net.over .dep-net-row b { color: var(--muted); }
+.dep-calc { margin-top: 2px; }
+.dep-over { margin: 10px 0 0; }
+.dep-back { margin: 14px 0 -4px; }
+.dep-done { margin-top: 14px; padding: 14px; }
+.dep-done-h { display: flex; align-items: center; gap: 10px; }
+.dep-done-h > svg { width: 30px; height: 30px; padding: 6px; border-radius: 50%; background: var(--t-green-bg); color: var(--t-green); flex: none; }
+.dep-done-h .grow { flex: 1; min-width: 0; }
+.dep-done-h b { display: block; }
+.dep-done-h small { display: block; color: var(--muted); font-size: 12.5px; }
+.dep-big { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+.dep-note { margin: 10px 0 0; }
+.dep-slip { margin-top: 12px; align-items: center; }
+.dep-pic { border-radius: 12px; overflow: hidden; background: #F1F3F6; border: 1px solid var(--line); }
+.dep-pic img { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; }
+.dep-ph { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid #D9DCE2; border-radius: 12px; background: #fff; }
+.dep-ph .grow { flex: 1; min-width: 0; color: #3B4250; line-height: 1.35; }
+.dep-reading { color: var(--brand-ink); font-weight: 650; animation: depPulse 1s ease-in-out infinite alternate; }
+@keyframes depPulse { from { opacity: .45; } to { opacity: 1; } }
+.dep-due { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; margin: 4px 0 14px; background: var(--bg); font-weight: 650; }
+.dep-due b { font-size: 20px; font-weight: 800; }
+.seg.dep-meth { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 4px; }
+.seg.dep-meth button { height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px; font-size: 13.5px; }
+.seg.dep-meth button svg { width: 17px; height: 17px; flex: none; }
+.dep-kept { padding: 12px 12px 10px; margin: -4px 0 12px; border-color: var(--t-amber-bg); background: #FFFBF3; }
+.dep-kept-h { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; font-size: 14px; }
+.dep-kept-h svg { width: 18px; height: 18px; color: var(--t-amber); flex: none; margin-top: 1px; }
+.dep-kept .seg { margin-bottom: 8px; }
+.dep-dt { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+.dep-dt .field { margin-bottom: 0; }
+.dep-dterr { margin: 0 0 12px; min-height: 4px; }
+textarea.inp.dep-ta { height: 96px; padding: 10px 12px; resize: vertical; line-height: 1.4; }
+textarea.inp.dep-ta.big { height: 170px; font-size: 15px; }
+
+/* list */
+.dep-kpis { margin: 6px 0 14px; }
+.dep-kpis .tile { min-height: 78px; }
+.tile .v.money-v { font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dep-tabs a .n { font-size: 12px; opacity: .6; margin-left: 3px; }
+.dep-search { margin-bottom: 8px; }
+.dep-sort { margin: 2px 2px 6px; }
+.dep-row { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
+.dep-row .c2-end { padding-top: 2px; }
+.dep-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dep-chips { align-items: center; }

@@ -129,3 +129,21 @@
   .mt-mini{grid-template-columns:1fr 1fr}
   .mt-ws-car{min-width:0;width:100%}
 }
+/* W5: clash panel, file kinds, odometer readings, car picker in the log */
+.pg-maintenance .mt-lcar,.mt-lcar{max-width:360px;margin-bottom:8px}
+.mt-clashp{align-items:flex-start}
+.mt-clashp .mt-clash li{margin:2px 0}
+.mt-force{margin-top:10px;min-height:40px}
+.mt-forced{background:var(--warning);border-color:var(--warning);color:#fff}
+.mt-filek{align-items:flex-start}
+.mt-filek-b{display:flex;flex-direction:column;gap:6px;min-width:0}
+.mt-filek-f{display:flex;gap:6px;flex-wrap:wrap}
+.mt-filek-f select,.mt-filek-f input{min-height:40px;border:1px solid var(--divider);border-radius:6px;background:var(--paper);color:var(--text);padding:0 8px;font:inherit;font-size:13.5px}
+.mt-filek-f select{flex:0 0 150px}
+.mt-filek-f input{flex:1 1 160px;min-width:0}
+.mt-odol{display:flex;flex-direction:column;gap:6px}
+.mt-odo{display:flex;flex-direction:column;gap:2px;border:1px solid var(--divider);border-radius:6px;padding:8px 10px}
+.mt-odo-t{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mt-odo.bad{border-color:rgb(var(--error-rgb) / .45);background:rgb(var(--error-rgb) / .06)}
+.mt-odo-why{color:var(--error)}
+@media (max-width:640px){.mt-filek-f select{flex:1 1 100%}.mt-lcar{max-width:none}}

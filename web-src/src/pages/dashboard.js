@@ -44,6 +44,7 @@ DATA_INIT.push(function (d, brand) {
 });
 
 /* ---------------- dates and numbers ---------------- */
+function dshPhone() { try { return window.matchMedia('(max-width: 760px)').matches; } catch (e) { return false; } }
 function dshD0(t) { var x = new Date(t); x.setHours(0, 0, 0, 0); return x.getTime(); }
 function dshMonth(y, m) { return new Date(y, m, 1).getTime(); }
 function dshK(v) { var a = Math.abs(v); return (v < 0 ? '-' : '') + (a >= 1e6 ? (Math.round(a / 1e5) / 10) + 'm' : a >= 1000 ? (Math.round(a / 100) / 10) + 'k' : String(Math.round(a))); }
@@ -85,18 +86,20 @@ function dshEdges(from, to, gran, count) {
 function dshIdx(edges, t) { if (t < edges[0] || t >= edges[edges.length - 1]) return -1; for (var k = 1; k < edges.length; k++) if (t < edges[k]) return k - 1; return -1; }
 
 /* ---------------- the model: every rental cut into 24-hour blocks, every expense with its kind ---------------- */
-function dshModel(d) {
-  var real = d.bookings.filter(function (x) { return x.status !== 'Pending' && x.status !== 'Cancelled'; });
-  var rentals = (d.dashHist || []).concat(real), blocks = [];
+/* only: leave out => the counted cars (Reports > Cars counted), or a list of car ids => just those cars */
+function dshModel(d, only) {
+  var keep = only ? function (id) { return only.indexOf(id) >= 0; } : function (id) { return typeof isCounted !== 'function' || isCounted(id, d); };
+  var real = d.bookings.filter(function (x) { return x.status !== 'Pending' && x.status !== 'Cancelled' && keep(x.car.id); });
+  var rentals = (d.dashHist || []).filter(function (b) { return keep(b.car.id); }).concat(real), blocks = [];
   rentals.forEach(function (b) {
     var n = Math.max(1, b.days || 1), rent = (b.rent - (b.disc || 0)) / n, dl = (b.deliv || 0) / n, rt = (b.ret || 0) / n, dm = (b.dmg || 0) / n, ot = (b.others || 0) / n;
     for (var k = 0; k < n; k++) blocks.push({ t: b.start.getTime() + k * DAY, car: b.car.id, b: b, rent: rent, deliv: dl, ret: rt, dmg: dm, other: ot, total: rent + dl + rt + dm + ot });
   });
   var cats = {}; d.expenseCats.forEach(function (c) { cats[c.id] = c.name; });
-  var ex = allExpenses(d).map(function (e) { return { t: +e.day, amount: e.amount, kind: e.source === 'job' ? 'Service and repair jobs' : e.source === 'paper' ? 'Road tax, insurance and other papers' : cats[e.cat] || 'Other', car: e.car, src: e.source }; }).concat(d.dashHistExp || []);
+  var ex = allExpenses(d).map(function (e) { return { t: +e.day, amount: e.amount, kind: e.source === 'job' ? 'Service and repair jobs' : e.source === 'paper' ? 'Road tax, insurance and other papers' : cats[e.cat] || 'Other', car: e.car, src: e.source }; }).concat(d.dashHistExp || []).filter(function (e) { return e.car ? keep(e.car) : !only; });
   var firstSeen = {};
   rentals.slice().sort(function (a, b) { return a.start - b.start; }).forEach(function (b) { if (firstSeen[b.cust.id] == null) firstSeen[b.cust.id] = b.start.getTime(); });
-  return { rentals: rentals, real: real, blocks: blocks, ex: ex, firstSeen: firstSeen, cars: d.cars.filter(function (c) { return c.fleet !== 'Sold'; }) };
+  return { rentals: rentals, real: real, blocks: blocks, ex: ex, firstSeen: firstSeen, cars: d.cars.filter(function (c) { return keep(c.id) && (only || c.fleet !== 'Sold'); }) };
 }
 /* totals for [from, to) */
 function dshAgg(M, from, to, carId) {
@@ -179,7 +182,7 @@ function dshBars(o) {
   var legend = legItems.length > 1 || o.legendId ? '<div class="dsh-leg" role="group" aria-label="Show or hide a part">' + legItems.map(function (s) { var off = hid[s.key]; return o.legendId ? '<button type="button" class="dsh-legi" data-leg="' + esc(o.legendId) + '" data-k="' + esc(s.key) + '" aria-pressed="' + !off + '"><i style="background:' + s.color + '"></i>' + esc(s.name) + '</button>' : '<span class="dsh-legi"><i style="background:' + s.color + '"></i>' + esc(s.name) + '</span>'; }).join('') + '</div>' : '';
   return legend + '<div class="vd-chart dsh-chart"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label || 'Bar chart') + '">' + g + '</svg></div>';
 }
-function dshSeg(name, items, cur, cls) { return '<div class="vd-seg dsh-seg' + (cls ? ' ' + cls : '') + '" role="group" aria-label="' + esc(name) + '">' + items.map(function (it) { return '<button type="button" data-seg="' + esc(name) + '" data-v="' + esc(it[0]) + '" aria-pressed="' + (String(cur) === String(it[0])) + '">' + esc(it[1]) + '</button>'; }).join('') + '</div>'; }
+function dshSeg(name, items, cur, cls) { return '<div data-srow class="vd-seg dsh-seg' + (cls ? ' ' + cls : '') + '" role="group" aria-label="' + esc(name) + '">' + items.map(function (it) { return '<button type="button" data-seg="' + esc(name) + '" data-v="' + esc(it[0]) + '" aria-pressed="' + (String(cur) === String(it[0])) + '">' + esc(it[1]) + '</button>'; }).join('') + '</div>'; }
 function dshChange(now, before, goodUp, label) {
   var pc = dshPct(now, before);
   if (pc == null) return '<span class="row gap6 wrap"><span class="vd-chip">New</span>' + (label ? '<span class="vd-chip-note">' + esc(label) + '</span>' : '') + '</span>';
@@ -203,6 +206,9 @@ PAGES['dashboard'] = {
 
     function draw(opts) {
       var M = dshModel(d), P = dshPeriod(st), A = dshAgg(M, P.from, P.to), C = dshAgg(M, P.cf, P.ct);
+      st.phone = dshPhone();
+      var offIds = ((CO(d) || {}).carsNotCounted || []).filter(function (id) { return carById(id); });
+      M.off = offIds.length ? dshModel(d, offIds) : null;
       var layout = (d.settings.dashLayout || LISTS.dashSections.map(function (s) { return { id: s[0], on: true }; })).filter(function (s) { return s.on; }).map(function (s) { return s.id; });
       var parts = { overview: secOverview, today: secToday, period: secPeriod, months: secMonths, cars: secCars, habits: secHabits, fleet: secFleet, cash: secCash };
       var chips = { today: 'Today', period: 'This period', months: 'Month by month', cars: 'Car by car', habits: 'Habits and customers', fleet: 'Fleet and papers', cash: 'Cash' };
@@ -212,17 +218,40 @@ PAGES['dashboard'] = {
         '<div class="col gap16"><div class="vd-head"><div><h1 class="h4">' + greet + ', ' + esc((u ? u.name : b.owner).split(' ')[0]) + '</h1><div class="muted">' + UI.fmt.long(NOW()) + '</div></div>' +
         '<div class="row wrap gap8 dsh-quick"><span class="cap">Updated ' + tm(st.updated) + ' · refreshes every minute</span>' +
         (can0('billing.record_payment') ? UI.btn('Upload payment slip', { kind: 'tonal', size: 'sm', icon: 'receipt', attrs: { 'data-act': 'slip' } }) : '') +
+        (can0('expenses.view') && typeof ctx.api.bankIn === 'function' ? UI.btn('Bank in cash', { kind: 'tonal', size: 'sm', icon: 'building-bank', attrs: { 'data-act': 'bankin' } }) : '') +
         (can0('expenses.add') || can0('expenses.add_business') ? UI.btn('Add expense', { kind: 'tonal', size: 'sm', icon: 'receipt-2', attrs: { 'data-act': 'expense' } }) : '') +
         UI.btn('Refresh', { kind: 'o', size: 'sm', icon: 'refresh', attrs: { 'data-act': 'refresh' } }) + '</div></div>' +
         (st.busy ? '<div class="dsh-busy" role="progressbar" aria-label="Refreshing"><i></i></div>' : '') +
         (st.failed ? UI.alert('Could not refresh just now. Showing the last numbers we had.', 'warn', { action: UI.btn('Try again', { kind: 't', size: 'sm', attrs: { 'data-act': 'refresh' } }) }) : '') +
-        '<nav class="vd-navs" aria-label="Parts of the page">' + shown.filter(function (id) { return chips[id]; }).map(function (id) { return '<button type="button" class="vd-navchip" data-jump="dsh-' + id + '">' + chips[id] + '</button>'; }).join('') + '</nav></div>' +
-        shown.map(function (id) { return parts[id](M, P, A, C); }).join('') +
+        '<nav class="vd-navs" data-srow aria-label="Parts of the page">' + shown.filter(function (id) { return chips[id]; }).map(function (id) { return '<button type="button" class="vd-navchip" data-jump="dsh-' + id + '">' + chips[id] + '</button>'; }).join('') + '</nav></div>' +
+        (st.phone ? phoneOrder(shown).map(function (id) { return id === 'now' ? secOverview(M, P, A, C, 'now') : id === 'overview' ? secOverview(M, P, A, C, 'figures') : FOLDS.indexOf(id) >= 0 && !st.open[id] ? folded(id, chips[id]) : parts[id](M, P, A, C); }).join('')
+          : shown.map(function (id) { return parts[id](M, P, A, C); }).join('')) +
         (V.any ? '' : '<p class="b2 dsh-hiddencap">' + i('lock') + ' Some parts are not shown because your login does not include them.</p>') +
         (st.follow && carById(st.follow) ? '<div class="dsh-follow" role="status">' + i('target-arrow') + '<span>Following <b>' + esc(carById(st.follow).plate) + '</b> in the car charts</span>' + UI.btn('Open car', { kind: 't', size: 'sm', attrs: { 'data-act': 'opencar', 'data-v': st.follow } }) + UI.iconBtn('x', 'Stop following', { size: 'sm', attrs: { 'data-act': 'unfollow' } }) + '</div>' : '') +
         '</div>';
       root.innerHTML = html;
       if (opts && opts.count) countUp();
+    }
+
+    /* ---------- phones: Right now (with Needs you) and Today first, the analysis parts folded behind the jump buttons ---------- */
+    var FOLDS = ['period', 'months', 'cars', 'habits', 'fleet', 'cash'];
+    st.open = st.open || {};
+    function phoneOrder(shown) {
+      var first = (shown.indexOf('overview') >= 0 ? ['now'] : []).concat(shown.indexOf('today') >= 0 ? ['today'] : []);
+      return first.concat(shown.indexOf('overview') >= 0 ? ['overview'] : []).concat(shown.filter(function (id) { return id !== 'today' && id !== 'overview'; }));
+    }
+    function folded(id, title) {
+      return '<section class="dsh-sec dsh-fold" id="dsh-' + id + '"><button type="button" class="dsh-foldb" data-act="unfold" data-v="' + id + '" aria-expanded="false"><span class="grow"><b>' + esc(title) + '</b><small>Tap to show</small></span>' + i('chevron-down') + '</button></section>';
+    }
+    /* ---------- cars left out of the figures (Reports > Cars counted): their own numbers ---------- */
+    function notCounted(M, kind, from, to, label) {
+      var O = M.off; if (!O) return '';
+      var Ao = dshAgg(O, from, to), plates = O.cars.map(function (c) { return '<span class="chip dsh-ncp" title="' + esc(carName(c)) + '">' + esc(c.plate) + (c.fleet === 'Sold' ? ' <small>sold</small>' : '') + '</span>'; }).join('');
+      var fig = function (lab, val) { return '<div class="dsh-ncf"><span class="b2">' + esc(lab) + '</span><b class="num">' + val + '</b></div>'; };
+      var figs = (V.rev ? fig('Income', UI.fmt.money(Ao.income)) : '') + fig('Bookings', n0(Ao.count)) + fig('Rental days', n0(Ao.days)) + (V.prof ? fig('Expenses', UI.fmt.money(Ao.exp)) + fig('Net result', UI.fmt.money(Ao.net)) : '');
+      return card({ id: 'nc-' + kind, icon: 'eye-off', cls: 'dsh-nc', title: 'Cars not counted', sub: 'Left out of every figure on this page. Their own numbers for ' + label + '.',
+        actions: '<button type="button" class="btn t sm" data-act="notcounted">' + (can0('reports.choose_cars') ? 'Change' : 'See the list') + '</button>',
+        body: '<div class="dsh-ncplates">' + plates + '</div><div class="dsh-ncfigs">' + figs + '</div>' });
     }
 
     /* ---------- card helper: title, optional chart/table toggle ---------- */
@@ -257,7 +286,7 @@ PAGES['dashboard'] = {
     }
 
     /* ---------- 1. Overview ---------- */
-    function secOverview(M, P, A, C) {
+    function secOverview(M, P, A, C, part) {
       var rev = V.rev, vals = dshSeries(M, P.edges, rev ? 'income' : 'count'), prev = dshSeries(M, P.cedges, rev ? 'income' : 'count');
       var t0 = dshD0(NOW()), tEnd = t0 + DAY;
       /* buckets after now are not drawn */
@@ -272,7 +301,7 @@ PAGES['dashboard'] = {
       var bestLbl = best < 0 ? '' : tips[best].split(' (')[0];
       var hero = '<div class="vd-card vd-hero vd-rise dsh-hero" id="dsh-period-hero"><div class="vd-hero-body">' +
         '<div class="vd-hero-top"><div><span class="vd-kicker">' + (rev ? 'Income' : 'Bookings') + '</span><span class="vd-hero-range">' + esc(P.label + ' · ' + P.range) + '</span></div>' +
-        '<div class="vd-seg" role="group" aria-label="Period">' + segs.map(function (s) { return '<button type="button" data-act="period" data-v="' + s[0] + '" aria-pressed="' + (P.key === s[0]) + '">' + s[1] + (s[0] === 'dates' ? ' ' + i('calendar', 'dsh-cal') : '') + '</button>'; }).join('') + '</div></div>' +
+        '<div class="vd-seg" data-srow role="group" aria-label="Period">' + segs.map(function (s) { return '<button type="button" data-act="period" data-v="' + s[0] + '" aria-pressed="' + (P.key === s[0]) + '">' + s[1] + (s[0] === 'dates' ? ' ' + i('calendar', 'dsh-cal') : '') + '</button>'; }).join('') + '</div></div>' +
         (P.long ? '<div class="dsh-herowarn">' + i('alert-triangle') + 'That is more than a year. The figures are right, the chart shows months.</div>' : '') +
         '<div class="vd-hero-figure"><span class="vd-hero-value num" data-count="' + total + '" data-money="' + (rev ? 1 : 0) + '">' + fmtV(total) + '</span>' + dshChange(total, ptotal, true, 'vs ' + P.cmp) + '</div>' +
         (st.heroTable ? heroTbl : chart) +
@@ -282,7 +311,7 @@ PAGES['dashboard'] = {
         '<div class="vd-fact"><span class="vd-fact-label">Before</span><span class="vd-fact-value">' + fmtV(ptotal) + '</span><span class="vd-fact-note">' + esc(P.cmp) + '</span></div></div></div></div>';
 
       /* right now */
-      var now = NOW(), cars = M.cars, out = d.bookings.filter(function (x) { return x.status === 'Car Delivered'; });
+      var now = NOW(), cars = d.cars.filter(function (c) { return c.fleet !== 'Sold'; }), out = d.bookings.filter(function (x) { return x.status === 'Car Delivered'; });
       var work = cars.filter(function (c) { return c.inWorkshop; }).length, free = Math.max(0, cars.length - out.length - work);
       var startsToday = d.bookings.filter(function (x) { return x.status !== 'Cancelled' && x.start >= t0 && x.start < tEnd; });
       var endsToday = d.bookings.filter(function (x) { return x.status !== 'Cancelled' && x.end >= t0 && x.end < tEnd; });
@@ -319,7 +348,8 @@ PAGES['dashboard'] = {
       if (V.rev) [['Rental income', 'rent'], ['Delivery fee', 'deliv'], ['Return fee', 'ret'], ['Damage coverage', 'dmg'], ['Other charges', 'other'], ['Deposits held', 'deposits']].forEach(function (q) { k2.push([q[0], money(A[q[1]]), A[q[1]] || C[q[1]] ? dshChange(A[q[1]], C[q[1]], true, cl) : '']); });
       var kpi = function (k, j, small) { return '<div class="vd-kpi vd-rise vd-h-' + (k[4] || 'revenue') + (small ? ' dsh-kpi-sm' : '') + '" style="--i:' + j + '"><span class="lab">' + esc(k[0]) + ' <button type="button" class="dsh-info" data-act="info" data-v="' + esc(defs[k[0]] || '') + '" aria-label="What is ' + esc(k[0]) + '?" title="' + esc(defs[k[0]] || '') + '">' + i('info-circle') + '</button></span><span class="vd-kpi-value num">' + k[1] + '</span>' + (k[2] || '') + (k[3] || '') + '</div>'; };
       var warn = M.cars.filter(function (c) { return !c.rate; }).length ? UI.alert(plural(M.cars.filter(function (c) { return !c.rate; }).length, 'car') + ' have no daily rate, so their days count but their income does not.', 'warn') : '';
-      return '<section class="col gap24 dsh-sec" id="dsh-overview"><div class="vd-top">' + hero + nowCard + '</div>' + warn +
+      if (part === 'now') return '<section class="col gap24 dsh-sec" id="dsh-now">' + nowCard + '</section>';
+      return '<section class="col gap24 dsh-sec" id="dsh-overview"><div class="vd-top' + (part === 'figures' ? ' dsh-top1' : '') + '">' + hero + (part === 'figures' ? '' : nowCard) + '</div>' + warn +
         '<div class="vd-kpi-grid dsh-k1" style="--n:' + k1.length + '">' + k1.map(function (k, j) { return kpi(k, j); }).join('') + '</div>' +
         '<div class="dsh-k2">' + k2.map(function (k, j) { return kpi(k, j, true); }).join('') + '</div>' +
         (V.prof ? '<p class="b2 dsh-note">Expenses are the finished service and repair jobs from Maintenance, the price entered on road tax, insurance and other papers (counted on the day the paper was issued), and everything recorded on the Expenses page (counted on the day the money was spent). A cost that is on a service job or a paper should not also be recorded there, so nothing is counted twice. This period: ' + plural(A.jobs, 'finished job') + ', ' + plural(A.papers, 'paper') + ' and ' + plural(A.rec, 'entry').replace('entrys', 'entries') + ' on the Expenses page.</p>' : '') +
@@ -381,6 +411,7 @@ PAGES['dashboard'] = {
       out += card({ id: 'busy', icon: 'gauge', title: 'How busy each car was', sub: 'The share of the days in the period that the car was rented.', body: '<div class="dsh-rings">' + util.map(function (u) { return '<button type="button" class="dsh-ring' + (st.follow === u.c.id ? ' on' : '') + '" data-follow="' + u.c.id + '">' + UI.chart.ring(u.pct, { size: 84, color: u.pct < 40 ? 'var(--warning)' : 'var(--primary)' }) + '<b>' + esc(u.c.plate) + '</b><small>' + plural(u.days, 'day') + '<br>' + plural(u.bk, 'booking') + '</small></button>'; }).join('') + '</div>', table: { cols: ['Car', 'Busy', 'Days', 'Bookings'], rows: util.map(function (u) { return [u.c.plate, Math.round(u.pct) + '%', String(u.days), String(u.bk)]; }) } });
       var topIncome = V.rev && V.veh, tops = cars.map(function (c) { return { c: c, inc: A.byCar[c.id] || 0, days: A.daysCar[c.id] || 0 }; }).sort(function (a, c) { return topIncome ? c.inc - a.inc : c.days - a.days; }).slice(0, 5);
       out += card({ id: 'top', icon: 'trophy', title: 'Top cars', sub: topIncome ? 'The five that earned the most in the period.' : 'The five that were rented the most in the period.', body: '<ol class="dsh-top">' + tops.map(function (t, k) { return '<li><span class="dsh-rank">' + (k + 1) + '</span><span class="grow"><b>' + esc(t.c.plate) + '</b><small>' + esc(carName(t.c)) + ' · ' + plural(t.days, 'day') + ' rented</small></span><b class="num">' + (topIncome ? money(t.inc) : plural(t.days, 'day')) + '</b></li>'; }).join('') + '</ol>' });
+      out += notCounted(M, 'period', P.from, P.to, P.label.toLowerCase() + ', ' + P.range);
       return chapter('period', 'How the period went', P.label + ', ' + P.range + '. Every figure is set against ' + P.cmp + '.', UI.btn('Change period', { kind: 't', size: 'sm', icon: 'calendar', attrs: { 'data-jump': 'dsh-period-hero' } })) + out + '</section>';
     }
 
@@ -437,6 +468,7 @@ PAGES['dashboard'] = {
       if (low && low.p < 40) ins.push(['zzz', 'bad', low.c.plate + ' was on the road only ' + low.p + '% of the days (' + PP.label.toLowerCase() + ').']);
       var stands = card({ id: 'stand', icon: 'bulb', title: 'What stands out', sub: 'Plain words about the numbers on this page.', body: '<ul class="dsh-ins">' + ins.slice(0, 5).map(function (x) { return '<li class="' + x[1] + '">' + i(x[0]) + '<span>' + esc(x[2]) + '</span></li>'; }).join('') + '</ul>' });
       out += cnts + '<div class="grid dsh-g84">' + (rel || '') + stands + '</div>';
+      out += notCounted(M, 'year', dshMonth(Y, 0), dshMonth(Y + 1, 0), Y === NOW().getFullYear() ? Y + ' so far' : String(Y));
       return chapter('months', 'Month by month', Y + ' against ' + (Y - 1) + '.', picker) + out + '</section>';
     }
 
@@ -560,7 +592,8 @@ PAGES['dashboard'] = {
     }
 
     /* ---------- events ---------- */
-    var jump = function (id) { var el = document.getElementById(id); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' }); el.classList.add('dsh-flash'); setTimeout(function () { el.classList.remove('dsh-flash'); }, 1400); } };
+    var jump = function (id) { var sec = /^dsh-([a-z]+)$/.exec(id); if (sec && st.phone && FOLDS.indexOf(sec[1]) >= 0 && !st.open[sec[1]]) { st.open[sec[1]] = true; draw(); }
+      var el = document.getElementById(id); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' }); el.classList.add('dsh-flash'); setTimeout(function () { el.classList.remove('dsh-flash'); }, 1400); } };
     function setPeriod(v) { st.period = v; dshLS('period', v); draw({ count: true }); }
     function datesPop(anchor) {
       var t0 = new Date(dshD0(NOW()));
@@ -596,6 +629,9 @@ PAGES['dashboard'] = {
       else if (a === 'refresh') doRefresh();
       else if (a === 'slip') ctx.api.uploadSlips();
       else if (a === 'expense') ctx.api.addExpense();
+      else if (a === 'bankin') ctx.api.bankIn();
+      else if (a === 'unfold') { st.open[v] = true; draw(); jump('dsh-' + v); }
+      else if (a === 'notcounted') { ctx.go('reports'); setTimeout(function () { if (typeof rptCarsCounted === 'function') rptCarsCounted(); }, 350); }
       else if (a === 'unfollow') { st.follow = null; draw(); }
       else if (a === 'opencar') ctx.api.openCar(v);
       else if (a === 'info') UI.popover(el, '<p class="b2" style="margin:0;padding:12px 14px">' + esc(v) + '</p>', { width: 280, align: 'start' });
@@ -604,6 +640,8 @@ PAGES['dashboard'] = {
     UI.on(root, 'change', '[data-act="year"],[data-act="idle"]', function (ev, el) { if (el.getAttribute('data-act') === 'year') st.year = +el.value; else st.idle = +el.value; draw(); });
     /* expenses added from the quick button refresh the page through the data bus; every minute the figures are worked out again */
     var timer = setInterval(function () { if (!document.contains(root)) { clearInterval(timer); return; } if (document.hidden || UI.top()) return; st.updated = NOW(); draw(); }, 60000);
+    /* the phone layout follows the screen width */
+    try { var mq = window.matchMedia('(max-width: 760px)'), onMq = function () { if (!document.contains(root)) { mq.removeEventListener('change', onMq); return; } draw(); }; mq.addEventListener('change', onMq); } catch (e) { /* older browsers keep the layout they opened with */ }
     draw({ count: true });
   }
 };

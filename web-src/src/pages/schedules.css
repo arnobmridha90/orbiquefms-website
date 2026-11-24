@@ -2,11 +2,11 @@
 .pg-schedules .sc-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px}
 .pg-schedules .sc-stats .ui-stat{text-align:left;border:0;font:inherit;cursor:pointer;width:100%}
 .pg-schedules .sc-stats .ui-stat[aria-pressed="true"]{outline:2px solid rgb(var(--c) / .6);outline-offset:-2px}
-.pg-schedules .sc-tools{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 16px;margin-bottom:20px}
+.pg-schedules .sc-tools{display:flex;flex-direction:column;gap:12px;padding:12px 16px;margin-bottom:20px}
 .pg-schedules .sc-tools .tabs{border-bottom:0}
 .pg-schedules .sc-fil{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
 .pg-schedules .sc-fil > .inp{width:240px}
-.pg-schedules .sc-range{display:flex;flex-direction:column;gap:4px}
+.pg-schedules .sc-range{display:flex;gap:12px;flex-wrap:wrap}
 .pg-schedules .sc-rl{font-size:13px;color:var(--text2)}
 .pg-schedules .sc-rin{display:flex;align-items:center;gap:6px}
 .pg-schedules .sc-rin .inp{width:150px}
@@ -34,7 +34,7 @@
 .sc-car span{font-size:12.5px;color:var(--text2)}
 .sc-car .sc-plate{border:1px solid var(--divider);border-radius:4px;padding:1px 6px;font-weight:600;letter-spacing:.06em;color:var(--text)}
 .sc-ph{width:84px;flex:none;border-radius:6px;background:var(--hover)}
-.pg-schedules .sc-when{display:flex;flex-direction:column;gap:12px;border-left:1px solid var(--divider);padding-left:18px;min-width:0}
+.pg-schedules .sc-when2{display:flex;flex-direction:column;gap:12px;border-left:1px solid var(--divider);padding-left:18px;min-width:0}
 .pg-schedules .sc-wi{display:flex;gap:8px;align-items:flex-start}
 .pg-schedules .sc-wi > i{color:var(--primary-text);font-size:18px;margin-top:2px}
 .pg-schedules .sc-wi .sc-cap{margin-top:0}
@@ -137,7 +137,7 @@
 .sc-ok{color:rgb(var(--success-rgb))}
 @media (max-width:1100px){
   .pg-schedules .sc-cb{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .pg-schedules .sc-when{border-left:0;padding-left:0}
+  .pg-schedules .sc-when2{border-left:0;padding-left:0}
 }
 @media (max-width:760px){
   .pg-schedules .sc-stats{gap:8px}
@@ -169,3 +169,55 @@
   .pg-schedules .sc-pair{justify-content:center}
   .pg-schedules .sc-more,.pg-schedules .sc-go{justify-content:center}
 }
+/* W4: date chips, per-kind chips, compact list, checks, staff messages, agent km */
+.pg-schedules .sc-trow{display:flex;align-items:center;gap:12px;justify-content:space-between;min-width:0}
+.pg-schedules .sc-trow #sc-tabs{min-width:0;flex:1}
+.pg-schedules .sc-view{display:flex;gap:4px;flex:none}
+.pg-schedules .sc-view .ib[aria-pressed="true"]{background:rgb(var(--primary-rgb) / .12);color:var(--primary-text,var(--primary))}
+.pg-schedules .sc-when,.pg-schedules .sc-krow{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.pg-schedules .sc-when::-webkit-scrollbar,.pg-schedules .sc-krow::-webkit-scrollbar{display:none}
+.pg-schedules .sc-when .ui-fchip,.pg-schedules .sc-krow .ui-fchip{height:36px;flex:none}
+.pg-schedules .sc-kinds{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--divider);padding-top:10px}
+.pg-schedules .sc-ktot{font-weight:600}
+.pg-schedules .sc-range[hidden]{display:none}
+.pg-schedules .sc-range .ui-dtf,.pg-schedules .sc-range > div{min-width:180px}
+.pg-schedules .sc-checks{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+.pg-schedules .sc-kind.sm{font-size:11.5px;padding:3px 8px;white-space:nowrap}
+.pg-schedules .sc-lines{padding:0;overflow:hidden}
+.pg-schedules .sc-line{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--divider);cursor:pointer;min-height:56px;border-left:3px solid transparent}
+.pg-schedules .sc-line:last-child{border-bottom:0}
+.pg-schedules .sc-line:hover{background:var(--hover)}
+.pg-schedules .sc-line.bad{border-left-color:var(--error)}
+.pg-schedules .sc-line.warn{border-left-color:var(--warning)}
+.pg-schedules .sc-lt{display:flex;flex-direction:column;align-items:flex-start;min-width:74px}
+.pg-schedules .sc-lt b{color:var(--text);white-space:nowrap}
+.pg-schedules .sc-lt small{color:var(--text3);font-size:12px}
+.pg-schedules .sc-lm{display:flex;flex-direction:column;min-width:0;flex:1}
+.pg-schedules .sc-lm b{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-schedules .sc-lm .b2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-schedules .sc-lc{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
+.pg-schedules .sc-pair .ib{min-width:36px;min-height:36px}
+@media (max-width:760px){
+  .pg-schedules .sc-line{flex-wrap:wrap;gap:6px 10px;padding:10px 12px}
+  .pg-schedules .sc-lm{flex:1 1 60%}
+  .pg-schedules .sc-lc{max-width:none;flex:1 1 100%;justify-content:flex-start}
+  .pg-schedules .sc-range{flex-direction:column}
+  .pg-schedules .sc-range > *{width:100%}
+}
+.sc-prog{display:flex;flex-direction:column;gap:6px;margin:4px 0 10px}
+.sc-progt{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:inherit;opacity:.85;flex-wrap:wrap}
+.sc-draft{display:inline-flex;align-items:center;gap:4px;color:var(--success-text,var(--success))}
+.sc-in{width:100%;min-height:44px;border:1px solid var(--divider);border-radius:8px;padding:8px 12px;font:inherit;background:var(--paper);color:var(--text)}
+.sc-kmw{min-height:4px}
+.sc-sm .sc-smh{margin:18px 0 8px;align-items:center}
+.sc-smlog{display:flex;flex-direction:column;border:1px solid var(--divider);border-radius:10px}
+.sc-sml{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--divider)}
+.sc-sml:last-child{border-bottom:0}
+.sc-sml .grow{min-width:180px}
+.sc-sml b{color:var(--text)}
+.sc-bad{color:var(--error-text,var(--error))}
+.sc-smdlg .sc-sm{box-shadow:none;border:0;margin:0}
+.sc-smdlg .sc-sm > .card-h{display:none}
+.sc-smdlg .sc-sm > .card-b{padding:0}
+.pg-schedules .sc-q{width:min(360px,100%)}
+@media (max-width:760px){.pg-schedules .sc-q{width:100%}}

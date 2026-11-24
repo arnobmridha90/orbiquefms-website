@@ -1,0 +1,27 @@
+/* where is it now (M7) */
+.tr-tabs { margin-top: 4px; }
+.tr-tabs a { min-height: 40px; display: flex; align-items: center; justify-content: center; }
+.tr-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--t-grey); }
+.tr-dot.Moving { background: var(--t-green); } .tr-dot.Parked { background: var(--t-blue); } .tr-dot.Offline { background: #A8AEB8; }
+.fchip.on .tr-dot { box-shadow: 0 0 0 2px rgba(255,255,255,.6); }
+.tr-over { margin-top: 6px; }
+.tr-list { margin-top: 6px; }
+.tr-row { display: flex; align-items: stretch; border-top: 1px solid var(--line); }
+.tr-row:first-child { border-top: 0; }
+.tr-row.over { background: #FFF7F7; }
+.tr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 11px 8px 11px 14px; color: inherit; }
+.tr-main:active { background: #F7F8FA; }
+.tr-plate { font-size: 17px; font-weight: 800; letter-spacing: .03em; }
+.tr-sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.tr-speed { font-size: 14px; font-variant-numeric: tabular-nums; }
+.tr-ign { font-size: 12.5px; color: var(--muted); }
+.tr-ago { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.tr-ago svg { width: 14px; height: 14px; }
+.tr-maps { flex: none; width: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-left: 1px solid var(--line); color: var(--brand-ink); font-size: 12px; font-weight: 700; }
+.tr-maps svg { width: 22px; height: 22px; }
+.tr-maps:active { background: var(--tint); }
+.tr-alarm { min-height: 64px; }
+.tr-aic { width: 38px; height: 38px; border-radius: 11px; background: var(--t-red-bg); color: var(--t-red); display: grid; place-items: center; flex: none; }
+.tr-aic svg { width: 20px; height: 20px; }
+.tr-amap { color: var(--brand-ink); flex: none; width: 44px; height: 44px; }

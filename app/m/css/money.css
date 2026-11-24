@@ -1,0 +1,70 @@
+/* money screens (M4). Shared classes live in base.css. */
+.m4-main .m4-chips { margin-top: 4px; margin-bottom: 8px; }
+.m4-hero { display: block; width: 100%; text-align: left; padding: 14px 16px; margin-bottom: 10px; }
+.m4-hero-k { font-size: 13px; font-weight: 620; color: var(--muted); }
+.m4-hero-v { text-align: left; font-size: 30px; font-weight: 800; letter-spacing: -.025em; margin-top: 2px; }
+.m4-hero-v.neg, .money.neg, b.neg { color: var(--t-red); }
+.m4-hero-note { font-size: 13px; color: #4A5160; margin-top: 4px; line-height: 1.4; }
+.m4-hero-split { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.m4-hero-split span { min-width: 0; }
+.m4-hero-split small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.m4-hero-split b { display: block; text-align: left; font-size: 14.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.btn.m4-bibtn { width: 100%; margin-top: 12px; }
+.m4-tiles { margin-bottom: 4px; }
+.m4-tile { display: block; width: 100%; min-height: 86px; }
+.m4-tile .v { font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m4-tile.neg .v { color: var(--t-red); }
+.m4-tile.warnv .v { color: var(--t-amber); }
+.m4-sub { font-size: 12px; color: var(--muted); margin-top: 1px; line-height: 1.3; overflow-wrap: anywhere; }
+.m4-sum { margin-bottom: 10px; overflow: hidden; }
+.m4-meths { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin: 0 2px 4px; }
+.m4-meths b { color: var(--text); font-weight: 650; }
+.m4-note { margin: 10px 2px 0; line-height: 1.45; }
+.m4-links .row > svg:first-child { color: var(--brand-ink); }
+
+/* cash */
+.m4-cash .m4-hero-v { font-size: 34px; }
+.m4-person { align-items: center; }
+.m4-pend { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; min-width: 96px; }
+.m4-pend b { font-size: 15px; font-weight: 750; }
+.m4-pend .btn.sm { height: 40px; padding: 0 14px; }
+.m4-bi.voided .c2-end { color: var(--faint); text-decoration: line-through; }
+.carfield.m4-static { background: var(--bg); border-color: transparent; }
+.carfield .grow b { display: block; }
+.carfield .grow small { display: block; font-size: 12.5px; }
+.m4-slip { margin-top: 12px; }
+
+/* my money */
+.carfield.m4-whobtn { margin: 4px 0 10px; }
+.m4-people { display: grid; gap: 10px; }
+.m4-pcard { display: block; padding: 12px 14px; color: var(--text); }
+.m4-pcard:active { background: #F7F8FA; }
+.m4-pcard-h { display: flex; align-items: center; gap: 10px; }
+.m4-pcard-h .grow { flex: 1; min-width: 0; }
+.m4-pcard-h .grow b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m4-pcard-h .grow small { display: block; font-size: 12.5px; }
+.m4-pbal { text-align: center; flex: none; }
+.m4-pbal small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+.m4-pbal b { font-size: 17px; font-weight: 800; }
+.m4-pfig { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); }
+.m4-pfig small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-align: center; }
+.m4-pfig b { display: block; font-size: 13px; font-weight: 650; }
+.seg2.m4-tabs4 { grid-template-columns: repeat(4, 1fr); margin-top: 12px; scroll-margin-top: 70px; }
+.seg2.m4-tabs4 a { font-size: 13px; padding: 9px 2px; min-height: 40px; display: grid; place-items: center; line-height: 1.15; }
+.m4-led { align-items: center; }
+.m4-led .c2-end { min-width: 112px; }
+.m4-in { color: var(--t-green); }
+.m4-out { color: var(--text); }
+.m4-bf { background: var(--bg); }
+.m4-bf .c2-t1 { color: #4A5160; }
+
+/* instalments */
+.m4-month { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.m4-month .iconbtn { width: 44px; height: 44px; background: var(--card); border: 1px solid var(--line); }
+.m4-month .m4-next svg { transform: rotate(180deg); }
+.m4-mlabel { flex: 1; min-height: 44px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-weight: 700; font-size: 15.5px; text-align: center; padding: 4px 8px; }
+.m4-mlabel small { display: block; font-size: 11.5px; font-weight: 550; color: var(--muted); }
+.m4-insttot { margin: 0 2px 8px; }
+.m4-inst { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
+.m4-inst .c2-end { padding-top: 2px; }
+.m4-led .c2-t1 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
