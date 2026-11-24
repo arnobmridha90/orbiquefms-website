@@ -645,7 +645,7 @@ function route() {
   var h = (location.hash || '#home').slice(1).split('/');
   return { name: h[0] || 'home', a: h[1], b: h[2] };
 }
-var TAB_OF = { home: 'home', bookings: 'bookings', booking: 'bookings', edit: 'bookings', new: 'new', chat: 'chat', more: 'more', schedules: 'more', cars: 'more', customers: 'more', money: 'more', notifs: 'more', company: 'more', install: 'more', inbox: 'home', customer: 'more', carinfo: 'more' };
+var TAB_OF = { home: 'home', bookings: 'bookings', booking: 'bookings', new: 'new', chat: 'chat', more: 'more', schedules: 'more', cars: 'more', customers: 'more', money: 'more', notifs: 'more', company: 'more', install: 'more', inbox: 'home', customer: 'more', carinfo: 'more' };
 window.addEventListener('hashchange', function () { closeSheet(true); render(true); });
 window.addEventListener('scroll', function () { var t = $('.top'); if (t) t.classList.toggle('scrolled', window.scrollY > 4); }, { passive: true });
 
@@ -779,7 +779,6 @@ VIEWS.booking = function (r) {
     '<div class="actions"><a class="act" href="tel:' + cu.phone.replace(/[^\d+]/g, '') + '">' + I('phone') + 'Call</a><a class="act" href="' + wa + '" target="_blank" rel="noopener">' + I('wa') + 'WhatsApp</a>' +
     '<button class="act" onclick="payment(\'' + b.id + '\')">' + I('cash') + 'Payment</button><button class="act" onclick="editBk(\'' + b.id + '\')">' + I('edit') + 'Change</button></div>' +
     (step ? '<div style="margin-top:12px">' + step + '</div>' : '') +
-    '<div style="margin-top:8px"><button class="btn ghost" onclick="editBk(\'' + b.id + '\')">' + I('edit') + 'Edit booking details</button></div>' +
     '<div class="sec"><h2>Money</h2><span class="small b ' + (p.balance > 0 && b.status !== 'Cancelled' ? 'bal due' : 'bal paid') + '">' + (b.status === 'Cancelled' ? '' : p.balance > 0 ? rm(p.balance) + ' to collect' : 'Fully paid') + '</span></div>' +
     '<div class="list"><div class="sumline"><span>Rent · ' + p.days + ' × ' + rm(b.rate) + '</span><span>' + rm(p.rent) + '</span></div>' +
     (p.cover ? '<div class="sumline"><span>' + p.coverName + '</span><span>' + rm(p.cover) + '</span></div>' : '') +
@@ -846,17 +845,31 @@ function doPayment(id) {
   logIt(b, rm(amt) + ' ' + kind.toLowerCase() + ' received by ' + meth.toLowerCase()); save(); closeSheet();
   notify('pay', rm(amt) + ' received', b.code + ' · ' + cust(b.cust).name + ' · ' + meth, '#booking/' + b.id); render();
 }
-function editBk(id) { NB = null; location.hash = '#edit/' + id; }
-function nbFromBooking(b) {
-  var c = cust(b.cust);
-  return { editId: b.id, cust: b.cust, cname: c.name, cphone: c.phone, newName: '', newPhone: '', q: '', s: b.start, e: b.end, car: b.car, rate: b.rate,
-    pick: b.pickPlace, ret: b.retPlace, cover: b.cover, deposit: b.deposit, note: b.note || '', source: b.source || 'Staff' };
+function editBk(id) {
+  var b = bk(id);
+  sheet('<h3>Change booking</h3><p class="lead">' + esc(b.code) + '. Changes are saved in the history and sent to staff who follow booking changes.</p>' +
+    '<div class="two"><label class="field"><span>Pick-up date</span><input class="inp" type="date" id="es_d" value="' + toLocalInput(b.start) + '"></label><label class="field"><span>Time</span><input class="inp" type="time" id="es_t" value="' + toTimeInput(b.start) + '"></label></div>' +
+    '<div class="two"><label class="field"><span>Return date</span><input class="inp" type="date" id="ee_d" value="' + toLocalInput(b.end) + '"></label><label class="field"><span>Time</span><input class="inp" type="time" id="ee_t" value="' + toTimeInput(b.end) + '"></label></div>' +
+    '<label class="field"><span>Car</span><select class="inp" id="e_car">' + S.cars.map(function (c) { return '<option value="' + c.id + '"' + (c.id === b.car ? ' selected' : '') + '>' + esc(c.plate + ' · ' + c.make + ' ' + c.model) + '</option>'; }).join('') + '</select></label>' +
+    '<label class="field"><span>Return place</span><select class="inp" id="e_rp">' + B().places.map(function (p) { return '<option' + (p === b.retPlace ? ' selected' : '') + '>' + esc(p) + '</option>'; }).join('') + '</select></label>' +
+    '<label class="field"><span>Note for staff</span><textarea class="inp" id="e_note">' + esc(b.note) + '</textarea></label>' +
+    '<button class="btn" onclick="doEdit(\'' + id + '\')">Save changes</button>');
 }
-VIEWS.edit = function (r) {
-  var b = bk(r.a); if (!b) return { html: topbar('Booking', { back: '#bookings' }) + '<main><div class="empty">This booking is not here any more.</div></main>' };
-  if (!NB || NB.editId !== b.id) NB = nbFromBooking(b);
-  return VIEWS.new(r);
-};
+function doEdit(id) {
+  var b = bk(id), s = fromInputs($('#es_d').value, $('#es_t').value), e = fromInputs($('#ee_d').value, $('#ee_t').value), ch = [];
+  if (!(e > s)) { say('Return must be after pick-up'); return; }
+  var ncar = $('#e_car').value;
+  if (busy(ncar, s, e, b.id)) { say(car(ncar).plate + ' is booked then'); return; }
+  if (s.getTime() !== new Date(b.start).getTime() || e.getTime() !== new Date(b.end).getTime()) ch.push('dates to ' + dShort(s) + ' ' + hm(s) + ' → ' + dShort(e) + ' ' + hm(e));
+  if (ncar !== b.car) { ch.push('car to ' + car(ncar).plate); b.rate = car(ncar).rate; }
+  if ($('#e_rp').value !== b.retPlace) ch.push('return place to ' + $('#e_rp').value);
+  var note = $('#e_note').value.trim(); if (note !== b.note) ch.push('note');
+  b.start = s.toISOString(); b.end = e.toISOString(); b.car = ncar; b.retPlace = $('#e_rp').value; b.note = note;
+  closeSheet();
+  if (!ch.length) { say('Nothing changed'); return; }
+  logIt(b, 'Changed ' + ch.join(', ')); save();
+  notify('change', b.code + ' changed', S.me.split(' ')[0] + ' changed ' + ch.join(', '), '#booking/' + b.id); render();
+}
 function busy(carId, s, e, except) { return S.bookings.some(function (b) { return b.id !== except && b.car === carId && b.status !== 'Cancelled' && b.status !== 'Returned' && new Date(b.start) < e && new Date(b.end) > s; }); }
 
 /* ---------------- NEW BOOKING ---------------- */
@@ -866,20 +879,18 @@ function nbFresh() {
   return { cust: null, newName: '', newPhone: '', q: '', s: s.toISOString(), e: e.toISOString(), car: null, pick: B().places[0], ret: B().places[0], cover: 'basic', deposit: null, note: '', source: 'Staff' };
 }
 VIEWS.new = function () {
-  if (!NB || (NB.editId && route().name === 'new')) NB = nbFresh();
+  if (!NB) NB = nbFresh();
   var s = new Date(NB.s), e = new Date(NB.e), days = nDays(s, e);
   var custBlock;
-  if (NB.cust && NB.editId) { var c0 = cust(NB.cust); custBlock = '<div><label class="field"><span>Customer name</span><input class="inp" id="nb_cname" value="' + esc(NB.cname != null ? NB.cname : c0.name) + '" autocomplete="off"></label><label class="field"><span>Phone</span><input class="inp num" id="nb_cphone" inputmode="tel" value="' + esc(NB.cphone != null ? NB.cphone : c0.phone) + '"></label></div>' + (c0.flag ? '<p style="margin:-4px 0 10px">' + flagChip(c0.flag) + '</p>' : '') + '<button type="button" class="btn sm ghost" style="margin-bottom:12px" onclick="NB.cust=null;NB.cname=null;NB.cphone=null;render(false,true)">Use another customer</button>'; }
-  else if (NB.cust) { var c = cust(NB.cust); custBlock = '<div class="picked"><div class="av sm" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</div><div class="grow"><div class="b">' + esc(c.name) + ' ' + (c.flag ? flagChip(c.flag) : '') + '</div><div class="small muted nowrap">' + esc(c.phone) + '</div></div><button class="btn sm ghost" onclick="NB.cust=null;render()">Change</button></div>' + (c.flag === 'Blacklisted' ? '<div class="banner warn">' + I('info') + '<div><b>Blacklisted customer.</b> Check with the manager before you confirm.</div></div>' : ''); }
+  if (NB.cust) { var c = cust(NB.cust); custBlock = '<div class="picked"><div class="av sm" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</div><div class="grow"><div class="b">' + esc(c.name) + ' ' + (c.flag ? flagChip(c.flag) : '') + '</div><div class="small muted nowrap">' + esc(c.phone) + '</div></div><button class="btn sm ghost" onclick="NB.cust=null;render()">Change</button></div>' + (c.flag === 'Blacklisted' ? '<div class="banner warn">' + I('info') + '<div><b>Blacklisted customer.</b> Check with the manager before you confirm.</div></div>' : ''); }
   else custBlock = '<label class="field"><span>Find a customer, or type a new one</span><input class="inp" id="nb_q" placeholder="Name or phone" value="' + esc(NB.q) + '" autocomplete="off"></label><div id="nb_sug"></div>' +
     '<div class="two"><label class="field"><span>New customer name</span><input class="inp" id="nb_name" value="' + esc(NB.newName) + '" autocomplete="off"></label><label class="field"><span>Phone</span><input class="inp num" id="nb_phone" inputmode="tel" placeholder="012-345 6789" value="' + esc(NB.newPhone) + '"></label></div>';
-  var cars = S.cars.map(function (c) { var bz = busy(c.id, s, e, NB.editId); return '<button type="button" class="cp ' + (NB.car === c.id ? 'on ' : '') + (bz ? 'busy' : '') + '" ' + (bz ? 'disabled' : 'onclick="NB.car=\'' + c.id + '\';NB.deposit=null;NB.rate=null;render(false,true)"') + '>' + carSVG(c.color, c.shape) + '<div class="p">' + esc(c.plate) + '</div><div class="m">' + esc(c.make + ' ' + c.model) + '</div><div class="r num">' + rm0(c.rate) + '<span class="muted" style="font-weight:500">/day</span></div></button>'; }).join('');
-  var free = S.cars.filter(function (c) { return !busy(c.id, s, e, NB.editId); }).length;
-  var rate = NB.rate != null ? NB.rate : NB.car ? car(NB.car).rate : 0;
-  var tmp = NB.car ? { start: NB.s, end: NB.e, rate: rate, cover: NB.cover, pickPlace: NB.pick, retPlace: NB.ret, extras: [], payments: [] } : null, pr = tmp ? priceOf(tmp) : null;
+  var cars = S.cars.map(function (c) { var bz = busy(c.id, s, e); return '<button type="button" class="cp ' + (NB.car === c.id ? 'on ' : '') + (bz ? 'busy' : '') + '" ' + (bz ? 'disabled' : 'onclick="NB.car=\'' + c.id + '\';NB.deposit=null;render(false,true)"') + '>' + carSVG(c.color, c.shape) + '<div class="p">' + esc(c.plate) + '</div><div class="m">' + esc(c.make + ' ' + c.model) + '</div><div class="r num">' + rm0(c.rate) + '<span class="muted" style="font-weight:500">/day</span></div></button>'; }).join('');
+  var free = S.cars.filter(function (c) { return !busy(c.id, s, e); }).length;
+  var tmp = NB.car ? { start: NB.s, end: NB.e, rate: car(NB.car).rate, cover: NB.cover, pickPlace: NB.pick, retPlace: NB.ret, extras: [], payments: [] } : null, pr = tmp ? priceOf(tmp) : null;
   var dep = NB.deposit != null ? NB.deposit : NB.car ? car(NB.car).deposit : 0;
   var placeOpts = function (sel) { return B().places.map(function (p) { var f = placeFee(p); return '<option value="' + esc(p) + '"' + (p === sel ? ' selected' : '') + '>' + esc(p) + (f ? ' (+' + rm0(f) + ')' : '') + '</option>'; }).join(''); };
-  var html = topbar(NB.editId ? 'Edit booking' : 'New booking', { back: NB.editId ? '#booking/' + NB.editId : '#bookings', sub: NB.editId ? bk(NB.editId).code + ' · every detail can be changed' : B().code + '-' + String(S.nextNo).padStart(5, '0') }) + '<main>' +
+  var html = topbar('New booking', { back: '#bookings', sub: B().code + '-' + String(S.nextNo).padStart(5, '0') }) + '<main>' +
     '<div class="formcard"><h3><span class="stepn">1</span>Customer</h3>' + custBlock + '</div>' +
     '<div class="formcard"><h3><span class="stepn">2</span>Dates</h3>' +
     '<div class="two"><label class="field"><span>Pick-up</span><input class="inp" type="date" id="nb_sd" value="' + toLocalInput(s) + '"></label><label class="field"><span>Time</span><input class="inp" type="time" id="nb_st" value="' + toTimeInput(s) + '"></label></div>' +
@@ -890,27 +901,23 @@ VIEWS.new = function () {
     '<label class="field"><span>Pick-up place</span><select class="inp" id="nb_pick">' + placeOpts(NB.pick) + '</select></label>' +
     '<label class="field"><span>Return place</span><select class="inp" id="nb_ret">' + placeOpts(NB.ret) + '</select></label></div>' +
     '<div class="formcard"><h3><span class="stepn">5</span>Cover and deposit</h3><div class="seg" id="nb_cover">' + COVERS.map(function (c) { return '<button type="button" data-v="' + c.id + '" class="' + (NB.cover === c.id ? 'on' : '') + '">' + c.name + (c.daily ? '<small>' + rm0(c.daily) + '/day</small>' : '') + '</button>'; }).join('') + '</div>' +
-    (NB.car ? '<label class="field"><span>Price per day (RM)</span><input class="inp num" id="nb_rate" inputmode="decimal" value="' + rate + '"></label>' : '') + '<div class="two"><label class="field"><span>Deposit (RM)</span><input class="inp num" id="nb_dep" inputmode="decimal" value="' + dep + '"></label><label class="field"><span>Booked through</span><select class="inp" id="nb_src">' + ['Staff', 'WhatsApp', 'Website', 'Walk-in'].map(function (x) { return '<option' + (x === NB.source ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label></div>' +
+    '<div class="two"><label class="field"><span>Deposit (RM)</span><input class="inp num" id="nb_dep" inputmode="decimal" value="' + dep + '"></label><label class="field"><span>Booked through</span><select class="inp" id="nb_src">' + ['Staff', 'WhatsApp', 'Website', 'Walk-in'].map(function (x) { return '<option' + (x === NB.source ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label></div>' +
     '<label class="field"><span>Note for staff (optional)</span><textarea class="inp" id="nb_note">' + esc(NB.note) + '</textarea></label></div>' +
     (pr ? '<div class="list" style="margin-bottom:8px"><div class="sumline"><span>Rent · ' + pr.days + ' × ' + rm(tmp.rate) + '</span><span>' + rm(pr.rent) + '</span></div>' + (pr.cover ? '<div class="sumline"><span>' + pr.coverName + '</span><span>' + rm(pr.cover) + '</span></div>' : '') + (pr.places ? '<div class="sumline"><span>Delivery / airport fees</span><span>' + rm(pr.places) + '</span></div>' : '') + '<div class="sumline big"><span>Total</span><span>' + rm(pr.total) + '</span></div><div class="sumline"><span class="muted">Deposit, refundable</span><span class="muted">' + rm(+dep || 0) + '</span></div></div>' : '') +
-    '<button class="btn ghost" style="margin-top:6px" onclick="var back=NB&&NB.editId?\'#booking/\'+NB.editId:\'#bookings\';NB=null;location.hash=back">' + (NB.editId ? 'Cancel changes' : 'Discard') + '</button></main>' +
-    '<div class="stickybar"><div class="stickybar-in"><div class="tot">' + (pr ? '<b class="num">' + rm(pr.total) + '</b><span>' + pr.days + ' day' + (pr.days > 1 ? 's' : '') + ' + ' + rm0(+dep || 0) + ' deposit</span>' : '<b style="font-size:15px">Choose a car</b><span>to see the price</span>') + '</div><button class="btn" id="nb_save" onclick="saveNew()">' + I('check', 2.4) + (NB.editId ? 'Save changes' : 'Save booking') + '</button></div></div>';
+    '<button class="btn ghost" style="margin-top:6px" onclick="NB=null;location.hash=\'#bookings\'">Discard</button></main>' +
+    '<div class="stickybar"><div class="stickybar-in"><div class="tot">' + (pr ? '<b class="num">' + rm(pr.total) + '</b><span>' + pr.days + ' day' + (pr.days > 1 ? 's' : '') + ' + ' + rm0(+dep || 0) + ' deposit</span>' : '<b style="font-size:15px">Choose a car</b><span>to see the price</span>') + '</div><button class="btn" id="nb_save" onclick="saveNew()">' + I('check', 2.4) + 'Save booking</button></div></div>';
   return { html: html, noNav: true, keepScroll: true, after: function () {
     var keep = function () {
       if ($('#nb_name')) { NB.newName = $('#nb_name').value; NB.newPhone = $('#nb_phone').value; }
       NB.note = $('#nb_note').value; NB.deposit = parseFloat($('#nb_dep').value) || 0; NB.source = $('#nb_src').value;
-      if ($('#nb_cname')) { NB.cname = $('#nb_cname').value; NB.cphone = $('#nb_cphone').value; }
     };
-    var rt = $('#nb_rate'); if (rt) rt.addEventListener('change', function () { keep(); var v = parseFloat(rt.value.replace(/[^\d.]/g, '')); NB.rate = v >= 0 ? v : null; render(false, true); });
-    var cn = $('#nb_cname'); if (cn) cn.addEventListener('input', keep);
-    var cph = $('#nb_cphone'); if (cph) cph.addEventListener('input', function () { if (cph.value.replace(/\D/g, '').length > 2) cph.value = fmtPhone(cph.value); keep(); });
     ['nb_note', 'nb_dep', 'nb_src', 'nb_name'].forEach(function (i) { var el = $('#' + i); if (el) el.addEventListener('input', keep); if (el) el.addEventListener('change', keep); });
     var ph = $('#nb_phone'); if (ph) ph.addEventListener('input', function () { var v = fmtPhone(ph.value); if (ph.value.replace(/\D/g, '').length > 2) ph.value = v; keep(); });
     var redate = function () {
       keep(); var s2 = fromInputs($('#nb_sd').value, $('#nb_st').value), e2 = fromInputs($('#nb_ed').value, $('#nb_et').value);
       if (isNaN(s2) || isNaN(e2)) return;
       if (e2 <= s2) { e2 = new Date(s2.getTime() + DAY); }
-      NB.s = s2.toISOString(); NB.e = e2.toISOString(); if (NB.car && busy(NB.car, s2, e2, NB.editId)) { NB.car = null; say('That car is booked for the new dates'); }
+      NB.s = s2.toISOString(); NB.e = e2.toISOString(); if (NB.car && busy(NB.car, s2, e2)) { NB.car = null; say('That car is booked for the new dates'); }
       render(false, true);
     };
     ['nb_sd', 'nb_st', 'nb_ed', 'nb_et'].forEach(function (i) { $('#' + i).addEventListener('change', redate); });
@@ -937,7 +944,6 @@ function saveNew() {
   n.note = $('#nb_note').value.trim(); n.source = $('#nb_src').value; n.deposit = parseFloat($('#nb_dep').value) || 0;
   if (!n.cust && (!n.newName || n.newPhone.replace(/\D/g, '').length < 9)) { say('Choose a customer, or type a name and phone'); return; }
   if (!n.car) { say('Choose a car'); var cp = $('#carpick'); if (cp) cp.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-  if (n.editId) { saveEdit(n); return; }
   var cid = n.cust;
   if (!cid) { cid = 'cu' + uid(); S.customers.push({ id: cid, name: n.newName, phone: fmtPhone(n.newPhone), flag: '' }); }
   var c = car(n.car), b = { id: uid(), code: B().code + '-' + String(S.nextNo++).padStart(5, '0'), cust: cid, car: c.id, start: n.s, end: n.e, pickPlace: n.pick, retPlace: n.ret, cover: n.cover, deposit: n.deposit, rate: c.rate,
@@ -946,35 +952,6 @@ function saveNew() {
   S.bookings.push(b); NB = null; save();
   location.hash = '#booking/' + b.id;
   setTimeout(function () { notify('new', 'New booking ' + b.code, cust(cid).name + ' · ' + c.make + ' ' + c.model + ' · ' + when(b.start), '#booking/' + b.id); }, 350);
-}
-function saveEdit(n) {
-  var b = bk(n.editId), ch = [], s = new Date(n.s), e = new Date(n.e);
-  if (n.cust && $('#nb_cname')) {
-    var nm = $('#nb_cname').value.trim(), ph = fmtPhone($('#nb_cphone').value), c = cust(n.cust);
-    if (!nm || ph.replace(/\D/g, '').length < 10) { say('Type the customer name and phone'); return; }
-    if (nm !== c.name) { ch.push('customer name to ' + nm); c.name = nm; }
-    if (ph !== c.phone) { ch.push('phone to ' + ph); c.phone = ph; }
-  }
-  var cid = n.cust;
-  if (!cid) { cid = 'cu' + uid(); S.customers.push({ id: cid, name: n.newName, phone: fmtPhone(n.newPhone), flag: '' }); }
-  if (cid !== b.cust) ch.push('customer to ' + cust(cid).name);
-  if (busy(n.car, s, e, b.id)) { say(car(n.car).plate + ' is booked then'); return; }
-  var rate = n.rate != null ? n.rate : car(n.car).rate;
-  if (s.getTime() !== new Date(b.start).getTime() || e.getTime() !== new Date(b.end).getTime()) ch.push('dates to ' + dShort(s) + ' ' + hm(s) + ' → ' + dShort(e) + ' ' + hm(e));
-  if (n.car !== b.car) ch.push('car to ' + car(n.car).plate);
-  if (rate !== b.rate) ch.push('price to ' + rm(rate) + ' a day');
-  if (n.pick !== b.pickPlace) ch.push('pick-up place to ' + n.pick);
-  if (n.ret !== b.retPlace) ch.push('return place to ' + n.ret);
-  if (n.cover !== b.cover) ch.push('cover to ' + (COVERS.filter(function (c) { return c.id === n.cover; })[0] || {}).name);
-  if (n.deposit !== b.deposit) ch.push('deposit to ' + rm(n.deposit));
-  var src = n.source === 'Walk-in' ? 'Staff' : n.source; if (src !== b.source) ch.push('booked through ' + n.source);
-  if ((n.note || '') !== (b.note || '')) ch.push('note');
-  b.cust = cid; b.start = n.s; b.end = n.e; b.car = n.car; b.rate = rate; b.pickPlace = n.pick; b.retPlace = n.ret; b.cover = n.cover; b.deposit = n.deposit; b.source = src; b.note = n.note;
-  NB = null;
-  if (!ch.length) { save(); location.hash = '#booking/' + b.id; say('Nothing changed'); return; }
-  logIt(b, 'Changed ' + ch.join(', ')); save();
-  location.hash = '#booking/' + b.id;
-  setTimeout(function () { notify('change', b.code + ' changed', S.me.split(' ')[0] + ' changed ' + ch.join(', '), '#booking/' + b.id); }, 350);
 }
 var _render = render;
 render = function (navd, keep) { var y = window.scrollY; _render(navd); if (keep) window.scrollTo(0, y); };
