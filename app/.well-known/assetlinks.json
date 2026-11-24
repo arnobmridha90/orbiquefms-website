@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.orbique.fms.kilatstaff.demo",
+    "sha256_cert_fingerprints": ["3B:4F:52:35:E1:BA:B4:5D:88:F1:E6:2E:B2:13:2A:53:CB:9C:69:21:91:F9:F8:A4:D2:63:0E:54:95:D6:C0:A7"]
+  }
+}]

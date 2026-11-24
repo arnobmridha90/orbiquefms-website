@@ -1,1 +1,4 @@
-<resources><string name="app_name">Kilat Staff</string></resources>
+<resources>
+  <string name="app_name">Kilat Staff</string>
+  <string name="asset_statements">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://staff-preview.orbiquefms.com\"}}]</string>
+</resources>

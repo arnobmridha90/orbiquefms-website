@@ -6,8 +6,15 @@ android {
     applicationId 'com.orbique.fms.kilatstaff.demo'
     minSdk 24
     targetSdk 34
-    versionCode 1
-    versionName '0.1-demo'
+    versionCode 2
+    versionName '0.2-demo'
   }
+  signingConfigs {
+    // Demo-only signing key, used so the web address can trust this app (no browser bar).
+    // The real app will be signed with a private key kept outside the repository.
+    demo { storeFile file('demo-signing.jks'); storePassword 'orbique-demo'; keyAlias 'demo'; keyPassword 'orbique-demo' }
+  }
+  buildTypes { debug { signingConfig signingConfigs.demo } }
   compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
+dependencies { implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0' }
