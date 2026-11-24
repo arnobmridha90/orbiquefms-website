@@ -195,6 +195,21 @@ section.feature { padding-block: 72px; border-top: 1px solid var(--rule); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* custom features */
+/* staff mobile app: the real mobile web app, live inside a phone frame */
+.mobile .wrap { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); }
+.phone { justify-self: center; position: relative; width: 300px; height: 624px; border-radius: 46px; background: #10161f; padding: 12px; box-shadow: 0 2px 4px rgba(24,38,58,.12), 0 30px 60px -20px rgba(24,38,58,.45); }
+.phone::before { content: ""; position: absolute; top: 20px; left: 50%; width: 84px; height: 22px; margin-left: -42px; border-radius: 999px; background: #10161f; z-index: 3; }
+.phone .screen { position: relative; width: 276px; height: 600px; border-radius: 36px; overflow: hidden; background: #0b0d12; }
+.phone iframe { position: absolute; left: 0; top: 0; width: 390px; height: 848px; border: 0; transform: scale(.7077); transform-origin: 0 0; background: #fff; }
+.phone .poster { position: absolute; inset: 0; z-index: 2; background: #fff; transition: opacity .4s; }
+.phone .shots img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .6s; }
+.phone .shots img.on { opacity: 1; }
+.phone #phone-go { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); font-size: 14px; white-space: nowrap; box-shadow: 0 8px 20px -6px rgba(1,94,91,.6); }
+.phone.live .poster { opacity: 0; pointer-events: none; }
+.mobile .stores { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.mobile .note { font-size: 14px; color: var(--muted); }
+@media (max-width: 900px) { .mobile .wrap { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 360px) { .phone { transform: scale(.9); transform-origin: top center; margin-bottom: -60px; } }
 .custom { padding-block: 72px; border-top: 1px solid var(--rule); }
 .custom .wrap { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: center; }
 .custom .copy { display: grid; gap: 16px; max-width: 480px; }
@@ -622,6 +637,7 @@ footer b { color: var(--ink); font-weight: 600; }
       <a href="#tour">Tour</a>
       <a href="#payments">Payments</a>
       <a href="#schedules">Schedules</a>
+      <a href="#mobile">Mobile app</a>
       <a href="#custom">Custom features</a>
       <a href="#deposits">Deposits</a>
       <div class="sndw" id="sndw">
@@ -642,7 +658,7 @@ footer b { color: var(--ink); font-weight: 600; }
         <p class="lede">Orbique FMS runs a rental fleet from the first enquiry to the deposit refund: who has which car, what has been paid and spent, which summons came in, and what every car earns.</p>
         <div class="ctas">
           <a class="btn btn-primary" href="#demo">Book a demo</a>
-          <a class="btn btn-quiet" href="#tour">See it work</a>
+          <a class="btn btn-quiet" href="https://app.orbiquefms.com" target="_blank" rel="noopener">Try the live demo</a>
         </div>
         <div class="facts"><span>Made in Kuala Lumpur</span><span>Prices in RM</span><span>Custom features on request</span><span>Runs Ventura Car Rental every day</span></div>
       </div>
@@ -1068,6 +1084,32 @@ footer b { color: var(--ink); font-weight: 600; }
             <div class="sig-box"><svg viewBox="0 0 300 82" aria-label="Customer signature"><path id="sigpath" d="M14 58 C 26 20, 40 18, 42 44 S 50 70, 62 40 C 70 20, 78 26, 76 50 C 74 68, 92 60, 102 36 C 108 22, 116 28, 114 48 C 113 62, 128 62, 138 42 L 146 28 C 150 52, 160 66, 176 46 C 186 32, 194 30, 198 44 C 202 58, 214 60, 232 40 C 244 28, 262 30, 286 36"/></svg></div>
             <span class="chip teal" id="signed">Signed 10:58</span>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature band mobile" id="mobile">
+    <div class="wrap">
+      <div class="copy">
+        <span class="eyebrow">Staff mobile app</span>
+        <h2>Your team runs the day from their phone.</h2>
+        <p>The staff app puts handovers, bookings and customer chats in their pocket. It installs with your company's name, logo and colours.</p>
+        <ul class="ticks">
+          <li>Today's handovers and balances to collect on the home screen</li>
+          <li>A new booking in a few taps, with the free cars and the price</li>
+          <li>WhatsApp chats where the booking assistant answers until staff step in</li>
+        </ul>
+        <div class="stores">
+          <a class="btn btn-primary" href="https://staff-preview.orbiquefms.com/m/kilat-staff.apk" download>Download for Android</a>
+          <a class="btn btn-quiet" href="https://staff-preview.orbiquefms.com/m/" target="_blank" rel="noopener">Open in your browser</a>
+        </div>
+        <p class="note">On iPhone, open it in Safari and choose Add to Home Screen. The demo uses made-up data.</p>
+      </div>
+      <div class="phone" id="phone">
+        <div class="screen">
+          <div class="poster"><div class="shots" aria-hidden="true"><img src="img/mobile/home.webp" alt="" class="on"><img src="img/mobile/bookings.webp" alt="" loading="lazy"><img src="img/mobile/new-booking-filled.webp" alt="" loading="lazy"><img src="img/mobile/whatsapp-chat.webp" alt="" loading="lazy"></div><button class="btn btn-primary" type="button" id="phone-go">Try it live</button></div>
+          <iframe id="phone-app" title="Orbique FMS staff app demo" loading="lazy" data-src="https://staff-preview.orbiquefms.com/m/?co=kilat" referrerpolicy="strict-origin-when-cross-origin"></iframe>
         </div>
       </div>
     </div>
@@ -1849,7 +1891,7 @@ footer b { color: var(--ink); font-weight: 600; }
 
   // the rest of the page settles in as it scrolls into view
   gsap.fromTo('.hero-copy > *', { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: .8, stagger: .08, ease: 'power3.out' });
-  gsap.utils.toArray('.tour-head, .feature .copy, .feature .window, .custom .copy, .custom-steps li, .proof .wrap > *, .demo .copy, form.req').forEach(el => {
+  gsap.utils.toArray('.tour-head, .feature .copy, .feature .window, .phone, .custom .copy, .custom-steps li, .proof .wrap > *, .demo .copy, form.req').forEach(el => {
     gsap.fromTo(el, { y: 28, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 90%', once: true } });
   });
   gsap.set('.more-grid > div', { opacity: 0, y: 18 });
@@ -1857,6 +1899,18 @@ footer b { color: var(--ink); font-weight: 600; }
 })();
 </script>
 
+<script>
+/* staff app phone: load the live mobile app only when the visitor asks for it */
+(() => {
+  const ph = document.getElementById('phone'), go = document.getElementById('phone-go'), fr = document.getElementById('phone-app');
+  if (!ph || !go || !fr) return;
+  // cycle the screenshots until the visitor starts the live app
+  const shots = [...ph.querySelectorAll('.shots img')]; let k = 0;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cyc = reduce ? 0 : setInterval(() => { if (document.hidden) return; shots[k].classList.remove('on'); k = (k + 1) % shots.length; shots[k].classList.add('on'); }, 2600);
+  go.addEventListener('click', () => { clearInterval(cyc); fr.src = fr.dataset.src; fr.addEventListener('load', () => ph.classList.add('live'), { once: true }); go.textContent = 'Loading…'; });
+})();
+</script>
 <script>
 /* Soundtrack ("Countdown"): a suspense loop made live with Web Audio (no audio files to download).
    On by default; browsers only allow sound after the visitor's first tap or key press, so it starts then. */
