@@ -1,0 +1,30 @@
+/* Instalments (builder 2) */
+.pg-instalments .ins-head{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
+.pg-instalments .ins-head h1{margin:0;font-size:24px;font-weight:500}
+.pg-instalments .ins-head p{margin:4px 0 0;color:var(--text2);font-size:14px}
+.pg-instalments .ins-top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-bottom:18px}
+.pg-instalments .ins-k{padding:20px 22px;display:flex;flex-direction:column;gap:4px;border-top:3px solid var(--primary)}
+.pg-instalments .ins-k > span{font-size:13.5px;color:var(--text2)}
+.pg-instalments .ins-k b{font-size:22px;font-weight:600}
+.pg-instalments .ins-k small{font-size:13px;color:var(--text3)}
+.pg-instalments .ins-k.bad{border-top-color:var(--error)}
+.pg-instalments .ins-k.bad b{color:var(--error-text)}
+.pg-instalments .ins-f{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.pg-instalments .ins-mon{display:flex;gap:6px;align-items:center}
+.pg-instalments .ins-mon input{flex:1;min-width:0}
+.pg-instalments .ins-list{padding:6px 22px}
+.pg-instalments .ins-row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--divider);flex-wrap:wrap}
+.pg-instalments .ins-row:last-child{border-bottom:0}
+.pg-instalments .ins-row > .grow{min-width:180px}
+.pg-instalments .ins-row b{font-weight:500;font-size:15px}
+.pg-instalments .ins-row small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
+.pg-instalments .ins-amt{text-align:right}
+.pg-instalments .ins-act{display:inline-flex;gap:2px}
+.pg-instalments .ins-pay{min-width:96px}
+.pg-instalments .ins-list .ui-empty{padding:40px 10px}
+@media (max-width:1000px){.pg-instalments .ins-top{grid-template-columns:repeat(2,minmax(0,1fr))}.pg-instalments .ins-f{grid-column:1/-1}}
+@media (max-width:560px){.pg-instalments .ins-top{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.pg-instalments .ins-k{padding:14px}.pg-instalments .ins-k b{font-size:18px}.pg-instalments .ins-list{padding:4px 14px}.pg-instalments .ins-row{gap:8px 10px}.pg-instalments .ins-row > .grow{flex-basis:100%}.pg-instalments .ins-amt{text-align:left;margin-right:auto}}
+.ins-dl{margin:0 0 4px;font-size:14px;color:var(--text2)}
+.ins-dl b{color:var(--text)}
+.ins-hint{display:flex;gap:6px;align-items:flex-start;margin:0}
+@media (max-width:760px){.pg-instalments .ins-head{flex-direction:column;gap:10px}}

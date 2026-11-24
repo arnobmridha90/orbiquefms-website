@@ -1,0 +1,4 @@
+/* FAQs (builder 5) */
+.pg-faqs .fq-q{font-weight:500;color:var(--text);white-space:normal}
+.pg-faqs .fq-a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;color:var(--text2);max-width:520px}
+.pg-faqs .fq-st{border:0;background:none;padding:0;cursor:pointer;min-height:32px}
