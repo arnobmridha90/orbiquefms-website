@@ -1,0 +1,85 @@
+/* ============================================================ Summons (builder 4) */
+.sms-alert .grow{line-height:1.5}
+.sms-cnts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}
+@media (max-width:1250px){.sms-cnts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.sms-cnts{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.sms-cnts > :last-child{grid-column:1 / -1}}
+.sms-cnt{--c:var(--primary-rgb);display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1px solid var(--divider);box-shadow:none;text-align:left;color:var(--text);cursor:pointer;font:inherit;min-width:0;transition:border-color .15s,background-color .15s}
+.sms-cnt:hover{border-color:rgb(var(--c) / .6)}
+.sms-cnt.on{border-color:rgb(var(--c));background:rgb(var(--c) / .07)}
+.sms-cnt.bad{--c:var(--error-rgb)}.sms-cnt.warn{--c:var(--warning-rgb)}.sms-cnt.info{--c:var(--info-rgb)}.sms-cnt.ok{--c:var(--success-rgb)}.sms-cnt.pri{--c:var(--primary-rgb)}
+.sms-ci{flex:none;width:36px;height:36px;border-radius:8px;display:grid;place-items:center;background:rgb(var(--c) / .14);color:rgb(var(--c));font-size:20px}
+.sms-cnt .grow{display:flex;flex-direction:column;min-width:0}
+.sms-cl{font-size:13px;color:var(--text2)}
+.sms-cnt b{font-size:24px;line-height:1.2}
+.sms-cnt .b2{font-size:12px;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:640px){.sms-ci{display:none}.sms-cnt{padding:12px}}
+.sms-card{overflow:hidden}
+.sms-flt{padding:16px 20px 4px}
+.sms-t{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:180px;max-width:280px;white-space:normal}
+.sms-t b{color:var(--text);font-weight:600}
+.sms-code{color:var(--primary-text);border:0;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;padding:2px 8px}
+.sms-code:hover{text-decoration:underline}
+.sms-marks{margin-top:4px}
+.sms-picmark{display:inline-grid;place-items:center;color:var(--text3);font-size:16px}
+.sms-why{max-width:300px;white-space:normal;margin-top:2px}
+.sms-c{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sms-c b{color:var(--text)}
+.sms-drop .ui-dz{padding:18px}
+
+/* drawer */
+.sms-sec{display:flex;flex-direction:column;gap:10px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--divider)}
+.sms-sh{display:flex;align-items:center;gap:10px;min-width:0}
+.sms-sh b{font-size:15px;color:var(--text);flex:none}
+.sms-sh .b2{min-width:0}
+.sms-sh .btn{margin-left:auto}
+.sms-sec > .btn{align-self:flex-start}
+.sms-banner{margin-bottom:16px}
+.sms-pic{border:1px solid var(--divider);border-radius:10px;background:var(--hover);overflow:auto;max-height:420px}
+.sms-picbox{display:flex;align-items:center;justify-content:center;min-height:260px;padding:12px}
+.sms-picbox img{display:block;max-width:100%;max-height:380px;transition:transform .2s;transform-origin:center}
+.sms-pictools{align-items:center}
+.sms-orig{display:block;max-width:100%;margin:0 auto}
+.sms-review{display:flex;flex-direction:column;gap:8px;padding:14px;margin-bottom:18px;border-radius:10px;border:1px solid rgb(var(--warning-rgb) / .5);background:rgb(var(--warning-rgb) / .1)}
+.sms-review > .row i{font-size:20px;color:var(--warning)}
+.sms-review > .row b{color:var(--text)}
+.sms-review p{margin:0}
+.sms-bk{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border:1px solid var(--divider);border-radius:10px;min-width:0}
+.sms-bk b{color:var(--text)}
+.sms-bk.pick{background:var(--hover)}
+.sms-p{margin:4px 0 0}
+.sms-type{display:flex;flex-direction:column;gap:4px}
+.sms-type input{width:100%}
+.sms-money{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;margin:0;font-size:14px}
+.sms-money dt{color:var(--text2)}
+.sms-money dd{margin:0;text-align:right;color:var(--text);display:flex;flex-direction:column;align-items:flex-end}
+.sms-money dd small{font-size:12px;color:var(--text3)}
+.sms-lock{display:flex;align-items:flex-start;gap:8px;margin:0;padding:10px 12px;border-radius:8px;background:var(--hover)}
+.sms-lock i{font-size:17px;flex:none;margin-top:1px}
+.sms-btns{padding-top:4px}
+.sms-form{gap:12px 16px}
+.sms-form > .inp.full,.sms-form > .inp:has(textarea){grid-column:1 / -1}
+.sms-council[hidden]{display:none}
+@media (max-width:640px){.sms-form{grid-template-columns:minmax(0,1fr)}}
+.sms-del{display:flex;justify-content:flex-start;padding-bottom:8px}
+.sms-lead{margin:0 0 14px}
+
+/* import and upload */
+.sms-imp{overflow:auto;max-height:52vh;border:1px solid var(--divider);border-radius:8px}
+.sms-imp .tbl{font-size:13.5px;min-width:820px}
+.sms-imp .tbl th{height:40px;padding:0 10px;position:sticky;top:0;background:var(--paper);z-index:1}
+.sms-imp .tbl td{padding:8px 10px}
+.sms-imp tr.off td{opacity:.6}
+.sms-imp .nw{white-space:nowrap}
+.sms-uplist{display:flex;flex-direction:column}
+.sms-uprow{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-top:1px solid var(--divider);min-width:0}
+.sms-uprow .grow{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sms-uprow b{color:var(--text);min-width:0;max-width:100%}
+.sms-th{flex:none;width:48px;height:48px;border-radius:6px;object-fit:cover;border:1px solid var(--divider);display:grid;place-items:center;background:var(--hover);color:var(--text2);font-size:22px}
+.sms-upacts{flex:none;justify-content:flex-end}
+@media (max-width:640px){.sms-uprow{flex-wrap:wrap}.sms-upacts{width:100%;justify-content:flex-start;padding-left:60px}}
+.chip .tabler-loader-2{animation:sms-spin 1s linear infinite}
+@keyframes sms-spin{to{transform:rotate(360deg)}}
+.pg-summons .srch input:focus{padding-left:37px}
+/* dark: the theme sets --primary-text for light paper only, so lift it here */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pg-summons,:root:not([data-theme="light"]) .ui-ov:has(.sms-sec,.sms-form,.sms-imp,.sms-uplist,.sms-lead,.sms-orig){--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}}
+:root[data-theme="dark"] .pg-summons,:root[data-theme="dark"] .ui-ov:has(.sms-sec,.sms-form,.sms-imp,.sms-uplist,.sms-lead,.sms-orig){--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}

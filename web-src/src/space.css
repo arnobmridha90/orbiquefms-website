@@ -1,0 +1,119 @@
+/* ===================================================================
+   Breathing room (design pass, 2026-10-19). Loaded after every other stylesheet:
+   more space around and inside cards, tables, drawers, dialogs and form sections.
+   =================================================================== */
+
+/* page frame */
+.d-main{padding:32px 36px}
+.pg-h{margin-bottom:32px;gap:16px}
+.pg-h p{margin-top:8px}
+.pg-h .acts{gap:12px}
+.grid{gap:28px}
+
+/* cards */
+.card-h{padding:28px 28px 0;gap:16px}
+.card-b{padding:28px}
+.card-b.tight{padding:20px 28px}
+.tb{padding:20px 28px;gap:14px}
+
+/* tables */
+.tbl th{height:52px;padding:0 18px}
+.tbl td{padding:16px 18px}
+.ui-tbl.compact .ui-t th{height:48px;padding:0 16px}
+.ui-tbl.compact .ui-t td{padding:13px 16px}
+.ui-fb{gap:14px;padding:22px 28px}
+.ui-frow{gap:12px}
+.ui-selbar{padding:12px 28px;gap:12px}
+.ui-pager{padding:18px 28px}
+.ui-cards{gap:14px;padding:16px}
+.ui-card{padding:16px 18px;gap:10px;border-radius:10px}
+
+/* forms */
+.inp{gap:6px}
+.sect-h{padding:16px 22px;gap:10px}
+.sect-b{padding:22px;gap:20px 24px}
+
+/* drawers and dialogs */
+.ui-drw-h{padding:22px 24px 18px 32px;gap:12px}
+.ui-drw-b{padding:28px 32px 36px;gap:26px}
+.ui-drw-f{padding:16px 32px;gap:12px}
+.ui-dlg-h{padding:26px 26px 6px 30px}
+.ui-dlg-b{padding:18px 30px;gap:18px}
+.ui-dlg-f{padding:16px 30px 26px;gap:12px}
+
+@media (max-width:760px){
+  .d-main{padding:20px 16px}
+  .pg-h{margin-bottom:22px}
+  .card-h{padding:20px 18px 0}
+  .card-b{padding:20px 18px}
+  .card-b.tight{padding:16px 18px}
+  .tb,.ui-fb{padding:16px 18px}
+  .ui-pager{padding:14px 16px}
+  .ui-drw-h{padding:18px 16px 14px 20px}
+  .ui-drw-b{padding:20px 18px 28px;gap:20px}
+  .ui-drw-f{padding:14px 18px}
+  .ui-dlg-h{padding:20px 18px 4px 20px}
+  .ui-dlg-b{padding:14px 20px}
+  .ui-dlg-f{padding:12px 20px 20px}
+  .sect-b{padding:18px;gap:16px}
+}
+
+/* ---------- Bookings: the list ---------- */
+.pg-bookings .bkx-pgh{margin-bottom:28px}
+.pg-bookings .bkx-list .ui-t th{padding:0 14px;height:50px}
+.pg-bookings .bkx-list .ui-t td{padding:16px 14px}
+.pg-bookings .bkx-list .ui-t td.ui-ck,.pg-bookings .bkx-list .ui-t th.ui-ck{padding-left:22px;padding-right:6px}
+.pg-bookings .bkx-id{font-size:14px}
+.pg-bookings .bkx-sub{margin-top:4px}
+.pg-bookings .bkx-cu,.pg-bookings .bkx-car{gap:5px}
+.bkx-sts2{gap:7px}
+.bkx-amt{gap:6px}
+.bkx-ics{gap:4px}
+.bkx-ho{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
+.pg-bookings .bkx-ag{display:inline-flex;align-items:center;gap:5px;max-width:120px;font-size:12.5px}
+.pg-bookings .bkx-ag i{font-size:14px;color:var(--text3);flex:none}
+.bkx-ins{height:28px;padding:0 8px 0 9px;gap:5px}
+.bkx-cd{gap:10px}
+.bkx-cd-f{padding-top:10px}
+
+/* ---------- Bookings: the booking drawer ---------- */
+.bkx-dl{gap:24px}
+.bkx-dl.two{grid-template-columns:minmax(0,1fr) 370px;gap:28px}
+.bkx-dl.two .bkx-side{gap:20px}
+.bkx-form{gap:22px}
+.bkx-sec{border-radius:12px}
+.bkx-sec-h{padding:18px 22px;gap:10px}
+.bkx-sec-b{padding:6px 22px 24px}
+#bkx-notes{padding:18px 22px}
+.bkx-g,.bkx-g3{gap:20px 18px}
+#bkx-alerts{gap:12px}
+.bkx-chk,.bkx-chk-b{gap:12px}
+.bkx-chk-res{padding:14px 16px;gap:10px}
+.bkx-sum{gap:10px}
+.bkx-sumr{padding:12px 14px;gap:12px}
+.bkx-card{padding:20px;gap:14px;border-radius:12px}
+.bkx-card-a{gap:10px;padding-top:8px}
+.bkx-sts{gap:10px}
+.bkx-mon{padding:14px 14px 20px;gap:10px}
+.bkx-mon > i{left:14px;right:14px;bottom:9px}
+.bkx-ln{gap:12px;padding:12px 0}
+.bkx-ln-ic{width:34px;height:34px}
+.bkx-ln .grow{gap:2px}
+.bkx-ln-a{gap:2px}
+.bkx-dep{padding:12px 14px;gap:10px}
+@media (max-width:760px){
+  .bkx-sec-h{padding:16px 18px}
+  .bkx-sec-b{padding:4px 18px 20px}
+  .bkx-g,.bkx-g3{gap:16px 14px}
+  .bkx-card{padding:16px}
+}
+
+/* ---------- Customers and Tasks: fewer, roomier columns ---------- */
+.cu-acts{display:inline-flex;align-items:center;gap:6px}
+.cu-nbx{display:inline-grid;place-items:center;width:30px;height:30px}
+.tsk-bk{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.tsk-bk span{color:var(--text)}
+.tsk-bk small{font-size:12.5px;color:var(--text2)}
+.pg-customers .cu-mail{max-width:150px}
+.pg-customers .cu-flags{gap:6px;max-width:150px}
+.pg-customers .ui-t td,.pg-customers .ui-t th{padding-left:14px;padding-right:14px}

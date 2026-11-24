@@ -1,0 +1,31 @@
+/* Signatures (builder 1). .pg-signatures for the page; .sg-* for the drawer and the draw pad. */
+.sg-paper{width:180px;height:56px;border-radius:6px;border:1px solid var(--divider);background:#fff;display:grid;place-items:center;padding:4px 8px;overflow:hidden}
+.sg-paper img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.sg-paper.big{width:min(100%,420px);height:140px;padding:10px 16px}
+.sg-paper.empty{background:var(--hover);border-style:dashed;color:var(--text2);display:flex;flex-direction:column;gap:6px;text-align:center;font-size:13px}
+.sg-paper.empty i{font-size:30px;color:var(--text3)}
+.sg-paper.empty.bad{border-color:var(--error)}
+.sg-acts,.dp-acts{display:inline-flex;align-items:center;gap:2px;justify-content:flex-end}
+.ib.sg-del,.ib.dp-del{color:var(--error)}
+.sg-form,.dp-form{display:flex;flex-direction:column;gap:16px}
+.sg-lbl{font-size:12.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--text2);margin-bottom:8px}
+#sg-img{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+#sg-img > .sg-lbl{margin-bottom:0}
+.sg-meta{margin-top:-2px}
+.sg-help{display:flex;gap:6px;align-items:flex-start;margin:0;font-size:12.5px;color:var(--text2)}
+.sg-help i{font-size:16px;flex:none;margin-top:1px}
+.btn.sg-rm{color:var(--error)}
+.sg-uses,.dp-uses{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:8px;background:var(--hover)}
+.sg-uses > i,.dp-uses > i{font-size:20px;color:var(--primary-text);flex:none;margin-top:1px}
+.sg-uses > div,.dp-uses > div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sg-uses b,.dp-uses b{color:var(--text);font-weight:500}
+.sg-uses a,.dp-uses a{color:var(--primary-text)}
+.sg-pad{position:relative;border:1px dashed var(--input-border);border-radius:10px;background:#fff;overflow:hidden;touch-action:none}
+.sg-pad canvas{display:block;width:100%;height:auto;aspect-ratio:3 / 1;cursor:crosshair;touch-action:none;position:relative;z-index:1}
+.sg-pad-line{position:absolute;left:8%;right:8%;bottom:24%;border-bottom:1.5px solid #c9cbd3}
+.sg-pad-hint{position:absolute;left:8%;bottom:10%;font-size:12px;color:#8a8d98}
+.sg-pad.on .sg-pad-hint{display:none}
+.sg-card{display:flex;align-items:center;gap:12px;min-width:0}
+.sg-card .sg-paper{width:110px;height:44px;flex:none}
+.sg-card-t{display:flex;flex-direction:column;min-width:0;flex:1}
+.sg-card-t b{color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

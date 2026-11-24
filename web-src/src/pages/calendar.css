@@ -1,0 +1,89 @@
+/* Calendar (cl-) */
+.pg-calendar .cl-card{overflow:hidden;--cl-left:208px}
+.pg-calendar .cl-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--divider)}
+.pg-calendar .cl-nav{display:flex;align-items:center;gap:6px;min-width:0}
+.pg-calendar .cl-label{font-size:19px;font-weight:600;margin:0 0 0 8px;color:var(--text);white-space:nowrap}
+.pg-calendar .cl-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pg-calendar .cl-count{color:var(--text2);font-size:14px;white-space:nowrap}
+.pg-calendar .cl-views{display:inline-flex;border:1px solid var(--divider);border-radius:6px;overflow:hidden}
+.pg-calendar .cl-views button{border:0;border-left:1px solid var(--divider);background:var(--paper);color:var(--text2);font:inherit;font-size:13.5px;padding:7px 12px;cursor:pointer;min-height:34px}
+.pg-calendar .cl-views button:first-child{border-left:0}
+.pg-calendar .cl-views button:hover{background:var(--hover)}
+.pg-calendar .cl-views button[aria-selected="true"]{background:rgb(var(--primary-rgb) / .12);color:var(--primary-text);font-weight:600}
+.pg-calendar .cl-legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:10px 16px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--divider)}
+.pg-calendar .cl-legend span{display:inline-flex;align-items:center;gap:6px}
+.pg-calendar .cl-sw{width:14px;height:10px;border-radius:3px;display:inline-block;flex:none}
+.pg-calendar .cl-sw.red,.pg-calendar .cl-ev.red{background:rgb(var(--error-rgb))}
+.pg-calendar .cl-sw.yellow,.pg-calendar .cl-ev.yellow{background:rgb(var(--warning-rgb))}
+.pg-calendar .cl-sw.green,.pg-calendar .cl-ev.green{background:rgb(var(--success-rgb))}
+.pg-calendar .cl-sw.blue,.pg-calendar .cl-ev.blue{background:rgb(var(--info-rgb))}
+.pg-calendar .cl-sw.grey,.pg-calendar .cl-ev.grey{background:rgb(var(--grey-rgb))}
+.pg-calendar .cl-sw.shop,.pg-calendar .cl-ev.shop{background:repeating-linear-gradient(45deg,rgb(var(--grey-rgb) / .95) 0 7px,rgb(var(--grey-rgb) / .7) 7px 14px)}
+.pg-calendar .cl-wrap{overflow:auto;max-height:72vh;position:relative}
+.pg-calendar .cl-grid{display:grid;position:relative}
+.pg-calendar .cl-corner{position:sticky;top:0;left:0;z-index:7;background:var(--paper);display:flex;align-items:flex-end;padding:10px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--divider);border-right:1px solid var(--divider)}
+.pg-calendar .cl-head{position:sticky;top:0;z-index:5;display:grid;background:var(--paper);border-bottom:1px solid var(--divider)}
+.pg-calendar .cl-hd{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:6px 0 8px;font-size:12.5px;color:var(--text2);border-left:1px solid var(--divider);min-width:0}
+.pg-calendar .cl-hd em{font-style:normal;font-size:11px;color:var(--text3);height:14px;text-transform:uppercase;letter-spacing:.04em}
+.pg-calendar .cl-hd b{font-size:14px;font-weight:600;color:var(--text);width:26px;height:26px;display:grid;place-items:center;border-radius:50%}
+.pg-calendar .cl-hd.we{color:var(--text3);background:rgb(var(--grey-rgb) / .07)}
+.pg-calendar .cl-hd.we b{color:var(--text3)}
+.pg-calendar .cl-hd.td{background:rgb(var(--error-rgb) / .1)}
+.pg-calendar .cl-hd.td b{background:rgb(var(--error-rgb));color:#fff}
+.pg-calendar .cl-hd.hr{justify-content:center;padding:14px 0}
+.pg-calendar .cl-hd.hr b{width:auto;height:auto;border-radius:4px;padding:2px 6px;font-size:13px}
+.pg-calendar .cl-car{position:sticky;left:0;z-index:6;background:var(--paper);display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--divider);border-right:1px solid var(--divider);cursor:pointer;min-width:0}
+.pg-calendar .cl-car:hover{background:var(--hover)}
+.pg-calendar .cl-car:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.pg-calendar .cl-ph{width:52px;flex:none;border-radius:5px;background:var(--hover)}
+.pg-calendar .cl-ci{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.pg-calendar .cl-ci b{font-size:14px;color:var(--text);letter-spacing:.04em}
+.pg-calendar .cl-ci span,.pg-calendar .cl-ci small{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-calendar .cl-ci small{color:var(--text3)}
+.pg-calendar .cl-track{position:relative;border-bottom:1px solid var(--divider);min-height:52px}
+.pg-calendar .cl-bg{position:absolute;inset:0;display:flex}
+.pg-calendar .cl-bg i{flex:1;border-left:1px solid var(--divider)}
+.pg-calendar .cl-bg i.we{background:rgb(var(--grey-rgb) / .07)}
+.pg-calendar .cl-bg i.td{background:rgb(var(--error-rgb) / .08)}
+.pg-calendar .cl-now{position:absolute;top:0;bottom:0;width:2px;background:rgb(var(--error-rgb));z-index:1}
+.pg-calendar .cl-ev{position:absolute;height:26px;margin-left:1px;border:0;border-radius:5px;color:#fff;font:inherit;font-size:12.5px;text-align:left;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;z-index:2;box-shadow:0 1px 2px rgb(0 0 0 / .15);min-width:6px}
+.pg-calendar .cl-ev b{font-weight:600}
+.pg-calendar .cl-ev.yellow{color:#1f1600}
+.pg-calendar .cl-ev.cl{border-top-left-radius:0;border-bottom-left-radius:0}
+.pg-calendar .cl-ev.cr{border-top-right-radius:0;border-bottom-right-radius:0}
+.pg-calendar .cl-ev.shop.past{opacity:.6}
+.pg-calendar .cl-ev:hover{filter:brightness(1.08);z-index:3}
+.pg-calendar .cl-ev:focus-visible{outline:2px solid var(--text);outline-offset:1px}
+.pg-calendar .cl-load{display:flex;align-items:center;justify-content:center;gap:8px;padding:80px 16px;color:var(--text2)}
+.pg-calendar .cl-list{display:flex;flex-direction:column;max-height:72vh;overflow:auto}
+.pg-calendar .cl-lday{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;gap:10px;padding:8px 16px;background:var(--hover);border-bottom:1px solid var(--divider);font-size:13.5px;color:var(--text2)}
+.pg-calendar .cl-lday b{color:var(--text);font-weight:600}
+.pg-calendar .cl-li{display:flex;align-items:center;gap:12px;padding:10px 16px;border:0;border-bottom:1px solid var(--divider);background:var(--paper);color:var(--text);font:inherit;text-align:left;cursor:pointer;width:100%}
+.pg-calendar .cl-li:hover{background:var(--hover)}
+.pg-calendar .cl-lt{width:78px;flex:none;color:var(--text2);font-size:13px}
+.pg-calendar .cl-lx{display:flex;flex-direction:column;flex:1;min-width:0}
+.pg-calendar .cl-lx span{font-size:12.5px;color:var(--text2)}
+.pg-calendar .cl-lc{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+/* booking tooltip card (popover lives outside the page root) */
+.cl-pop{padding:0}
+.cl-tip{display:flex;flex-direction:column;font-size:13.5px}
+.cl-tip-h{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-bottom:1px solid var(--divider)}
+.cl-tip-h b{font-size:15px;color:var(--text)}
+.cl-tip-s{display:flex;flex-direction:column;gap:3px;padding:10px 14px;border-bottom:1px solid var(--divider);color:var(--text)}
+.cl-tr{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.cl-tr span{color:var(--text2)}
+.cl-tr b{font-weight:500}
+.cl-tr.st b{font-weight:700}
+.cl-tip-a{display:flex;justify-content:flex-end;padding:10px 14px}
+@media (max-width:760px){
+  .pg-calendar .cl-card{--cl-left:132px}
+  .pg-calendar .cl-ph{display:none}
+  .pg-calendar .cl-car{padding:8px}
+  .pg-calendar .cl-right{width:100%;justify-content:space-between}
+  .pg-calendar .cl-label{font-size:16px}
+  .pg-calendar .cl-li{flex-wrap:wrap}
+  .pg-calendar .cl-lc{width:100%;justify-content:flex-start;padding-left:90px}
+}
+@media (max-width:400px){
+  .pg-calendar .cl-views button{padding:7px 9px;font-size:13px}
+}

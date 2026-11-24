@@ -1,0 +1,63 @@
+/* Website feeds (builder 5): FAQs, reviews, logos, social buttons and WhatsApp inside every design.
+   The designs have their own fixed palettes, so these blocks take the design's colours through currentColor. */
+.ws-sec{padding:64px 0 0}
+.t2 .ws-sec,.t2 > .ws-revs{padding:64px 56px 0}
+.t3 .ws-sec,.t3 > .ws-revs{padding:64px 48px 0}
+.ws-sec h2{margin:0 0 18px}
+.t1 .ws-revs h2{text-align:center;font-size:clamp(26px,3vw,36px);font-weight:500;margin-bottom:28px}
+.t2 .ws-faq,.t3 .ws-faq{margin:0}
+.t1 .ws-soc{margin-right:64px}
+
+.t3 .ws-sec h2{font-family:'Fraunces',serif;font-size:36px}
+.ws-faq{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.ws-faq details{border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-radius:12px;padding:0 18px;background:color-mix(in srgb,currentColor 3%,transparent)}
+.ws-faq summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0;cursor:pointer;font-weight:500}
+.ws-faq summary::-webkit-details-marker{display:none}
+.ws-faq summary b{font-size:22px;font-weight:400;color:var(--primary);transition:transform .2s;flex:none}
+.ws-faq details[open] summary b{transform:rotate(45deg)}
+.ws-faq p{margin:0 0 16px;opacity:.75;line-height:1.6;white-space:pre-line}
+.ws-rev-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.ws-rev{margin:0;border:1px solid color-mix(in srgb,currentColor 14%,transparent);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px;background:color-mix(in srgb,currentColor 3%,transparent)}
+.t1 .ws-rev{background:#151515;border-color:#262626}
+.ws-stars{color:#F5A524;letter-spacing:2px;font-size:16px}
+.ws-rev blockquote{margin:0;line-height:1.6;flex:1;opacity:.85}
+.ws-rev figcaption{display:flex;align-items:center;gap:10px}
+.ws-rev figcaption img,.ws-av{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none}
+.ws-av{display:grid;place-items:center;background:var(--primary);color:var(--on-primary);font-weight:600;font-size:14px}
+.ws-rev figcaption > span:last-child{display:flex;flex-direction:column;min-width:0}
+.ws-rev figcaption small{opacity:.6;font-size:12px}
+.ws-logos{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:14px 34px;padding:48px 0 0}
+.t2 > .ws-logos{padding:48px 56px 0}
+.t3 > .ws-logos{padding:48px 48px 0}
+.ws-logos span{display:grid;place-items:center;height:44px;opacity:.75;font-weight:600}
+.ws-logos img{height:40px;width:auto;max-width:120px;object-fit:contain}
+.t1 .ws-logos img{filter:invert(1) grayscale(1);opacity:.8}
+.ws-soc{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ws-soc a{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;border:1px solid color-mix(in srgb,currentColor 25%,transparent);color:inherit;text-decoration:none;font-size:18px;overflow:hidden}
+.ws-soc a:hover{border-color:var(--primary);color:var(--primary)}
+.ws-soc img{width:20px;height:20px;object-fit:contain}
+.ws-wa{position:sticky;bottom:18px;display:grid;place-items:center;width:52px;height:52px;margin:-70px 18px 18px auto;border-radius:50%;background:#1FA855;box-shadow:0 8px 20px -6px rgb(0 0 0 / .35);z-index:3}
+.ws-wa svg{width:28px;height:28px}
+.ws-blob img{width:100%;height:100%;object-fit:cover}
+.ws-r{min-height:320px}
+.ws-r > img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ws-hero{background-size:cover;background-position:center}
+@media (max-width:900px){.ws-rev-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+@media (max-width:760px){
+  .ws-rev-grid{grid-template-columns:minmax(0,1fr)}
+  .t2 .ws-sec,.t2 > .ws-revs,.t2 > .ws-logos,.t3 .ws-sec,.t3 > .ws-revs,.t3 > .ws-logos{padding-left:16px;padding-right:16px}
+  .ws-sec{padding-top:44px}
+}
+.wg-frame.phone .ws-rev-grid{grid-template-columns:minmax(0,1fr)}
+.wg-frame.phone .ws-sec,.wg-frame.phone .ws-revs,.wg-frame.phone .ws-logos{padding-left:16px;padding-right:16px}
+/* what your website shows */
+.pg-website .ws-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.pg-website .ws-tile{display:flex;align-items:center;gap:12px;border:1px solid var(--divider);border-radius:10px;padding:12px 14px;min-width:0}
+.pg-website .ws-tile .grow{min-width:0}
+.pg-website .ws-tile .b2{overflow:hidden;text-overflow:ellipsis}
+.pg-website .ws-ti{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgb(var(--primary-rgb) / .1);color:var(--primary-text);font-size:20px;flex:none}
+.pg-website .ws-tile .btn{flex:none}
+.pg-website .site .lg{min-height:0;padding:0;position:static;overflow:visible;background:none}
+.pg-website .ws-avlg{width:42px;height:42px;font-size:20px}
+.pg-website .ws-chiplg{height:28px;padding:0 12px}
+.t2-foot.ws-foot,.t3-foot.ws-foot{padding-right:96px}

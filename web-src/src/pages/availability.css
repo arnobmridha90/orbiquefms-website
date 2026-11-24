@@ -1,0 +1,46 @@
+/* Availability Checker (av-) */
+.pg-availability .av-pick{padding:24px;margin-bottom:24px}
+.pg-availability .av-pick-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
+.pg-availability .av-pick-h h1{margin:0 0 2px}
+.pg-availability .av-pick-h p{margin:0}
+.pg-availability .av-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pg-availability .av-lab{font-size:13px;color:var(--text2);margin:20px 0 8px}
+.pg-availability .av-chips{display:flex;flex-wrap:wrap;gap:8px}
+.pg-availability .av-chip{min-height:38px;padding:6px 14px;border-radius:6px;border:1px solid var(--divider);background:var(--paper);color:var(--text);font:inherit;font-size:14.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.pg-availability .av-chip:hover{background:var(--hover)}
+.pg-availability .av-chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.pg-availability .av-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.pg-availability .av-sum{display:flex;align-items:center;gap:8px;margin-top:18px;color:var(--text2)}
+.pg-availability .av-sum i{color:var(--primary-text);font-size:18px}
+.pg-availability .av-h{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;color:var(--text);margin:26px 0 12px}
+.pg-availability .av-h i{font-size:22px}
+.pg-availability .av-h.ok i{color:var(--success)}
+.pg-availability .av-h.warn i{color:var(--warning)}
+.pg-availability .av-h.bad i{color:var(--error-text)}
+.pg-availability .av-h .ui-swrow{flex:none;font-size:14px;font-weight:400}
+.pg-availability .av-p{margin:-4px 0 12px}
+.pg-availability .av-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.pg-availability .av-tile{background:var(--paper);border:1.5px solid var(--divider);border-left-width:4px;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.pg-availability .av-tile.free{border-color:rgb(var(--success-rgb) / .75)}
+.pg-availability .av-tile.check{border-color:rgb(var(--warning-rgb) / .85)}
+.pg-availability .av-tile.booked{border-color:var(--divider);border-left-color:rgb(var(--error-rgb) / .7)}
+.pg-availability .av-tile-t{font-size:16px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pg-availability .av-tile-b{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pg-availability .av-tile-id{display:flex;flex-direction:column;min-width:0}
+.pg-availability .av-tile-id b{font-size:16px;letter-spacing:.08em;color:var(--text)}
+.pg-availability .av-tile-id span{color:var(--text2)}
+.pg-availability .av-ph{width:96px;flex:none;border-radius:6px;background:var(--hover)}
+.pg-availability .av-notes{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.pg-availability .av-notes li{display:flex;align-items:flex-start;gap:6px;font-size:13.5px;color:var(--text2)}
+.pg-availability .av-tile.check .av-notes i{color:var(--warning)}
+.pg-availability .av-tile.booked .av-notes i{color:var(--error-text)}
+.pg-availability .av-notes i{font-size:16px;margin-top:1px;flex:none}
+.pg-availability .av-notes span{flex:1;min-width:0}
+.pg-availability .av-link{border:0;background:none;color:var(--primary-text);font:inherit;font-size:13px;cursor:pointer;padding:0 2px;text-decoration:underline}
+.pg-availability .av-tile-a{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;margin-top:auto}
+.pg-availability .av-err{padding:12px}
+@media (max-width:560px){
+  .pg-availability .av-pick{padding:18px 16px}
+  .pg-availability .av-dates{grid-template-columns:1fr}
+  .pg-availability .av-grid{grid-template-columns:1fr}
+}

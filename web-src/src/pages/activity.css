@@ -1,0 +1,29 @@
+/* Activity log (builder 5) */
+.pg-activity .ac-count{margin-left:auto;align-self:center;white-space:nowrap}
+.pg-activity .ac-tbl{border-top:1px solid var(--divider)}
+.pg-activity .ac-row{display:grid;grid-template-columns:150px 150px minmax(0,1fr) 160px 36px;gap:12px;align-items:center;padding:11px 24px;border-bottom:1px solid var(--divider);font-size:14px;color:var(--text)}
+.pg-activity .ac-row[data-ac]{cursor:pointer}
+.pg-activity .ac-row[data-ac]:hover{background:var(--hover)}
+.pg-activity .ac-row[data-ac]:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.pg-activity .ac-head{font-size:13px;text-transform:uppercase;letter-spacing:.2px;color:var(--text);font-weight:500;padding-top:14px;padding-bottom:14px}
+.pg-activity .ac-when{color:var(--text2);font-size:13.5px}
+.pg-activity .ac-what{min-width:0}
+.pg-activity .ac-what .chip{margin-right:4px;vertical-align:1px}
+.pg-activity .ac-txt{overflow-wrap:anywhere}
+.pg-activity .ac-line{display:block;font-size:12.5px;color:var(--text3);margin-top:3px;overflow-wrap:anywhere}
+.pg-activity .ac-chev{color:var(--text3);display:grid;place-items:center}
+.pg-activity .ac-item.open > .ac-row{background:var(--hover);border-bottom-color:transparent}
+.pg-activity .ac-det{background:var(--hover);padding:6px 24px 16px;border-bottom:1px solid var(--divider);display:flex;flex-direction:column;gap:8px}
+.pg-activity .ac-det ul{margin:0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.pg-activity .ac-det s{color:var(--text3)}
+.pg-activity .ac-det p{margin:0;color:var(--text2)}
+.pg-activity .ui-pager{padding:14px 24px}
+@media (max-width:900px){
+  .pg-activity .ac-head{display:none}
+  .pg-activity .ac-row{grid-template-columns:minmax(0,1fr) 36px;grid-template-areas:"when chev" "what chev" "who chev";gap:4px 8px;padding:12px 16px}
+  .pg-activity .ac-when{grid-area:when}.pg-activity .ac-what{grid-area:what}.pg-activity .ac-chev{grid-area:chev}
+  .pg-activity .ac-who{grid-area:who;font-size:13px;color:var(--text2)}
+  .pg-activity .ac-where{display:none}
+  .pg-activity .ac-det{padding:6px 16px 14px}
+  .pg-activity .ui-pager{padding:12px 16px;flex-wrap:wrap;gap:8px}
+}

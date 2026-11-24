@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FMS Staff</title>
+<meta name="description" content="Orbique FMS staff app demo. All names, numbers and amounts are made up.">
+<meta name="theme-color" content="#0B0D12" id="themeColor">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kilat Staff" id="appleTitle">
+<link rel="manifest" href="manifest-kilat.webmanifest" id="manifestLink">
+<link rel="apple-touch-icon" href="icons/kilat-180.png" id="appleIcon">
+<link rel="icon" href="icons/kilat-192.png" id="favIcon">
+<script>
+/* choose the company before the browser reads the manifest, so each company installs with its own name and icon */
+(function () {
+  var ok = { kilat: 1, padi: 1, bara: 1 }, q = (location.search.match(/[?&]co=(\w+)/) || [])[1], co;
+  try { co = q && ok[q] ? q : (localStorage.getItem('fms.co') || 'kilat'); localStorage.setItem('fms.co', co); } catch (e) { co = q && ok[q] ? q : 'kilat'; }
+  window.__CO = co;
+  var names = { kilat: 'Kilat Staff', padi: 'Padi Emas Staff', bara: 'Bara Staff' };
+  document.getElementById('manifestLink').href = 'manifest-' + co + '.webmanifest';
+  document.getElementById('appleIcon').href = 'icons/' + co + '-180.png';
+  document.getElementById('favIcon').href = 'icons/' + co + '-192.png';
+  document.getElementById('appleTitle').content = names[co];
+  document.title = names[co];
+})();
+</script>
+<link rel="stylesheet" href="css/base.css">
+</head>
+<body>
+<div id="app"></div>
+<div class="toasts" id="toasts"></div>
+<script src="js/core.js"></script>
+<script src="js/home.js"></script>
+<script src="js/bookings.js"></script>
+<script src="js/new-booking.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/inbox.js"></script>
+<script src="js/more.js"></script>
+<script src="js/notifs.js"></script>
+<script src="js/install.js"></script>
+<script src="js/start.js"></script>
+</body>
+</html>
