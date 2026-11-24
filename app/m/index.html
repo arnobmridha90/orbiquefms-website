@@ -576,6 +576,8 @@ function notify(kind, title, body, link, opts) {
   S.notifs.unshift(n); S.notifs = S.notifs.slice(0, 60); save();
   if (!S.prefs[kind]) { refreshBadges(); return; }
   if (!opts.silentToast) toast(n);
+  /* Android app (APK): hand it to the phone when the app is not on screen */
+  if (ANDROID) { try { if (!FMSAndroid.inFront()) FMSAndroid.notify(title, body, n.link || '#inbox'); } catch (e) {} refreshBadges(); return; }
   /* when the app is in the background, also show it as a phone notification */
   if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker && navigator.serviceWorker.controller) {
     navigator.serviceWorker.ready.then(function (reg) { reg.showNotification(title, { body: body, tag: n.id, icon: 'icons/' + CO + '-192.png', badge: 'icons/badge-96.png', data: { url: './' + (n.link || '') } }); });
@@ -609,7 +611,8 @@ function refreshBadges() {
 
 /* ---------------- push (real phone notifications through the server) ---------------- */
 var PUSH = { supported: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window, sub: null, server: null };
-function standalone() { return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+var ANDROID = !!window.FMSAndroid;
+function standalone() { return ANDROID || window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
 function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
 function b64ToBytes(s) { var p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
 var swReg = null;
@@ -1141,8 +1144,10 @@ VIEWS.money = function () {
 /* ---------------- NOTIFICATION SETTINGS ---------------- */
 VIEWS.notifs = function () {
   var perm = 'Notification' in window ? Notification.permission : 'unsupported', on = !!PUSH.sub && perm === 'granted';
+  if (ANDROID) { try { on = FMSAndroid.canNotify(); } catch (e) { on = false; } }
   var status;
-  if (on) status = '<div class="banner" style="background:var(--ok-bg);color:#0E4F2C">' + I('check', 2.4) + '<div><b>Phone notifications are on.</b> They arrive even when the app is closed or the phone is locked.</div></div>';
+  if (ANDROID && !on) status = '<div class="card" style="padding:14px;margin-bottom:12px"><div class="b" style="margin-bottom:4px">Allow notifications for this app</div><div class="small muted" style="margin-bottom:12px">If nothing pops up, allow them in Settings › Apps › Kilat Staff › Notifications.</div><button class="btn" onclick="FMSAndroid.askPermission();setTimeout(render,4000)">' + I('bell') + 'Allow notifications</button></div>';
+  else if (on) status = '<div class="banner" style="background:var(--ok-bg);color:#0E4F2C">' + I('check', 2.4) + '<div><b>Phone notifications are on.</b> They arrive even when the app is closed or the phone is locked.</div></div>';
   else if (isIOS() && !standalone()) status = '<div class="banner warn">' + I('info') + '<div><b>On iPhone, install the app first.</b> Apple only allows notifications from apps on the Home Screen (iOS 16.4 or newer). <a href="#install" style="font-weight:700">How to install</a></div></div>';
   else if (perm === 'denied') status = '<div class="banner warn">' + I('info') + '<div><b>Notifications are blocked</b> for this app in your phone settings. Allow them there, then come back.</div></div>';
   else if (!PUSH.supported) status = '<div class="banner warn">' + I('info') + '<div>This browser cannot show phone notifications. You still see them inside the app.</div></div>';
@@ -1193,6 +1198,7 @@ function simulate(kind) {
   }
   save();
   if (!S.prefs[kind]) { S.notifs.unshift({ id: uid(), kind: ev[0], title: ev[1], body: ev[2], at: now.toISOString(), read: false, link: ev[3] }); save(); refreshBadges(); say('Done. You switched this kind off, so no alert'); return; }
+  if (ANDROID) { say('Coming in 10 seconds. Lock your phone or leave the app'); setTimeout(function () { notify(ev[0], ev[1], ev[2], ev[3]); }, 10000); return; }
   if (PUSH.sub && Notification.permission === 'granted') {
     serverPush(ev[0], ev[1], ev[2], ev[3], 10).then(function () {
       say('Sending in 10 seconds. Lock your phone now');
@@ -1216,6 +1222,7 @@ VIEWS.install = function () {
     '<div class="row"><span class="chip brand">2</span><div class="grow" style="white-space:normal">Tap the <b>Share</b> button ' + I('share').replace('<svg', '<svg style="display:inline;width:18px;height:18px;vertical-align:-3px"') + ' at the bottom.</div></div>' +
     '<div class="row"><span class="chip brand">3</span><div class="grow" style="white-space:normal">Scroll and tap <b>Add to Home Screen</b>, then <b>Add</b>.</div></div>' +
     '<div class="row"><span class="chip brand">4</span><div class="grow" style="white-space:normal">Open <b>' + esc(b.short) + ' Staff</b> from the Home Screen, then turn on notifications in More › Notifications.</div></div></div>' +
+    '<div class="sec"><h2>Android app file (APK)</h2></div><div class="list"><a class="row" href="kilat-staff.apk" download>' + I('install') + '<div class="grow"><div class="t1">Download Kilat Staff APK</div><div class="t2" style="white-space:normal">Open the file and allow installing from this source when asked</div></div></a></div>' +
     '<div class="sec"><h2>On Android (Chrome)</h2></div><div class="list">' +
     '<div class="row"><span class="chip brand">1</span><div class="grow" style="white-space:normal">Tap <b>Install now</b> above if you see it, or the <b>⋮</b> menu › <b>Install app</b> / <b>Add to Home screen</b>.</div></div>' +
     '<div class="row"><span class="chip brand">2</span><div class="grow" style="white-space:normal">Open it from the Home Screen and allow notifications.</div></div></div>') +
