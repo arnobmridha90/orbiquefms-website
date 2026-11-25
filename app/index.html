@@ -9574,20 +9574,25 @@ var QuoteDoc = (function () {
 
     /* terms and notes */
     var tl = terms(q, m, inp.notes), tLines = [];
-    tl.forEach(function (rs, i) { var pre = (i + 1) + '. ', ls = wrapRuns([{ t: pre }].concat(rs), 7.4, 544 - 51.4); ls.forEach(function (l) { tLines.push(l); }); });
+    /* terms sit on the same left edge as every other text (inside the boxes); a long term wraps under its own words, not under the number */
+    var numW = tw((tl.length > 9 ? '10' : '9') + '. ', 7.4);
+    tl.forEach(function (rs, i) { var ls = wrapRuns(rs, 7.4, 521.2 - TX - numW); ls.forEach(function (l, k) { tLines.push({ n: k ? '' : (i + 1) + '.', l: l }); }); });
     need(13.4 + Math.min(tLines.length, 3) * 9.1);
-    text('TERMS & NOTES', 51.4, y, 10.2, 1, P.navy); y += 13.4;
-    tLines.forEach(function (l) { need(9.1); runs(l, 51.4, y, 7.4); y += 9.1; });
+    text('TERMS & NOTES', TX, y, 10.2, 1, P.navy); y += 13.4;
+    tLines.forEach(function (l) { need(9.1); if (l.n) text(l.n, TX, y, 7.4); runs(l.l, TX + numW, y, 7.4); y += 9.1; });
     y = y - 9.1 + 16.1;
 
     /* prepared by | customer acceptance */
     need(48.8 + 8.5 + 31 + 20);
     var bx = 48.8;
-    box(L, y, R - L, bx, P.line, .45); line(275, y, 275, y + bx, P.line, .45);
+    box(L, y, R - L, bx, P.line, .45); line(292, y, 292, y + bx, P.line, .4);
     text('Prepared by', TX, y + 4.7, 8.4, 1); text(co.trading || co.legal || '', TX, y + 15.4, 8.4);
     if (co.legal && co.trading && co.legal.toLowerCase() !== co.trading.toLowerCase()) text('Operated by ' + String(co.legal).replace(/\.+$/, '') + '.', TX, y + 27.2, 7, 0);
-    text('Customer Acceptance', 281, y + 4.7, 8.4, 1);
-    text('Name / Signature: ______________________    Date:', 281, y + 26.1, 8.4); text('____________', 281, y + 36.8, 8.4);
+    text('Customer Acceptance', 298, y + 4.7, 8.4, 1);
+    /* both blanks start at the same point and end at the box's right edge */
+    var bl = 298 + tw('Name / Signature: ', 8.4), blank = function (w) { var u = ''; while (tw(u + '_', 8.4) <= w) u += '_'; return u; };
+    text('Name / Signature:', 298, y + 21.4, 8.4); text(blank(521.2 - bl), bl, y + 21.4, 8.4);
+    text('Date:', 298, y + 34.6, 8.4); text(blank(521.2 - bl), bl, y + 34.6, 8.4);
     y += bx + 8.5;
 
     /* payment bar */
@@ -9601,9 +9606,9 @@ var QuoteDoc = (function () {
         var t0 = ls.length > 1 ? y + 7.6 : y + 12.3; ls.slice(0, 2).forEach(function (l, i) { runs(l, x, t0 + i * 9.5, 7.7); });
       };
       /* the account number never wraps: a long one moves its column left */
-      var acW = Math.max(tw('A/C No.:', 7.7, 1), tw(plain(bank.accNo || ''), 7.7)), acX = Math.max(400, Math.min(455.7, 521.2 - acW));
+      var acW = Math.max(tw('A/C No.:', 7.7, 1), tw(plain(bank.accNo || ''), 7.7)), acX = Math.max(400, Math.min(448.2, 521.2 - acW));
       cell('Account:', bank.accName || co.legal || co.trading, 155.2, 134);
-      cell('Bank:', bank.name || '', 297, acX - 297 - 6);
+      cell('Bank:', bank.name || '', 298, acX - 298 - 6);
       cell('A/C No.:', bank.accNo || '', acX, 521.2 - acX + 2);
       y += 31 + 8.2;
     }
@@ -9612,9 +9617,9 @@ var QuoteDoc = (function () {
     /* footer on every page */
     var foot = [co.legal, co.trading].filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(' | ');
     pages.forEach(function (pg, i) {
-      pg.push({ k: 'line', x1: 45.4, y1: 816.4, x2: 549.9, y2: 816.4, col: P.line, lw: .5 });
-      pg.push({ k: 'text', s: plain(foot), x: 45.4, y: 819.9 + 7 * .76, size: 7, bold: false, col: P.label, align: 'l', w: tw(foot, 7) });
-      pg.push({ k: 'text', s: 'Page ' + (i + 1), x: 549.9, y: 819.9 + 7 * .76, size: 7, bold: false, col: P.label, align: 'r', w: tw('Page ' + (i + 1), 7) });
+      pg.push({ k: 'line', x1: L, y1: 816.4, x2: R, y2: 816.4, col: P.line, lw: .5 });
+      pg.push({ k: 'text', s: plain(foot), x: TX, y: 819.9 + 7 * .76, size: 7, bold: false, col: P.label, align: 'l', w: tw(foot, 7) });
+      pg.push({ k: 'text', s: 'Page ' + (i + 1), x: 521.2, y: 819.9 + 7 * .76, size: 7, bold: false, col: P.label, align: 'r', w: tw('Page ' + (i + 1), 7) });
     });
     void footer;
     return { pages: pages, w: W, h: H, calc: m };
