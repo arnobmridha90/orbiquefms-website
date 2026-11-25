@@ -217,10 +217,11 @@ PAGES['dashboard'] = {
       var html = '<div class="vd dsh">' +
         '<div class="col gap16"><div class="vd-head"><div><h1 class="h4">' + greet + ', ' + esc((u ? u.name : b.owner).split(' ')[0]) + '</h1><div class="muted">' + UI.fmt.long(NOW()) + '</div></div>' +
         '<div class="row wrap gap8 dsh-quick"><span class="cap">Updated ' + tm(st.updated) + ' · refreshes every minute</span>' +
+        (can0('bookings.create') ? UI.btn('New booking', { kind: 'c', size: 'sm', icon: 'plus', attrs: { 'data-act': 'newbooking' } }) : '') +
         (can0('billing.record_payment') ? UI.btn('Upload payment slip', { kind: 'tonal', size: 'sm', icon: 'receipt', attrs: { 'data-act': 'slip' } }) : '') +
         (can0('expenses.view') && typeof ctx.api.bankIn === 'function' ? UI.btn('Bank in cash', { kind: 'tonal', size: 'sm', icon: 'building-bank', attrs: { 'data-act': 'bankin' } }) : '') +
         (can0('expenses.add') || can0('expenses.add_business') ? UI.btn('Add expense', { kind: 'tonal', size: 'sm', icon: 'receipt-2', attrs: { 'data-act': 'expense' } }) : '') +
-        UI.btn('Refresh', { kind: 'o', size: 'sm', icon: 'refresh', attrs: { 'data-act': 'refresh' } }) + '</div></div>' +
+        UI.iconBtn('refresh', 'Refresh now', { size: 'sm', attrs: { 'data-act': 'refresh' } }) + '</div></div>' +
         (st.busy ? '<div class="dsh-busy" role="progressbar" aria-label="Refreshing"><i></i></div>' : '') +
         (st.failed ? UI.alert('Could not refresh just now. Showing the last numbers we had.', 'warn', { action: UI.btn('Try again', { kind: 't', size: 'sm', attrs: { 'data-act': 'refresh' } }) }) : '') +
         '<nav class="vd-navs" data-srow aria-label="Parts of the page">' + shown.filter(function (id) { return chips[id]; }).map(function (id) { return '<button type="button" class="vd-navchip" data-jump="dsh-' + id + '">' + chips[id] + '</button>'; }).join('') + '</nav></div>' +
@@ -335,7 +336,7 @@ PAGES['dashboard'] = {
         'Fleet utilisation': 'The share of the car days in the period that were rented.', 'Average booking value': 'What a booking that starts in the period brings in, without the deposit.',
         'Rental days': 'Days rented in the period. Each rental is cut into 24-hour blocks from its pick-up time.', 'Average rental length': 'How many days a rental that starts in the period lasts.',
         'Rental income': 'Daily rent less discounts.', 'Delivery fee': 'Delivery charges.', 'Return fee': 'Return charges.', 'Damage coverage': 'Damage cover sold with the rentals.', 'Other charges': 'Other charges added to bookings.',
-        'Deposits taken': 'Security deposits taken for bookings that start in the period, including ones already given back. They are not income.'
+        'Deposits on bookings': 'Security deposits on the bookings that start in the period, counted by booking, including ones already given back. They are not income. For the money that came in, see Deposits received under Cash.'
       };
       var k1 = [], k2 = [];
       if (V.prof) {
@@ -347,7 +348,7 @@ PAGES['dashboard'] = {
       if (V.rev) k1.push(['Average booking value', money(A.avgValue), dshChange(A.avgValue, C.avgValue, true, cl), sp('income'), 'revenue']);
       k2.push(['Rental days', n0(A.days), dshChange(A.days, C.days, true, cl)]);
       k2.push(['Average rental length', A.avgLen.toFixed(1) + ' days', dshChange(A.avgLen, C.avgLen, true, cl)]);
-      if (V.rev) [['Rental income', 'rent'], ['Delivery fee', 'deliv'], ['Return fee', 'ret'], ['Damage coverage', 'dmg'], ['Other charges', 'other'], ['Deposits taken', 'deposits']].forEach(function (q) { k2.push([q[0], money(A[q[1]]), A[q[1]] || C[q[1]] ? dshChange(A[q[1]], C[q[1]], true, cl) : '']); });
+      if (V.rev) [['Rental income', 'rent'], ['Delivery fee', 'deliv'], ['Return fee', 'ret'], ['Damage coverage', 'dmg'], ['Other charges', 'other'], ['Deposits on bookings', 'deposits']].forEach(function (q) { k2.push([q[0], money(A[q[1]]), A[q[1]] || C[q[1]] ? dshChange(A[q[1]], C[q[1]], true, cl) : '']); });
       var kpi = function (k, j, small) { return '<div class="vd-kpi vd-rise vd-h-' + (k[4] || 'revenue') + (small ? ' dsh-kpi-sm' : '') + '" style="--i:' + j + '"><span class="lab">' + esc(k[0]) + ' <button type="button" class="dsh-info" data-act="info" data-v="' + esc(defs[k[0]] || '') + '" aria-label="What is ' + esc(k[0]) + '?" title="' + esc(defs[k[0]] || '') + '">' + i('info-circle') + '</button></span><span class="vd-kpi-value num">' + k[1] + '</span>' + (k[2] || '') + (k[3] || '') + '</div>'; };
       var warn = M.cars.filter(function (c) { return !c.rate; }).length ? UI.alert(plural(M.cars.filter(function (c) { return !c.rate; }).length, 'car') + ' have no daily rate, so their days count but their income does not.', 'warn') : '';
       if (part === 'now') return '<section class="col gap24 dsh-sec" id="dsh-now">' + nowCard + '</section>';
@@ -577,7 +578,7 @@ PAGES['dashboard'] = {
       var box = function (title, since, from) {
         var main = 0, side = 0, dep = 0;
         pays.forEach(function (p) { if (p.at < from || p.at > now || p.method === 'Deposit adjustment') return; var x = findBooking(p.booking); if (p.kind === 'Security deposit') dep += p.amount; else if (x && (x.status === 'Pending' || x.status === 'Cancelled')) side += p.amount; else main += p.amount; });
-        return '<div class="card dsh-cash"><div><b>' + title + '</b><span class="b2">' + since + '</span></div><b class="dsh-cashv num">' + UI.fmt.money(main) + '</b><p class="b2">Rental and other payments received. Cash, not revenue.</p><div class="dsh-cashside"><span>On pending or cancelled bookings (not revenue)</span><b class="num">' + UI.fmt.money(side) + '</b><span>Deposits taken (not income)</span><b class="num">' + UI.fmt.money(dep) + '</b></div></div>';
+        return '<div class="card dsh-cash"><div><b>' + title + '</b><span class="b2">' + since + '</span></div><b class="dsh-cashv num">' + UI.fmt.money(main) + '</b><p class="b2">Rental and other payments received. Cash, not revenue.</p><div class="dsh-cashside"><span>On pending or cancelled bookings (not revenue)</span><b class="num">' + UI.fmt.money(side) + '</b><span>Deposits received (not income)</span><b class="num">' + UI.fmt.money(dep) + '</b></div></div>';
       };
       var wait = depLists().wait.map(function (z) { var x = findBooking(z.booking); return x ? { x: x, amt: depDue(z) } : null; }).filter(Boolean);   /* the same list as Deposit refunds */
       var dep = '<div class="card dsh-cash"><div><b>Deposits to give back</b><span class="b2">Car back, what is left after deductions</span></div><div class="row gap8 wrap"><b class="dsh-cashv num">' + UI.fmt.money(sum(wait.map(function (w) { return w.amt; }))) + '</b>' + UI.chip(plural(wait.length, 'booking'), 'grey') + '</div><div class="dsh-deplist">' + wait.map(function (w) { return '<button type="button" data-go="deposits" data-p="' + esc(JSON.stringify({ booking: w.x.code })) + '"><span class="ellip">' + esc(w.x.cust.name) + ' ' + w.x.code + '</span><b class="num">' + UI.fmt.money(w.amt) + '</b></button>'; }).join('') + '</div></div>';
@@ -630,6 +631,7 @@ PAGES['dashboard'] = {
       else if (a === 'more') { st.more[v] = !st.more[v]; draw(); }
       else if (a === 'refresh') doRefresh();
       else if (a === 'slip') ctx.api.uploadSlips();
+      else if (a === 'newbooking') ctx.api.newBooking();
       else if (a === 'expense') ctx.api.addExpense();
       else if (a === 'bankin') ctx.api.bankIn();
       else if (a === 'unfold') { st.open[v] = true; draw(); jump('dsh-' + v); }

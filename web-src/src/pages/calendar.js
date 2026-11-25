@@ -118,7 +118,11 @@ PAGES['calendar'] = {
         (cars.length ? '' : st.q ? UI.empty({ icon: 'car-off', title: 'No car matches "' + st.q + '"', text: 'Try the numbers of the plate, or clear the box.' }) : UI.empty({ icon: 'car-off', title: 'No cars yet', text: 'Add a car on the Cars page to see it here.' }));
     }
     function listHtml(r, ev) {
-      var items = ev.bks.map(function (x) { return { at: x.start, b: x }; }).concat(ev.shop.map(function (w) { return { at: w.from, w: w }; })).sort(function (a, b) { return a.at - b.at; });
+      /* an agenda: each booking shows on its pick-up day and on its return day (a booking that only passes through the
+         range shows once at the top as Continues) */
+      var inR = function (t) { return t >= r.from && t < r.to; }, bi = [];
+      ev.bks.forEach(function (x) { var a = inR(x.start), z = inR(x.end); if (a) bi.push({ at: x.start, b: x, kind: 'out' }); if (z) bi.push({ at: x.end, b: x, kind: 'back' }); if (!a && !z) bi.push({ at: x.start, b: x, kind: 'on' }); });
+      var items = bi.concat(ev.shop.map(function (w) { return { at: w.from, w: w }; })).sort(function (a, b) { return a.at - b.at; });
       if (!items.length) return UI.empty({ icon: 'calendar-off', title: 'No events to display', text: 'No bookings or workshop time in ' + r.label + '.' });
       var groups = {}, order = [];
       items.forEach(function (it) { var k = UI.isoDate(it.at < r.from ? r.from : it.at); if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
@@ -129,8 +133,9 @@ PAGES['calendar'] = {
         return '<div class="cl-lday' + (+dt === +today ? ' td' : '') + '"><span>' + (+dt === +today ? 'Today, ' : '') + WDL[dt.getDay()] + '</span><b>' + UI.fmt.date(dt) + '</b></div>' + groups[k].map(function (it) {
           if (it.w) { var c = carById(it.w.car); return '<button type="button" class="cl-li" data-shop="' + it.w.id + '"><span class="cl-lt">' + (it.at < r.from ? 'Continues' : tm(it.w.from)) + '</span><i class="cl-sw shop"></i><span class="cl-lx"><b>Workshop · ' + esc(it.w.reason) + '</b><span>' + (c ? esc(c.plate) + ' · ' + esc(carName(c)) : '') + ' · until ' + (it.w.to ? UI.fmt.dateTime(it.w.to) : 'no date set') + '</span></span></button>'; }
           var x = it.b;
-          return '<button type="button" class="cl-li" data-bk="' + x.code + '"><span class="cl-lt">' + (it.at < r.from ? 'Continues' : tm(x.start)) + '</span><i class="cl-sw ' + clTone(x) + '"></i><span class="cl-lx"><b>' + esc(x.cust.name) + ' · ' + esc(x.car.plate) + '</b><span>' + x.code + ' · ' + clDays(x) + ', until ' + UI.fmt.dateTime(x.end) + '</span></span><span class="cl-lc">' + UI.status('booking', x.status) + UI.status('payment', x.pay) + '</span></button>';
-        }).join('') + (groups[k].length ? '' : '<div class="cl-lnone">No bookings or workshop time start today.</div>');
+          var back = it.kind === 'back';
+          return '<button type="button" class="cl-li" data-bk="' + x.code + '"><span class="cl-lt">' + (it.kind === 'on' ? 'Continues' : '<b>' + tm(it.at) + '</b>' + UI.chip(back ? 'Return' : 'Pick-up', back ? 'grey' : 'info', { icon: back ? 'arrow-back-up' : 'key' })) + '</span><i class="cl-sw ' + clTone(x) + '"></i><span class="cl-lx"><b>' + esc(x.cust.name) + ' · ' + esc(x.car.plate) + '</b><span>' + x.code + ' · ' + clDays(x) + (back ? ', out since ' + UI.fmt.dateTime(x.start) : ', until ' + UI.fmt.dateTime(x.end)) + '</span></span><span class="cl-lc">' + UI.status('booking', x.status) + UI.status('payment', x.pay) + '</span></button>';
+        }).join('') + (groups[k].length ? '' : '<div class="cl-lnone">No pick-ups, returns or workshop time today.</div>');
       }).join('') + '</div>';
     }
     function pointAnchor(ev, el) {

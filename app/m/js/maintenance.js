@@ -82,6 +82,8 @@ var Maint = (function () {
     (S.expenses || []).forEach(function (e) { if (!e.voided && e.car && kinds.indexOf(e.kind) >= 0 && new Date(e.at).getTime() >= m0 && new Date(e.at).getTime() <= Date.now()) s += +e.amt || 0; });
     return Math.round(s * 100) / 100;
   }
+  /* the booking the car is out on right now (handed over, not back yet), or null */
+  function carOut(carId) { var b = carNow(carId); return b && b.bookingStatus === 'Car Delivered' ? b : null; }
   /* bookings that would clash with workshop time from..to (to null = open ended) */
   function clashes(carId, from, to) {
     var f = new Date(from).getTime(), t = to ? new Date(to).getTime() : Infinity;
@@ -286,6 +288,7 @@ var Maint = (function () {
     var f = { car: c0 ? c0.id : null, type: o.type || '', status: o.status || 'done', date: toLocalInput(new Date()), cost: '', km: '', vendor: mtLastVendor(c0 ? c0.id : null), block: true, back: '', photo: null, remind: !!(td && (td.km || td.days)), remindKm: td && td.km ? String(td.km) : '', remindDays: td && td.days ? String(td.days) : '', note: '' };
     if (o.status === 'planned') f.date = toLocalInput(new Date(Date.now() + DAY));
     var allTypes = types(); if (f.type && allTypes.indexOf(f.type) < 0) allTypes.push(f.type);
+    var mg = formGuard(function () { return [f.car, f.type, f.status, f.photo ? 1 : 0]; });
     var sh = sheet(sheetHead({ done: 'Log a service', planned: 'Plan a job', workshop: 'Car goes into the workshop' }[f.status] || 'Log a service') +
       '<div class="field"><span>Car</span><button type="button" class="carfield" id="mlcar"></button></div>' +
       '<div class="field"><span>What was done</span><div class="seg mt-types" id="mltype">' + allTypes.map(function (t) { return '<button type="button" class="' + (t === f.type ? 'on' : '') + '">' + esc(t) + '</button>'; }).join('') + '</div></div>' +
@@ -301,7 +304,8 @@ var Maint = (function () {
       '<div class="mt-2" id="mlremf"><label class="field"><span>After how many km</span><input class="inp num" id="mlrkm" inputmode="numeric" value="' + esc(f.remindKm) + '" placeholder="10000"></label><label class="field"><span>Or after how many days</span><input class="inp num" id="mlrd" inputmode="numeric" value="' + esc(f.remindDays) + '" placeholder="180"></label></div></div>' +
       '<label class="field"><span>Note (optional)</span><textarea class="inp cr-ta" id="mlnote" rows="2" placeholder="What was done, what the mechanic said"></textarea></label>' +
       '<small class="err" id="mlerr" hidden></small>' +
-      '<div class="sheet-foot"><button type="button" class="btn" id="mlok">Save service</button></div>', null, { full: true });
+      '<div class="sheet-foot"><button type="button" class="btn" id="mlok">Save service</button></div>', null, { full: true, guard: function () { return mg(); } });
+    mg.arm(sh);
     var fillVendors = function (sel) { $('#mlv', sh).innerHTML = '<option value="">Not said</option>' + (S.vendors || []).map(function (v) { return '<option value="' + v.id + '"' + (v.id === sel ? ' selected' : '') + '>' + esc(v.name) + (v.kind && v.kind !== 'Workshop' ? ' (' + esc(v.kind) + ')' : '') + '</option>'; }).join(''); };
     fillVendors(f.vendor);
     var drawCar = function () {
@@ -333,8 +337,17 @@ var Maint = (function () {
         var ds = $('#mldate', sh).value, from = sameDay(ds + 'T12:00:00', new Date()) ? new Date() : new Date(ds + 'T09:00:00'), bk2 = $('#mlback', sh).value;
         curClash = clashes(f.car, from, bk2 ? endOfDay(bk2) : null);
       }
-      box.innerHTML = clashHtml(curClash);
+      /* a car out on rent cannot be in the workshop now: offer to plan it for the day it comes back */
+      var out = f.status === 'workshop' && f.car ? carOut(f.car) : null;
+      box.innerHTML = out ? '<div class="banner red mt-clash mt-out">' + I('warn') + '<div><b>' + esc(car(f.car).plate) + ' is out on rent</b> with ' + esc(cust(out.cust).name) + ' (' + esc(out.code) + ') until ' + esc(when(out.end)) + '. It cannot be in the workshop now.' +
+        '<button type="button" class="btn sm" id="mlplanback">' + I('cal') + 'Plan it for when it is back</button></div></div>' : clashHtml(curClash);
+      var pb = $('#mlplanback', sh); if (pb) pb.onclick = function () {
+        f.status = 'planned'; var back = new Date(out.end), d = toLocalInput(back) < toLocalInput(new Date()) ? toLocalInput(new Date()) : toLocalInput(back);
+        sh.querySelectorAll('#mlst button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === 'planned'); });
+        sync(); $('#mldate', sh).value = d; say('Planned for ' + dShort(d + 'T10:00:00'));
+      };
       var ok = $('#mlok', sh);
+      if (out) { ok.disabled = true; ok.classList.remove('mt-dbtn'); return; }
       if (f.status === 'workshop' && curClash.length) { ok.textContent = 'Put the car in the workshop anyway'; ok.disabled = !can('maintenance.manage_downtime'); ok.classList.toggle('mt-dbtn', true); }
       else { ok.disabled = false; ok.classList.remove('mt-dbtn'); }
     };
@@ -350,7 +363,8 @@ var Maint = (function () {
     $('#mladdv', sh).onclick = function () { addVendor(function (v) { fillVendors(v.id); }); };
     var kmIn = $('#mlkm', sh); kmIn.addEventListener('input', function () { var d = kmIn.value.replace(/[^\d]/g, ''); kmIn.value = d ? (+d).toLocaleString('en-US') : ''; });
     M7.wirePhoto(sh, 'mlph', function (u) { f.photo = u; }, { kind: 'receipt', sample: 'Workshop bill', maxPx: 900 });
-    $('#mlok', sh).onclick = function () {
+    $('#mlok', sh).onclick = function () { mlSave(false); };
+    var mlSave = function (okClash) {
       var err = $('#mlerr', sh), fail = function (t) { err.textContent = t; err.hidden = false; err.scrollIntoView({ block: 'nearest' }); };
       err.hidden = true;
       var c = f.car && car(f.car);
@@ -372,7 +386,13 @@ var Maint = (function () {
         if ((remKm != null && isNaN(remKm)) || (!remKm && !remDays)) return fail('Type after how many km or days to remind you.');
       }
       var back = $('#mlback', sh).value, block = f.status === 'workshop' && $('#mlblock', sh).checked;
+      if (f.status === 'workshop' && carOut(c.id)) return fail(c.plate + ' is out on rent. Plan the job for when it is back.');
       if (block && curClash.length && !can('maintenance.manage_downtime')) return fail('Rentals clash with this. Move them first, or ask the owner for Workshop blocks access.');
+      if (block && curClash.length && !okClash) {
+        confirm({ icon: 'warn', title: 'Block the car over ' + curClash.length + ' booking' + (curClash.length > 1 ? 's' : '') + '?', text: curClash.map(function (b) { return b.code + ' ' + cust(b.cust).name; }).slice(0, 3).join(', ') + (curClash.length > 3 ? ' and more' : '') + ' will need another car.', ok: 'Put in workshop', cancel: 'Go back', primary: 'cancel', danger: true })
+          .then(function (y) { if (y) mlSave(true); });
+        return;
+      }
       var j = { id: uid(), car: c.id, type: f.type, status: f.status, at: at.toISOString(), cost: cost || 0, km: kmv, vendor: $('#mlv', sh).value || null, note: $('#mlnote', sh).value.trim(), photo: f.photo, remindKm: remKm, remindDays: remDays, by: S.me, created: new Date().toISOString(), backAt: null };
       if (f.status === 'done') { j.doneAt = j.at; if (kmv == null) j.kmEst = M7.odo(c.id); }
       S.jobs = S.jobs || []; S.jobs.push(j);
@@ -380,7 +400,7 @@ var Maint = (function () {
       if (f.status === 'workshop') j.startedAt = at.toISOString();
       if (f.status === 'done') doneEffects(j, c);
       audit({ done: 'Service logged', planned: 'Job planned', workshop: 'Car went into the workshop' }[f.status] + ': ' + c.plate + ', ' + f.type + (block && curClash.length ? ' (over ' + curClash.length + ' booking' + (curClash.length > 1 ? 's' : '') + ')' : ''), { car: c.id, link: '#car/' + c.id });
-      save(); closeSheet(); render(false, true);
+      save(); closeSheet(false, true); render(false, true);
       say({ done: 'Service saved', planned: 'Job planned', workshop: 'Car is now in the workshop' }[f.status]);
     };
     return sh;

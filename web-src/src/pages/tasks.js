@@ -8,7 +8,11 @@
 
 /* ---------------- small helpers ---------------- */
 function tskBooking(t) { return t && t.booking ? findBooking(t.booking) : null; }
-function tskWhen(dt) { if (!dt) return '-'; var h = dt.getHours(), m = dt.getMinutes(); return UI.fmt.date(dt) + ' / ' + String(h % 12 || 12).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'am' : 'pm'); }
+function tskWhen(dt) { if (!dt) return '-'; return UI.fmt.date(dt) + ' / ' + tm(dt); }   /* the same '10:00 AM' as Schedules and Settings */
+/* the order the list opens in: open jobs that are late, then today's, then the coming ones (soonest first), then done or
+   cancelled ones (latest first) */
+function tskRank(t, t0) { var open = t.status !== 'Completed' && t.status !== 'Cancelled'; if (!open) return 3; return t.at < t0 ? 0 : t.at < t0 + DAY ? 1 : 2; }
+function tskOrder(a, b) { var t0 = new Date(NOW()).setHours(0, 0, 0, 0), ra = tskRank(a, t0), rb = tskRank(b, t0); return ra - rb || (ra === 3 ? b.at - a.at : a.at - b.at); }
 function tskEmp(id) { return employeeById(id) || byId(D().employees, id); }
 function tskFirst(name) { return String(name || '').split(' ')[0]; }
 
@@ -452,7 +456,7 @@ PAGES['tasks'] = {
         if (sf && t.at < sf) return false; if (stt && t.at >= stt) return false;
         if (q) { var hay = [t.name, t.note, t.type, t.status, t.booking, x ? x.cust.name + ' ' + x.car.plate + ' ' + normPlate(x.car.plate) + ' ' + carName(x.car) : ''].concat(t.agents.map(function (a) { var e = tskEmp(a); return e ? e.name : ''; })).concat((t.photos || []).map(function (ph) { return ph.caption || ''; })).join(' ').toLowerCase(); if (!UI.wordsMatch(hay, q) && !(t.booking && matchBookingCode(q, t.booking))) return false; }
         return true;
-      }).sort(function (a, b) { return b.at - a.at; });
+      }).sort(tskOrder);
     }
     var canEdit = ctx.can('tasks.edit'), canDel = ctx.can('tasks.delete');
     var waChips = function (t) { return t.agents.length ? '<div class="tsk-wachips">' + t.agents.map(function (a) { var e = tskEmp(a), s = (t.wa || {})[a] || 'Not Sent'; return UI.status('wa', s, null, { sm: true, attrs: { title: (e ? e.name : a) + ': ' + s } }); }).join('') + '</div>' : '<span class="faint">-</span>'; };

@@ -32,7 +32,8 @@ VIEWS.company = function () {
     '<p class="small muted" style="margin:10px 4px">If you installed the app, the Home Screen icon stays the company you installed. To get another icon, open the page with that company and add it again.</p></main>';
   return { html: html };
 };
-function switchCo(k) {
+/* load another company's data and look. Returns true when someone is signed in there. */
+function useCo(k) {
   resetViewState(); closeAllSheets();
   CO = k; try { localStorage.setItem('fms.co', k); } catch (e) {}
   S = load();
@@ -41,7 +42,16 @@ function switchCo(k) {
   save(); applyTheme();
   $('#manifestLink').href = 'manifest-' + k + '.webmanifest'; $('#appleIcon').href = 'icons/' + k + '-180.png'; $('#favIcon').href = 'icons/' + k + '-192.png';
   document.title = B().appName; $('#appleTitle').content = B().appName;
-  var signedIn = S.me && staff(S.me) && me().loginActive;
+  return !!(S.me && staff(S.me) && me().loginActive);
+}
+function switchCo(k) {
+  var signedIn = useCo(k);
   history.replaceState(null, '', location.pathname + '?co=' + k + (signedIn ? '#company' : '#signin')); render(); say('Now showing ' + COMPANIES[k].name + (signedIn ? '' : '. Sign in to continue'));
 }
+/* the phone's Back (or Forward) reached a page of another company (?co= in the address): show that company, so the screen, the data and the address always agree */
+window.addEventListener('popstate', function () {
+  var q = (location.search.match(/[?&]co=(\w+)/) || [])[1];
+  if (!q || !COMPANIES[q] || q === CO || !S) return;
+  useCo(q); render(true); say('Now showing ' + COMPANIES[q].name);
+});
 

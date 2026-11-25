@@ -124,16 +124,21 @@ function stLocation(id) {
   var chipsHtml = function () { return agents.length ? agents.map(function (a) { var p = staff(a); return p ? '<span class="chip tone-blue">' + esc(p.name) + '</span>' : ''; }).join('') : '<span class="small muted">Nobody yet</span>'; };
   stForm(l ? 'Edit location' : 'Add location', 'One of your own offices or counters', [{ k: 'name', label: 'Name', v: l ? l.name : '', req: true }, { k: 'short', label: 'Short name', v: l ? l.short : '', req: true, hint: 'Used in lists, like “Cheras”' }, { k: 'pickup', label: 'Customers can pick up here', v: l ? l.pickup : true, type: 'sw' }, { k: 'dropoff', label: 'Customers can drop off here', v: l ? l.dropoff : true, type: 'sw' }],
     function (v) {
-      if (l) { var ch = stDiff(l, v, { pickup: 'pick-up', dropoff: 'drop-off' }); var oa = (l.agents || []).join(','); Object.assign(l, v); l.agents = agents; if (oa !== agents.join(',')) ch.agents = [oa.split(',').filter(Boolean).map(who).join(', '), agents.map(who).join(', ')]; if (!Object.keys(ch).length) return; stSave('Location changed: ' + l.name, ch); }
+      if (l) { var ch = stDiff(l, v, { pickup: 'pick-up', dropoff: 'drop-off' }); var oa = (l.agents || []).join(','), oldShort = l.short; Object.assign(l, v); l.agents = agents;
+        /* the handover fees follow the location: renamed with its short name, and a row added when pick-up or drop-off is switched on */
+        if (oldShort !== l.short) (S.settings.handoverFees || []).forEach(function (f) { if (f.kind === 'Pick-up from our location, ' + oldShort) f.kind = 'Pick-up from our location, ' + l.short; else if (f.kind === 'Drop-off at our location, ' + oldShort) f.kind = 'Drop-off at our location, ' + l.short; });
+        stHandoverForLoc(l); if (oa !== agents.join(',')) ch.agents = [oa.split(',').filter(Boolean).map(who).join(', '), agents.map(who).join(', ')]; if (!Object.keys(ch).length) return; stSave('Location changed: ' + l.name, ch); }
       else { var n = 1; while (byId(list, 'L' + n)) n++; var nl = Object.assign({ id: 'L' + n, agents: agents }, v); list.push(nl); stHandoverForLoc(nl); stSave('Location added: ' + nl.name); }
       say('Location saved');
     }, { extra: '<div class="field"><span>Agents here</span><div class="st-chips st-agents" id="stAg">' + chipsHtml() + '</div><button type="button" class="btn ghost sm" id="stAgPick">' + I('users') + 'Choose agents</button></div>',
       after: function (sh) { $('#stAgPick', sh).onclick = function () { Pickers.staff({ multi: true, selected: agents, title: 'Agents at this location', onPick: function (ps) { agents = ps.map(function (p) { return p.id; }); $('#stAg', sh).innerHTML = chipsHtml(); } }); }; } });
 }
+/* a fee row for each way the location is used (pick-up, drop-off) that does not have one yet */
 function stHandoverForLoc(l) {
-  var hf = S.settings.handoverFees = S.settings.handoverFees || [];
-  if (l.pickup) hf.push({ kind: 'Pick-up from our location, ' + l.short, group: 'delivery', amount: 10, rates: {} });
-  if (l.dropoff) hf.push({ kind: 'Drop-off at our location, ' + l.short, group: 'return', amount: 10, rates: {} });
+  var hf = S.settings.handoverFees = S.settings.handoverFees || [], has = function (k) { return hf.some(function (f) { return f.kind === k; }); };
+  var pk = 'Pick-up from our location, ' + l.short, dk = 'Drop-off at our location, ' + l.short;
+  if (l.pickup && !has(pk)) hf.push({ kind: pk, group: 'delivery', amount: 10, rates: {} });
+  if (l.dropoff && !has(dk)) hf.push({ kind: dk, group: 'return', amount: 10, rates: {} });
 }
 function stPlace(id) {
   var s = S.settings;

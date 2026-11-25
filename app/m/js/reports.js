@@ -5,7 +5,7 @@
    - Bookings and income: Confirmed to Completed bookings only (Pending and Cancelled never count). Each booking is cut into
      24-hour blocks from pick-up; a block counts in the period it starts in. Rental income = (rent - discount) spread evenly
      over the blocks; damage coverage spread the same way; delivery fee and other charges in the first block, return fee in
-     the last. The security deposit is never income (shown as Deposits held).
+     the last. The security deposit is never income (shown apart as the deposits set on these bookings; what is held now is on Money).
    - Money in: every payment received in the period, void ones left out, payments made from a deposit already held left out.
    - Money in and out: money in, against expenses (not money handed to staff) and deposits given back.
    - Profit by car: income as above against what each car cost (running costs, service jobs, papers, instalments).
@@ -79,8 +79,8 @@ function rpInOut(r) {
   outR.forEach(function (x) { var d = day(x.at); d.out += x.amt; d.n++; });
   var list = Object.keys(days).map(function (k) { var d = days[k]; d.net = d.inn - d.out; return d; }).sort(function (a, b) { return b.at - a.at; });
   var part = function (ks) { return rpSum(outR.filter(function (x) { return ks.indexOf(x.kind) >= 0; }), function (x) { return x.amt; }); };
-  var exT = part(['exp', 'fee', 'job', 'paper']), rfT = part(['ref']), ccT = part(['card']);
-  return { list: list, inn: M.total, out: rpSum([exT, rfT, ccT]), ex: exT, rf: rfT, cc: ccT, nPay: M.list.length, nEx: outR.filter(function (x) { return x.kind !== 'ref' && x.kind !== 'card'; }).length, nRf: outR.filter(function (x) { return x.kind === 'ref'; }).length, hide: hide };
+  var exT = part(['exp', 'fee', 'job', 'paper']), rfT = part(['ref']), rtT = part(['rent']), ccT = part(['card']);
+  return { list: list, inn: M.total, out: rpSum([exT, rfT, rtT, ccT]), ex: exT, rf: rfT, rt: rtT, cc: ccT, nPay: M.list.length, nEx: outR.filter(function (x) { return x.kind !== 'ref' && x.kind !== 'rent' && x.kind !== 'card'; }).length, nRf: outR.filter(function (x) { return x.kind === 'ref' || x.kind === 'rent'; }).length, hide: hide };
 }
 function rpProfit(r) {
   var BI = rpIncome(r), rows = Expenses.rows(r.from, r.end, { all: true });
@@ -110,10 +110,10 @@ function rpModels(r) {
   var I1 = rpIncome(r), t = I1.tot;
   out.push({ id: 'income', title: 'Bookings and income', icon: 'list', desc: 'Income from bookings, spread over the days of each rental.',
     kpis: [{ l: 'Earned from bookings', v: t.total, t: 'money', hero: true, note: t.n + ' booking' + (t.n === 1 ? '' : 's'), split: [['Rental', t.rental], ['Delivery fee', t.deliv], ['Return fee', t.ret], ['Damage coverage', t.dmg]].concat(t.other ? [['Other charges', t.other]] : []) },
-      { l: 'Days booked', v: t.days, t: 'int', note: 'Utilisation ' + rpPct(t.util) }, { l: 'Average per booking', v: t.n ? t.total / t.n : 0, t: 'money' }, { l: 'Deposits held', v: t.dep, t: 'money', note: 'Not income' }, { l: 'Cars', v: I1.cars.length, t: 'int', note: 'In the fleet' }],
+      { l: 'Days booked', v: t.days, t: 'int', note: 'Utilisation ' + rpPct(t.util) }, { l: 'Average per booking', v: t.n ? t.total / t.n : 0, t: 'money' }, { l: 'Deposits set on these bookings', v: t.dep, t: 'money', note: 'Not income, not what is held now' }, { l: 'Cars', v: I1.cars.length, t: 'int', note: 'In the fleet' }],
     rowsTitle: 'Income by car', rows: I1.byCar.filter(function (x) { return x.n; }).sort(function (a, b) { return b.total - a.total; }).map(function (x) { return { t1: rpCarName(x.car), t2: x.n + ' booking' + (x.n === 1 ? '' : 's') + ' · ' + x.days + ' day' + (x.days === 1 ? '' : 's') + ' · ' + rpPct(x.days / r.days) + ' used', v: x.total, link: '#car/' + x.car.id }; }),
     totalRow: { l: 'Earned from bookings', v: t.total },
-    notes: ['Rental income = rent minus any discount, spread evenly over the 24-hour blocks of the booking (the first block starts at pick-up). Damage coverage is spread the same way.', 'The delivery fee and other charges count in the period of the first block, the return fee in the period of the last block.', 'The security deposit is never income: it is held and given back, so it is shown apart as Deposits held.', 'Pending and cancelled bookings are never counted as income.'] });
+    notes: ['Rental income = rent minus any discount, spread evenly over the 24-hour blocks of the booking (the first block starts at pick-up). Damage coverage is spread the same way.', 'The delivery fee and other charges count in the period of the first block, the return fee in the period of the last block.', 'The security deposit is never income: it is held and given back. Deposits set on these bookings adds up the deposit on each booking in the period, paid or not. What is held right now is on Money, Deposits held.', 'Pending and cancelled bookings are never counted as income.'] });
   var M = rpPayments(r);
   out.push({ id: 'money', title: 'Money in', icon: 'cash', desc: 'Every payment received in the period, newest first.',
     kpis: [{ l: 'Money in', v: M.total, t: 'money', hero: true, note: M.list.length + ' payment' + (M.list.length === 1 ? '' : 's'), split: [['Rent and charges received', M.total - M.dep], ['Deposits received', M.dep], ['Taken in cash', M.cash]] }, { l: 'Rent and charges received', v: M.total - M.dep, t: 'money', note: 'Paid in this period' }, { l: 'Deposits received', v: M.dep, t: 'money', note: 'Held, not income' }, { l: 'Void payments', v: M.voided, t: 'int', note: 'Left out' }],
@@ -122,7 +122,7 @@ function rpModels(r) {
     notes: ['Void payments are left out' + (M.voided ? ' (' + M.voided + ' in this period)' : '') + '. Payments made from a deposit already held are left out too' + (M.fromDep ? ' (' + M.fromDep + ')' : '') + ': no money came in.', 'Payments on Pending or Cancelled bookings are listed, because the money came in. Deposit refunds are not listed here.'] });
   var IO = rpInOut(r);
   out.push({ id: 'inout', title: 'Money in and out', icon: 'activity', desc: 'What came in and what went out, day by day.',
-    kpis: [{ l: 'Net', v: IO.inn - IO.out, t: 'money', hero: true, signed: true, note: 'Money in minus money out', split: [['Money in', IO.inn], ['Expenses and service', IO.ex], ['Deposits returned', IO.rf]].concat(IO.cc ? [['Card charges', IO.cc]] : []) }, { l: 'Money in', v: IO.inn, t: 'money', note: IO.nPay + ' payment' + (IO.nPay === 1 ? '' : 's') }, { l: 'Money out', v: IO.out, t: 'money', note: IO.nEx + ' expense' + (IO.nEx === 1 ? '' : 's') + ', ' + IO.nRf + ' refund' + (IO.nRf === 1 ? '' : 's') }],
+    kpis: [{ l: 'Net', v: IO.inn - IO.out, t: 'money', hero: true, signed: true, note: 'Money in minus money out', split: [['Money in', IO.inn], ['Expenses and service', IO.ex], ['Deposits returned', IO.rf]].concat(IO.rt ? [['Rent refunded (cancelled)', IO.rt]] : [], IO.cc ? [['Card charges', IO.cc]] : []) }, { l: 'Money in', v: IO.inn, t: 'money', note: IO.nPay + ' payment' + (IO.nPay === 1 ? '' : 's') }, { l: 'Money out', v: IO.out, t: 'money', note: IO.nEx + ' expense' + (IO.nEx === 1 ? '' : 's') + ', ' + IO.nRf + ' refund' + (IO.nRf === 1 ? '' : 's') }],
     rowsTitle: 'By day', rows: IO.list.map(function (d) { return { t1: dLong(d.at), t2: 'In ' + rm(d.inn) + ' · Out ' + rm(d.out), t2money: true, v: d.net, signed: true }; }),
     totalRow: { l: 'Net', v: IO.inn - IO.out, signed: true },
     notes: ['Money in = every payment received (void ones and payments from a deposit left out). Money out = every expense and handover fee, finished service jobs and car papers, every deposit given back, and the charges the card company keeps. Money uses the same figures.', 'Cash banked in and money handed to staff are left out: no money left or entered the company.'].concat(IO.hide ? ['Car instalments are hidden for your role.'] : []) });

@@ -78,3 +78,6 @@ a.card2 { color: inherit; }
 .cr-bk .c2-t1, .cr-bk .c2-t2 { white-space: normal; }
 .cr-bk .c2-t1 { color: var(--brand-ink); }
 .sheet.full > .cr-odolist, .sheet.full > .empty { flex-shrink: 0; }
+.cr-distrust { min-height: 40px; flex-shrink: 0; padding: 0 8px; color: var(--t-amber); }
+.cr-nogo { margin: 0 0 12px; }
+.cr-nogo .btn.sm { margin-top: 8px; display: inline-flex; }

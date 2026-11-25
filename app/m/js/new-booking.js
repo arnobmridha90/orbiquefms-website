@@ -154,6 +154,20 @@ function nbTemp() {
 }
 function nbMoneyMode() { return can('bookings.edit_amounts') ? 'edit' : can('bookings.see_amounts') ? 'see' : 'hidden'; }
 /* customers that already use this phone / IC (never make a duplicate) */
+/* live bookings of the picked customer that overlap the chosen dates */
+function nbOverlaps(n) {
+  n = n || NB; if (!n || !n.cust) return [];
+  var s = new Date(n.s).getTime(), e = new Date(n.e).getTime(); if (!(e > s)) return [];
+  return S.bookings.filter(function (b) { return b.cust === n.cust && b.bookingStatus !== 'Cancelled' && b.bookingStatus !== 'Completed' && new Date(b.start).getTime() < e && new Date(bkHoldEnd(b)).getTime() > s; });
+}
+function nbOverlapText(list) {
+  var c = cust(list[0].cust), one = list.length === 1;
+  return callName(c.name) + ' already has ' + list.map(function (b) { return b.code + ' (' + ((car(b.car) || {}).plate || '') + ')'; }).join(', ') + ' on ' + (one ? 'these dates' : 'these dates: ' + list.length + ' bookings');
+}
+function nbOverlapBanner() {
+  var ov = nbOverlaps(); if (!ov.length) return '';
+  return '<div class="banner amber nb-overlap">' + I('warn') + '<div><b>' + esc(nbOverlapText(ov)) + '.</b> Check it is not the same booking twice. ' + ov.slice(0, 3).map(function (b) { return '<a class="btn link sm" href="#booking/' + b.id + '">Open ' + esc(b.code) + '</a>'; }).join(' ') + '</div></div>';
+}
 function nbDupes(f) {
   var pc = phoneCore(f.phone), id = String(f.ic || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   var out = [];
@@ -188,6 +202,9 @@ function nbProblems() {
     }
     if (NB.car && !(e <= s)) { var m = calcBooking(nbTemp()); if (m.discount > m.rent + m.coverTotal + m.delivery + m['return'] + m.others) add('r_discount', 'price', 'The discount is more than the charges', 'Check the discount'); }
   }
+  /* the driver and the counter need to know where the handover is */
+  if (!nbParsePlace(NB.pick).kind) add('pick', 'places', 'Choose the pick-up place', 'Choose the pick-up place');
+  if (!nbParsePlace(NB.ret).kind) add('ret', 'places', 'Choose the return place', 'Choose the return place');
   /* the driver needs an address to deliver to or collect from */
   if (nbParsePlace(NB.pick).kind === 'client' && !String(NB.pickNote || '').trim()) add('pickNote', 'places', 'Type the delivery address', 'Add the delivery address');
   if (nbParsePlace(NB.ret).kind === 'client' && !String(NB.retNote || '').trim()) add('retNote', 'places', 'Type the collection address', 'Add the collection address');
@@ -227,6 +244,11 @@ function nbCustBanner(c) {
   if (rep) return box('blue', 'star', rep, []);
   return '';
 }
+/* the licence on file (or typed): red when expired, amber when it ends before the car comes back */
+function nbLicBanner() {
+  var ls = typeof licenceState === 'function' ? licenceState({ licenceExp: NB.f.licenceExp }, NB.e) : null; if (!ls) return '';
+  return '<div class="banner ' + ls.tone + ' nb-licb">' + I('warn') + '<div><b>' + esc(ls.text) + '.</b> ' + (ls.tone === 'red' ? 'Ask for a valid licence and type the new expiry date.' : 'Check the licence before the handover.') + '</div></div>';
+}
 function nbDocsLine() {
   var d = NB.docs || {}, names = [];
   [['icFront', 'IC front'], ['icBack', 'IC back'], ['passport', 'Passport'], ['licence', 'Licence'], ['poa', 'Proof of address']].forEach(function (x) { if (d[x[0]]) names.push(x[1]); });
@@ -244,7 +266,7 @@ function nbCustFields(probs, isNew) {
   var icHint = '', icd = digits(f.ic);
   if (icd.length === 12 && /^[\d\s-]+$/.test(f.ic)) { var fa = icFacts(f.ic); icHint = fa.issues.length ? '<span class="hint nb-warn">' + esc(fa.issues.join('. ')) + '</span>' : '<span class="hint">Born ' + esc(fa.facts.born) + ', ' + esc(fa.facts.state) + ', ' + esc(fa.facts.sex) + '</span>'; }
   var licHint = '';
-  if (f.licenceExp) { var le = new Date(f.licenceExp + 'T23:59:00'); if (le < new Date()) licHint = '<span class="err">This licence has expired</span>'; else if (le < new Date(NB.e)) licHint = '<span class="hint nb-warn">The licence expires before the rental ends</span>'; }
+  if (f.licenceExp) { var le = new Date(f.licenceExp + 'T23:59:00'); if (le < new Date()) licHint = '<span class="err">This licence expired on ' + esc(dFull(le)) + '</span>'; else if (le < new Date(NB.e)) licHint = '<span class="hint nb-warn">The licence expires before the rental ends</span>'; }
   var em = (f.emName || f.emPhone) ? [f.emName, f.emRel, f.emPhone].filter(Boolean).join(' · ') : 'Optional';
   return fx('name', 'Full name', 'autocomplete="off" autocapitalize="words" placeholder="As on the IC or passport"') +
     fx('phone', 'Phone', 'type="tel" inputmode="tel" autocomplete="off" placeholder="012-345 6789"') +
@@ -266,14 +288,14 @@ function nbCustSection(probs) {
   if (NB.cust) {
     var c = cust(NB.cust), fl = custFlags(c);
     body = '<div class="picked nb-picked"><div class="av sm" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</div><div class="grow"><div class="b">' + esc(c.name) + ' ' + fl.slice(0, 2).map(flagChip).join(' ') + '</div><div class="small muted nowrap">' + esc(c.phone) + (c.ic ? ' · ' + esc(maskIC(c.ic)) : '') + '</div></div><button type="button" class="btn sm ghost" id="nb_custchange">Change</button></div>' +
-      nbCustBanner(c) + (NB.blOverride ? '<div class="small nb-override">' + I('shield') + 'Booking anyway: allowed by ' + esc(myName()) + '</div>' : '');
+      nbCustBanner(c) + nbLicBanner() + nbOverlapBanner() + (NB.blOverride ? '<div class="small nb-override">' + I('shield') + 'Booking anyway: allowed by ' + esc(myName()) + '</div>' : '');
     if (NB.editCust) body += '<div class="nb-subh"><b>Details</b><button type="button" class="btn link sm" id="nb_editcust">Done</button></div>' + nbCustFields(probs, false);
     else {
       var f = NB.f, row = function (k, v, cls) { return v ? '<div class="nb-kv' + (cls || '') + '"><span>' + k + '</span><b>' + esc(v) + '</b></div>' : ''; };
       var lexp = f.licenceExp ? new Date(f.licenceExp + 'T23:59:00') : null;
       body += '<div class="nb-subh"><b>Details</b><button type="button" class="btn link sm" id="nb_editcust">' + I('edit') + 'Edit</button></div><div class="nb-kvs">' +
         row('Email', f.email) + row('IC / Passport', f.ic ? maskIC(f.ic) : '') + row('Nationality', f.nationality) +
-        row('Licence', [f.licenceNo, f.licenceExp ? 'until ' + dFull(lexp) : ''].filter(Boolean).join(', '), lexp && lexp < new Date(NB.e) ? ' red' : '') +
+        row('Licence', [f.licenceNo, f.licenceExp ? (lexp < new Date() ? 'expired on ' : 'until ') + dFull(lexp) : ''].filter(Boolean).join(', '), lexp && lexp < new Date(NB.e) ? ' red' : '') +
         row('Address', f.address) + row('Emergency', [f.emName, f.emRel, f.emPhone].filter(Boolean).join(' · ')) +
         (!f.email && !f.ic && !f.licenceNo ? '<div class="small muted">No IC or licence on file yet. Tap Edit or Check papers.</div>' : '') + '</div>';
     }
@@ -288,11 +310,11 @@ function nbCustSection(probs) {
 }
 function nbDatesSection(probs) {
   var s = new Date(NB.s), e = new Date(NB.e), len = e - s, past = s < new Date(Date.now() - 5 * MIN);
-  var chips = NB_LENGTHS.map(function (x) { return '<button type="button" class="fchip' + (len === x.ms ? ' on' : '') + '" data-len="' + x.ms + '">' + x.l + '</button>'; }).join('') + '<button type="button" class="fchip" data-add="' + 12 * HOUR + '">+12 hours</button>';
+  var chips = '<button type="button" class="fchip" data-now>' + I('clock') + 'Now</button>' + NB_LENGTHS.map(function (x) { return '<button type="button" class="fchip' + (len === x.ms ? ' on' : '') + '" data-len="' + x.ms + '">' + x.l + '</button>'; }).join('') + '<button type="button" class="fchip" data-add="' + 12 * HOUR + '">+12 hours</button>';
   return '<div class="formcard" id="nbs_dates"><h3><span class="stepn">2</span>Dates<span class="nb-dur" id="nb_dur">' + (len > 0 ? esc(durationText(s, e)) : '') + '</span></h3>' +
     '<div class="field"><span>Start of rental</span><div class="nb-dt"><input class="inp" type="date" id="nb_sd" value="' + toLocalInput(s) + '">' + nbTimeSel('nb_st', s) + '</div>' + (past ? '<span class="hint nb-warn">This pick-up is in the past</span>' : '') + '</div>' +
     '<div class="chiprow nb-lens">' + chips + '</div>' +
-    '<div class="field" id="nbf_end"><span>End of rental</span><div class="nb-dt"><input class="inp' + (len <= 0 ? ' bad' : '') + '" type="date" id="nb_ed" value="' + toLocalInput(e) + '">' + nbTimeSel('nb_et', e) + '</div>' + nbErr(probs, 'end') + '</div></div>';
+    '<div class="field" id="nbf_end"><span>End of rental</span><div class="nb-dt"><input class="inp' + (len <= 0 ? ' bad' : '') + '" type="date" id="nb_ed" value="' + toLocalInput(e) + '">' + nbTimeSel('nb_et', e) + '</div>' + nbErr(probs, 'end') + '</div>' + nbOverlapBanner() + '</div>';
 }
 function nbCarSection(probs) {
   var s = new Date(NB.s), e = new Date(NB.e), ok = e > s, usable = S.cars.filter(function (c) { return c.status === 'active'; });
@@ -300,22 +322,23 @@ function nbCarSection(probs) {
   if (NB.car) {
     var cc = car(NB.car), bz = ok ? busy(cc.id, s, e) : { free: true };
     block = '<button type="button" class="carfield picked-car' + (!bz.free ? ' nb-busy' : '') + '" id="nb_car"><span class="pk-car">' + carSVG(cc.color, cc.shape) + '</span><span class="grow"><span class="pk-plate">' + esc(cc.plate) + '</span><span class="pk-sub">' + esc(cc.make + ' ' + cc.model + ' · ' + cc.color) + '</span>' + (nbMoneyMode() !== 'hidden' ? '<span class="pk-sub nb-rate"><span class="money">' + rm(cc.rate) + '</span> a day</span>' : '') + '</span><span class="btn sm ghost">Change</span></button>' +
-      (!bz.free ? (function () { var ff = nbFirstFree(NB.car, new Date(NB.s), new Date(NB.e) - new Date(NB.s)); return '<div class="banner red nb-carbad">' + I('warn') + '<div><b>This car is not available for the selected dates:</b> ' + esc(bz.reason.replace(/^Booked: /, 'Booked ')) + (ff ? '<div class="nb-free">Free from ' + esc(dLong(ff) + ', ' + hm(ff)) + '. <button type="button" class="btn sm ghost" id="nb_usefree" data-at="' + ff.toISOString() + '">Use these dates</button></div>' : '') + '</div></div>'; })() : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '');
+      (!bz.free ? (function () { var ff = nbFirstFree(NB.car, new Date(NB.s), new Date(NB.e) - new Date(NB.s)); return '<div class="banner red nb-carbad">' + I('warn') + '<div><b>This car is not available for the selected dates:</b> ' + esc(bz.reason.replace(/^Booked: /, 'Booked ')) + (ff ? '<div class="nb-free">Free from ' + esc(dLong(ff) + ', ' + hm(ff)) + '. <button type="button" class="btn sm ghost" id="nb_usefree" data-at="' + ff.toISOString() + '">Use these dates</button></div>' : '') + '</div></div>'; })() : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '') +
+      (function () { var hd = bz.free && ok ? heldFor(cc.id, s, e, NB.leadId) : null; return hd ? '<div class="banner amber nb-held">' + I('wa') + '<div><b>Held for ' + esc(hd.name) + '</b> on WhatsApp for ' + hd.min + ' more min. Check with the team before you give it to someone else.</div></div>' : ''; })();
   } else block = '<button type="button" class="carfield empty-car' + nbBad(probs, 'car') + '" id="nb_car">' + I('search') + '<span class="grow">Search a car by plate, model or colour</span>' + I('chev') + '</button>' + (NB.tried ? nbErr(probs, 'car') : '');
   return '<div class="formcard" id="nbs_car"><h3><span class="stepn">3</span>Car</h3><div class="field" id="nbf_car">' + block +
     '<div class="nb-freeline"><span class="small muted">' + (ok ? free + ' of ' + usable.length + ' cars free' + (check ? ' (' + check + ' need' + (check === 1 ? 's' : '') + ' a check)' : '') + ' for these dates' : 'Fix the dates to see free cars') + '</span><a class="btn link sm" href="' + hashWith('availability', { start: NB.s, end: NB.e }) + '">' + I('cal') + 'Check availability</a></div></div></div>';
 }
-function nbPlaceSel(end) {
+function nbPlaceSel(end, probs) {
   var sel = end === 'pick' ? NB.pick : NB.ret, money = nbMoneyMode() !== 'hidden';
-  var opts = '<option value=""' + (!sel ? ' selected' : '') + '>Not chosen</option>' + placeChoices(end).map(function (o) { return '<option value="' + o.v + '"' + (o.v === sel ? ' selected' : '') + '>' + esc(o.label) + (o.fee && money ? ' (' + rm(o.fee) + ')' : '') + '</option>'; }).join('');
+  var opts = (!sel ? '<option value="" selected disabled>Choose a place</option>' : '') + placeChoices(end).map(function (o) { return '<option value="' + o.v + '"' + (o.v === sel ? ' selected' : '') + '>' + esc(o.label) + (o.fee && money ? ' (' + rm(o.fee) + ')' : '') + '</option>'; }).join('');
   var p = nbParsePlace(sel), note = end === 'pick' ? NB.pickNote : NB.retNote;
   var noteLabel = p.kind === 'client' ? (end === 'pick' ? 'Delivery address' : 'Collection address') : 'Note';
   var err = NB.tried && p.kind === 'client' && !String(note || '').trim() ? '<span class="err">Type the ' + (end === 'pick' ? 'delivery' : 'collection') + ' address</span>' : '';
-  return '<label class="field"><span>' + (end === 'pick' ? 'Pick-up place' : 'Return place') + '</span><select class="inp" id="nb_' + end + '">' + opts + '</select></label>' +
+  return '<label class="field" id="nbf_' + end + '"><span>' + (end === 'pick' ? 'Pick-up place' : 'Return place') + '</span><select class="inp' + nbBad(probs || [], end) + '" id="nb_' + end + '">' + opts + '</select>' + nbErr(probs || [], end) + '</label>' +
     '<label class="field nb-note" id="nbf_' + end + 'Note"><span>' + noteLabel + '</span><input class="inp' + (err ? ' bad' : '') + '" id="nb_' + end + 'note" value="' + esc(note) + '" autocomplete="off" placeholder="' + (p.kind === 'client' ? 'Street, area, landmark' : 'Optional, for example flight number') + '">' + err + '</label>';
 }
-function nbPlacesSection() {
-  return '<div class="formcard" id="nbs_places"><h3><span class="stepn">4</span>Places</h3>' + nbPlaceSel('pick') + '<div class="nb-sep"></div>' + nbPlaceSel('ret') + '</div>';
+function nbPlacesSection(probs) {
+  return '<div class="formcard" id="nbs_places"><h3><span class="stepn">4</span>Places</h3>' + nbPlaceSel('pick', probs) + '<div class="nb-sep"></div>' + nbPlaceSel('ret', probs) + '</div>';
 }
 function nbCoverSection(probs) {
   var days = nDays(NB.s, NB.e), money = nbMoneyMode() !== 'hidden', locked = nbMoneyMode() !== 'edit', c = NB.cover;
@@ -395,7 +418,7 @@ VIEWS.new = function (r) {
   }
   var html = topbar('New booking', { back: '#bookings', sub: bookingCode(S.nextNo), noBell: true, right: '<button type="button" class="btn link sm nb-discard" id="nb_discard">Discard</button>' }) + '<main class="nb-main">' +
     (NB.restored ? '<div class="banner blue nb-restored">' + I('reset') + '<div class="grow">Continuing your draft from ' + esc(ago(NB.restored)) + '.</div><button type="button" class="btn link sm" id="nb_fresh">Start over</button></div>' : '') +
-    leadHtml + nbCustSection(probs) + nbDatesSection(probs) + nbCarSection(probs) + nbPlacesSection() + nbCoverSection(probs) + nbPriceSection(probs) + nbPaySection() +
+    leadHtml + nbCustSection(probs) + nbDatesSection(probs) + nbCarSection(probs) + nbPlacesSection(probs) + nbCoverSection(probs) + nbPriceSection(probs) + nbPaySection() +
     '</main><div class="stickybar nb-foot" id="nb_foot">' + nbFooter(probs) + '</div>';
   return { html: html, noNav: true, keepScroll: true, after: nbWire };
 };
@@ -459,12 +482,14 @@ function nbWire() {
   });
   et.addEventListener('change', function () { if (!NB) return; var p = fromInputs(ed.value || toLocalInput(NB.e), et.value); if (isNaN(p)) return; NB.e = p.toISOString(); nbRe(); });
   $$('.nb-lens [data-len]').forEach(function (b) { b.onclick = function () { NB.e = new Date(new Date(NB.s).getTime() + +b.dataset.len).toISOString(); nbRe(); }; });
+  /* a walk-in: start at the next quarter hour today, same length */
+  $$('.nb-lens [data-now]').forEach(function (b) { b.onclick = function () { var len = new Date(NB.e) - new Date(NB.s); if (!(len > 0)) len = DAY; var q = 15 * MIN, s = new Date(Math.ceil(Date.now() / q) * q); NB.s = s.toISOString(); NB.e = new Date(s.getTime() + len).toISOString(); nbRe(); say('Starts today at ' + hm(s)); }; });
   $$('.nb-lens [data-add]').forEach(function (b) { b.onclick = function () { var e0 = new Date(NB.e), s0 = new Date(NB.s); NB.e = new Date(Math.max(e0, s0) + +b.dataset.add).toISOString(); nbRe(); }; });
   /* car */
   on('#nb_usefree', 'click', function () { var len = new Date(NB.e) - new Date(NB.s), at = new Date(this.dataset.at); NB.s = at.toISOString(); NB.e = new Date(at.getTime() + len).toISOString(); nbRe(); say('Dates moved to ' + dShort(at) + ', ' + hm(at)); });
   on('#nb_car', 'click', function () {
     var s = new Date(NB.s), e = new Date(NB.e);
-    Pickers.car({ start: e > s ? s : null, end: e > s ? e : null, selected: NB.car, onPick: function (c) { if (!NB) return; nbSetCar(c); nbRe(); } });
+    Pickers.car({ start: e > s ? s : null, end: e > s ? e : null, selected: NB.car, lead: NB.leadId, onPick: function (c) { if (!NB) return; nbSetCar(c); nbRe(); } });
   });
   /* places */
   ['pick', 'ret'].forEach(function (end) {
@@ -618,6 +643,24 @@ function saveNew() {
       .then(function (y) { if (!y) n.f.name = c0.name; return true; });
   });
   if (n.cust && cust(n.cust).blacklist && !n.blOverride) steps = steps.then(function (ok) { return ok && nbBlacklistGate(cust(n.cust)).then(function (y) { if (y) n.blOverride = true; return y; }); });
+  /* an expired licence: staff say so before saving (the booking page keeps a red banner until it is updated) */
+  steps = steps.then(function (ok) {
+    var exp = n.f.licenceExp || (n.cust ? cust(n.cust).licenceExp : ''); if (!ok || !exp || exp >= toLocalInput(new Date())) return ok;
+    return confirm({ icon: 'warn', title: 'Licence has expired', text: 'The driving licence expired on ' + dFull(exp + 'T00:00:00') + '. Save the booking anyway? Ask for a valid licence before the car goes out.', ok: 'Save anyway', cancel: 'Go back and update it', primary: 'cancel' })
+      .then(function (y) { if (y) n.licOverride = exp; return y; });
+  });
+  /* the car is held for another WhatsApp customer */
+  steps = steps.then(function (ok) {
+    var hd = ok && n.car ? heldFor(n.car, n.s, n.e, n.leadId) : null; if (!hd) return ok;
+    return confirm({ icon: 'warn', title: 'Car held for ' + firstName(hd.name), text: 'The WhatsApp assistant is holding this car for ' + hd.name + ' for ' + hd.min + ' more min. Book it for this customer anyway?', ok: 'Book anyway', cancel: 'Go back', primary: 'cancel' })
+      .then(function (y) { if (y) n.heldOk = hd.name; return y; });
+  });
+  /* the same customer already has a car on these dates (a WhatsApp booking taken again at the counter) */
+  steps = steps.then(function (ok) {
+    var ov = ok ? nbOverlaps(n) : []; if (!ov.length) return ok;
+    return confirm({ icon: 'warn', title: 'Book a second car?', text: nbOverlapText(ov) + '. Save this as a second booking at the same time?', ok: 'Yes, a second car', cancel: 'Go back', primary: 'cancel' })
+      .then(function (y) { if (y) n.overlapOk = ov.map(function (b) { return b.code; }).join(', '); return y; });
+  });
   NB_SAVING = true; var btn = $('#nb_save'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   steps.then(function (ok) { return new Promise(function (res) { nbAfterSheet(function () { res(ok); }); }); }).then(function (ok) {
     if (!ok || NB !== n) { NB_SAVING = false; if (NB === n) nbPaint(); return; }
@@ -671,6 +714,9 @@ function nbCommit(n) {
   if (n.icCheck) b.icCheck = n.icCheck;
   b.log.push({ at: nowIso, by: S.me, text: 'Booking made' + (n.source !== 'Staff' ? ' (' + n.source + ')' : '') + (b.bookingStatus === 'Confirmed' ? ', Confirmed' : '') + (b.paymentStatus ? ', payment status ' + b.paymentStatus : '') });
   if (n.blOverride) b.log.push({ at: nowIso, by: S.me, text: 'Booked a blacklisted customer anyway (' + ((cust(cid).blacklist || {}).reason || 'no reason given') + ')' });
+  if (n.licOverride) b.log.push({ at: nowIso, by: S.me, text: 'Booked with a licence that expired on ' + dFull(n.licOverride + 'T00:00:00') });
+  if (n.overlapOk) b.log.push({ at: nowIso, by: S.me, text: 'Second booking for the same dates as ' + n.overlapOk });
+  if (n.heldOk) b.log.push({ at: nowIso, by: S.me, text: 'Booked while the car was held on WhatsApp for ' + n.heldOk });
   if (n.dupeUsed) b.log.push({ at: nowIso, by: S.me, text: 'Used the existing customer ' + n.dupeUsed + ' instead of making a new one' });
   var nd = ['icFront', 'icBack', 'passport', 'licence', 'poa'].filter(function (k) { return docs[k]; }).length + (docs.other || []).length;
   if (nd) b.log.push({ at: nowIso, by: S.me, text: 'Added ' + nd + ' paper' + (nd > 1 ? 's' : '') + ' with the booking' + (n.icCheck ? ' (' + n.icCheck.label + ')' : '') });
@@ -702,6 +748,21 @@ function nbAfterSave(b) {
     });
 }
 function nbMoneyModeFor() { return can('bookings.see_amounts') || can('bookings.edit_amounts'); }
+/* the rental terms the customer agrees to: the company's own (Settings, B().terms) or plain ones made from its settings */
+function nbTerms(b) {
+  var co = B(), t = co.terms;
+  if (Array.isArray(t) && t.length) return t;
+  if (typeof t === 'string' && t.trim()) return t.split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  var fee = +co.summonsAdminFee || 0;
+  return [
+    'The car is rented to the person named above, who must hold a valid driving licence for the whole rental.',
+    'The deposit is held as security and returned after the car comes back, less any damage, fuel, cleaning, late return or summons costs.',
+    'Return the car on time, at the return place, with the same fuel level. Late returns are charged by the hour' + (b && b.rates && +b.rates.hourly ? ' (' + rm(b.rates.hourly) + ' an hour)' : '') + '.',
+    b && b.cover ? 'Damage is covered by ' + b.cover.name + (+b.cover.max ? ' up to ' + rm(b.cover.max) : '') + '. Damage above that is paid by the customer.' : 'No damage cover was taken: the customer pays for any damage to the car.',
+    'Traffic summons during the rental are paid by the customer' + (fee ? ', plus an admin fee of ' + rm(fee) : '') + '.',
+    'No smoking, no pets without permission, and the car may not leave the country without written approval from ' + co.name + '.'
+  ];
+}
 /* the customer signs the booking form on the staff phone (simulated form page) */
 function nbSignHere(b) {
   var c = cust(b.cust), k = car(b.car) || {}, m = calcBooking(b);
@@ -710,10 +771,13 @@ function nbSignHere(b) {
     '<div class="nb-sign-card"><div class="nb-kv"><span>Name</span><b>' + esc(c.name) + '</b></div><div class="nb-kv"><span>Phone</span><b>' + esc(c.phone) + '</b></div>' +
     '<div class="nb-kv"><span>Car</span><b>' + esc((k.make || '') + ' ' + (k.model || '') + ' · ' + (k.plate || '')) + '</b></div><div class="nb-kv"><span>From</span><b>' + esc(dLong(b.start) + ', ' + hm(b.start)) + '</b></div>' +
     '<div class="nb-kv"><span>To</span><b>' + esc(dLong(b.end) + ', ' + hm(b.end)) + '</b></div><div class="nb-kv"><span>Pick-up</span><b>' + esc(placeText(b, 'pick')) + '</b></div>' +
+    '<div class="nb-kv"><span>Return</span><b>' + esc(placeText(b, 'ret')) + '</b></div>' +
+    '<div class="nb-kv"><span>Damage cover</span><b>' + (b.cover ? esc(b.cover.name) + (+b.cover.max ? ', max cover <span class="money">' + rm(b.cover.max) + '</span>' : '') : 'None: the customer pays for any damage') + '</b></div>' +
     (nbMoneyModeFor() ? '<div class="nb-kv"><span>Total</span><b class="money">' + rm(m.payable) + '</b></div><div class="nb-kv"><span>Deposit</span><b class="money">' + rm(m.deposit) + '</b></div>' : '') + '</div>' +
+    '<details class="nb-terms"><summary>' + I('file') + 'Read the rental terms</summary><ol>' + nbTerms(b).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ol></details>' +
     '<label class="nb-agree"><input type="checkbox" id="nbs_agree"><span>I have read and agree to the rental terms of ' + esc(B().name) + ', and the details above are correct.</span></label>' +
     '<div class="nb-padwrap"><canvas id="nbs_pad" class="nb-pad noswipe" width="600" height="220"></canvas><span class="nb-padhint" id="nbs_hint">Sign here</span><button type="button" class="btn link sm nb-padclear" id="nbs_clear">Clear</button></div>' +
-    '<div class="sheet-foot"><button type="button" class="btn" id="nbs_ok" disabled>Sign and send</button></div></div>', null, { full: true, stack: true, noSwipe: true });
+    '<div class="sheet-foot"><button type="button" class="btn" id="nbs_ok" disabled>Sign</button></div></div>', null, { full: true, stack: true, noSwipe: true });
   var cv = $('#nbs_pad', sh), ctx = cv.getContext('2d'), drawn = 0, down = false, last = null;
   ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1B2333';
   var pt = function (e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; };

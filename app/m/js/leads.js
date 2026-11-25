@@ -85,6 +85,12 @@ var Leads = (function () {
     var clash = c && l.start && l.end && s !== 'booked' && s !== 'closed' ? busy(c.id, l.start, l.end) : null; if (clash && clash.free) clash = null;
     body += row('Car', c ? esc(c.make + ' ' + c.model) + ' <span class="muted">' + esc(c.plate) + '</span>' : '<span class="muted">Not chosen yet</span>', clash ? '' : s !== 'booked' && s !== 'closed' ? holdChip(l, true) || (c && l.start && !l.holdUntil ? 'Not held' : '') : '', true);
     if (clash) body += '<div class="banner red ld-clash">' + I('warn') + '<div class="grow"><b>Not free for these dates.</b> ' + esc(clash.reason) + '.' + (inThread && can('leads.manage') ? '<div><button type="button" class="btn sm" onclick="Leads.pickCar(\'' + id + '\')">' + I('car') + 'Pick another car</button></div>' : '') + '</div></div>';
+    /* the offered car cannot go out (road tax or insurance expired), or it is tight against another rental */
+    var live = c && s !== 'booked' && s !== 'closed';
+    var rp = live && !clash && window.M7 ? M7.roadPapers(c) : null;
+    if (rp && rp.level === 'overdue') body += '<div class="banner red ld-clash ld-papers">' + I('warn') + '<div class="grow"><b>' + esc(rp.type) + ' expired</b> on ' + esc(M7.ymd(carPaper(c.id, rp.type).until)) + '. This car must not go out until it is renewed.' + (inThread && can('leads.manage') ? '<div><button type="button" class="btn sm" onclick="Leads.pickCar(\'' + id + '\')">' + I('car') + 'Pick another car</button></div>' : '') + '</div></div>';
+    var soonBz = live && !clash && l.start && l.end ? busy(c.id, l.start, l.end, null) : null;
+    if (soonBz && soonBz.free && soonBz.soon) body += '<div class="banner amber ld-soon">' + I('clock') + '<div>Check the turnaround: ' + esc(soonBz.soon) + '.</div></div>';
     if (pf) body += row('Pick-up', esc(pf.text), esc(placeName(l, 'pick')) + (l.km && l.pickKind !== 'our' ? ' · about ' + l.km + ' km' : ''));
     if (rf) body += row('Return', esc(rf.text), esc(placeName(l, 'ret')) + (l.km && l.retKind !== 'our' ? ' · about ' + l.km + ' km' : ''));
     if (l.estimate != null && can('bookings.see_amounts')) {
@@ -144,7 +150,7 @@ var Leads = (function () {
   /* swap the held car for one that is free on the lead's dates */
   function pickCar(id) {
     var w = wa(id); if (!w || !w.lead || !can('leads.manage')) return; var l = w.lead;
-    Pickers.car({ title: 'Pick another car', start: l.start, end: l.end, selected: l.car, onPick: function (c) {
+    Pickers.car({ title: 'Pick another car', start: l.start, end: l.end, selected: l.car, lead: id, onPick: function (c) {
       if (!c) return; if (!isFree(c.id, l.start, l.end)) { say(c.plate + ' is not free for these dates'); return; }
       var was = l.car ? (car(l.car) || {}).plate : ''; l.car = c.id; l.holdUntil = new Date(Date.now() + 30 * MIN).toISOString();
       audit('Lead car changed' + (was ? ' from ' + was : '') + ' to ' + c.plate, { link: '#chat/wa/' + id }); done(c.plate + ' is held for 30 min');

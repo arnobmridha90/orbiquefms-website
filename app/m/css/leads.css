@@ -65,3 +65,5 @@ body.kb-open .ld-pin .ld-body { display: none; }
 .ld-pin .ld-prim { margin: 0; padding: 0 12px 10px; }
 .ld-prim:has(> :only-child) { grid-template-columns: 1fr; }
 body.kb-open .ld-pin .ld-prim { display: none; }
+.ch-search { margin: 4px 0 10px; }
+.ch-count { margin: 0 4px 8px; }

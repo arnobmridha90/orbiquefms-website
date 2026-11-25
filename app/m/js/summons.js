@@ -85,10 +85,13 @@ var Summons = (function () {
   /* ---------- snap a summons: photo, simulated reading, check, match ---------- */
   function snap(o) {
     o = o || {}; if (!can('summons.upload')) { say('Ask the owner for Add summons access'); return; }
+    var took = false;
     var sh = sheet(sheetHead('Snap a summons', 'Take a photo of the notice. The details are read for you to check.') +
       '<div class="sm-snap"><div class="sm-snapic">' + I('receipt') + '</div><button type="button" class="btn big" id="smtake">' + I('camera') + 'Take or choose a photo</button>' +
-      '<button type="button" class="btn ghost" id="smsample">' + I('image') + 'Use a sample notice</button><button type="button" class="btn link" id="smtype">Type it in instead</button></div>', null, { full: true });
+      '<button type="button" class="btn ghost" id="smsample">' + I('image') + 'Use a sample notice</button><button type="button" class="btn link" id="smtype">Type it in instead</button></div>', null, { full: true,
+      guard: function () { return took ? { title: 'Stop reading the notice?', text: 'The photo you took will be lost.', ok: 'Close anyway', cancel: 'Keep going' } : null; } });
     var go = function (r) {
+      took = true;
       $('.sm-snap', sh).innerHTML = '<div class="mt-reading sm-reading"><img alt="" src="' + esc(imgSrc(r.dataUrl)) + '"><div><b>Reading the notice</b><span class="mt-dots">Looking for the notice number, plate, date and amount</span></div></div>';
       later(function () { if (!document.body.contains(sh)) return; var read = simulateRead(r.dataUrl, o.booking); form(null, { photo: r.dataUrl, read: read, booking: o.booking }); }, 1300);
     };
@@ -117,6 +120,7 @@ var Summons = (function () {
   function form(s, o) {
     o = o || {};
     var rd = o.read || null, v = function (k, d) { return s ? s[k] : rd && rd[k] ? rd[k].v : d; };
+    var fg = formGuard(function () { return chosen; });
     var at0 = v('at', ''), auth = v('authority', 'PDRM'), photo = s ? s.photo : o.photo || null, chosen = s ? s.booking : o.booking || null, byHand = s ? !!s.byHand : !!o.booking;
     var sh = sheet(sheetHead(s ? 'Check the details' : rd ? 'Check what was read' : 'Add a summons', rd ? 'Compare each line with the picture' : '') +
       (photo ? '<button type="button" class="sm-photo" id="smph"><img alt="Summons photo" src="' + esc(imgSrc(photo)) + '"><span>Tap to zoom</span></button>' : '') +
@@ -129,7 +133,9 @@ var Summons = (function () {
       '<label class="field' + (rd && rd.amount && rd.amount.sure < 80 ? ' sm-warnf' : '') + '"><span>Fine amount</span><div class="rmfield"><input class="inp" id="sfm" inputmode="decimal" autocomplete="off" value="' + (v('amount', '') !== '' ? esc(money2(v('amount', 0))) : '') + '" placeholder="0.00"></div>' + sureNote(rd, 'amount') + '</label>' +
       '<div class="sec"><h2>Booking that had the car</h2></div><div id="sfmatch"></div>' +
       '<small class="err" id="sferr" hidden></small>' +
-      '<div class="sheet-foot stack"><button type="button" class="btn" id="sfok">Confirm and save</button>' + (s && s.status !== 'Needs review' ? '' : '<button type="button" class="btn link" id="sflater">Save, check it later</button>') + '</div>', null, { full: true });
+      '<div class="sheet-foot stack"><button type="button" class="btn" id="sfok">Confirm and save</button>' + (s && s.status !== 'Needs review' ? '' : '<button type="button" class="btn link" id="sflater">Save, check it later</button>') + '</div>', null, { full: true,
+        guard: function () { return !s && photo ? { title: 'Close without saving?', text: 'The photo and what was read from it will be lost. Tap Save, check it later to keep it.', ok: 'Close anyway', cancel: 'Keep editing' } : fg(); } });
+    fg.arm(sh);
     function fld(id, label, val, k, ph, extra) { return '<label class="field' + (rd && rd[k] && rd[k].sure < 80 ? ' sm-warnf' : '') + '"><span>' + label + '</span><input class="inp" id="' + id + '" autocomplete="off" spellcheck="false" value="' + esc(val || '') + '" placeholder="' + esc(ph) + '"' + (extra || '') + '>' + sureNote(rd, k) + '</label>'; }
     segPick('#sfa', function (t) { auth = t; });
     var ph = $('#smph', sh); if (ph) ph.onclick = function () { M7.zoom(photo, { title: 'Summons' }); };
@@ -212,6 +218,10 @@ var Summons = (function () {
     if (s.status === 'No booking' && can('summons.upload') && m && m.state === 'one') acts.push('<button type="button" class="btn" data-a="linkone">' + I('check') + 'Link ' + esc(m.bookings[0].code) + '</button>');
     if (s.status === 'No booking' && can('summons.upload')) acts.push('<button type="button" class="btn' + (m && m.state === 'one' ? ' ghost' : '') + '" data-a="pick">' + I('search') + 'Pick a booking</button>');
     if (s.status === 'Ready to charge' && can('summons.charge')) acts.push('<button type="button" class="btn" data-a="charge">' + I('wa') + 'Charge customer</button>');
+    /* the deposit is still held: the summons can be taken from it */
+    var depX = b && window.Deposit && (s.status === 'Ready to charge' || s.status === 'Charged') && can('deposits.edit_deductions') ? Deposit.info(b) : null;
+    var fromDep = depX && !depX.refund && !depX.cancelled && depX.basis > 0 && b.paymentStatus !== 'Deposit Refunded';
+    if (fromDep) acts.push('<button type="button" class="btn ghost" data-a="dep">' + I('shield') + 'Take from the deposit (' + rm(depX.net) + ' held)</button>');
     if (s.status === 'Charged') {
       if (can('summons.record_payment')) acts.push('<button type="button" class="btn sm-paid" data-a="paid">' + I('cash') + 'Mark as paid</button>');
       if (can('summons.charge')) acts.push('<button type="button" class="btn ghost" data-a="charge">' + I('wa') + 'Change amount or send again</button>');
@@ -234,7 +244,7 @@ var Summons = (function () {
       '<div class="sm-wide"><div class="k">Offence</div><div class="v">' + esc(s.offence || 'Not read') + '</div></div></div></div>' +
       '<div class="sec"><h2>Booking that had the car</h2></div>' + bkHtml +
       '<div class="sec"><h2>Money</h2></div><div class="list sm-money">' + mrow('Fine', s.amount) + mrow('Our admin fee', fee()) + mrow('Fine + fee', total, true) +
-      (s.chargedAmt != null ? mrow('Asked from the customer', s.chargedAmt, true, s.chargedAt ? 'on ' + dShort(s.chargedAt) : '') : '') + (s.paidAt ? mrow('Paid', s.paidAmt != null ? s.paidAmt : s.chargedAmt, true, 'on ' + dShort(s.paidAt)) : '') + '</div>' +
+      (s.chargedAmt != null ? mrow('Asked from the customer', s.chargedAmt, true, s.chargedAt ? 'on ' + dShort(s.chargedAt) : '') : '') + (s.paidAt ? mrow(s.paidFrom === 'deposit' ? 'Taken from the deposit' : 'Paid', s.paidAmt != null ? s.paidAmt : s.chargedAmt, true, 'on ' + dShort(s.paidAt)) : '') + '</div>' +
       '<p class="hint">Added by ' + esc(who(s.by) || 'someone') + ' on ' + esc(dFull(s.created || s.at)) + (s.fromPhoto ? ', read from a picture' : '') + '</p>' +
       ((acts.length || small.length) ? '<div class="sheet-foot stack">' + acts.join('') + (small.length ? '<div class="sm-small">' + small.join('') + '</div>' : '') + '</div>' : ''), function (sh) {
         var ph = $('#sdph', sh); if (ph) ph.onclick = function () { M7.zoom(s.photo, { title: 'Summons', sub: s.notice }); };
@@ -246,6 +256,11 @@ var Summons = (function () {
             else if (a === 'linkone' && m && m.state === 'one') { var lb = m.bookings[0]; linkBooking(s, lb.id); s.byHand = false; s.status = 'Ready to charge'; bLog(lb, 'Summons ' + title(s) + ' tied to this booking'); save(); open(s.id); render(false, true); say('Linked to ' + lb.code); }
             else if (a === 'charge') charge(s);
             else if (a === 'paid') markPaid(s);
+            else if (a === 'dep') {
+              var amt = s.chargedAmt != null ? +s.chargedAmt : (+s.amount || 0) + fee();
+              confirm({ icon: 'shield', title: 'Take ' + rm(amt) + ' from the deposit?', text: 'It is added as a Summons adjustment on ' + b.code + ' and the summons is marked paid. The customer gets the rest of the deposit back.', ok: 'Take from the deposit', cancel: 'Not now' })
+                .then(function (y) { if (!y) return; if (Deposit.takeSummons(b, s)) { closeAllSheetsM7(); render(false, true); say('Taken from the deposit. The summons is paid.'); } });
+            }
             else if (a === 'receipt') receipt(s);
             else if (a === 'waive' || a === 'dispute') reasonSheet(s, a);
             else if (a === 'reopen') { var prev = s.status; s.status = s.booking ? (s.chargedAmt != null ? 'Charged' : 'Ready to charge') : 'No booking'; s.reason = ''; logS(s, 'Summons ' + title(s) + ' opened again (was ' + prev + ')'); save(); open(s.id); render(false, true); say('Summons opened again'); }

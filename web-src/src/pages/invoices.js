@@ -20,7 +20,7 @@ function invPayOf(r) { return byId(D().payments, r.payment); }
 function invStaff() { return D().users.filter(function (u) { return u.active; }).map(function (u) { return u.name; }); }
 function invToken(no) { var h = 0; String(no + B().id).split('').forEach(function (c) { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return h.toString(36) + no.slice(-3).toLowerCase(); }
 function invLink(no) { return 'https://' + B().slug + '.orbiquefms.com/d/' + invToken(no) + '.pdf'; }
-function invWaNumber(p) { var s = String(p || '').replace(/[^\d+]/g, ''); if (!s) return ''; if (s[0] === '+') return s; if (s[0] === '0') return (invCo().countryCode || '+60') + s.slice(1); return '+' + s; }
+function invWaNumber(p) { return UI.waNumber(p); }
 function invPhoneOk(p) { var s = invWaNumber(p).replace(/\D/g, ''); return s.length >= 9 && s.length <= 15; }
 function invNextNo(kind) {
   var co = invCo(), nb = co.numbering || {}, pre = (kind === 'inv' ? nb.invPrefix || 'INV-' : nb.rcpPrefix || 'RCP-') + (nb.resetYearly !== false ? NOW().getFullYear() + '-' : ''), list = kind === 'inv' ? D().invoices : D().receipts, max = 0;

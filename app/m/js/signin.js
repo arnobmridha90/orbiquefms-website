@@ -153,6 +153,11 @@ function pinLockWire() {
       if (S.me && S.tempSession === S.me && live !== S.me) { S.me = null; S.tempSession = null; usePrefs(); save(); history.replaceState(null, '', location.pathname + location.search + '#signin'); }
       else if (S.me) { try { sessionStorage.setItem('fms.live.' + CO, S.me); } catch (e) {} }
     }
+    /* nobody signed in (signed out, or the login was switched off): every screen but #signin goes to sign in, also the ones the phone's Back reaches */
+    if (S && route().name !== 'signin' && !(S.me && staff(S.me) && staff(S.me).hasLogin !== false && me().loginActive)) {
+      closeAllSheets();
+      history.replaceState(null, '', location.pathname + location.search + '#signin');
+    }
     if (S && route().name !== 'signin' && pinLocked()) {
       closeAllSheets();
       $('#app').innerHTML = pinLockHtml(); pinLockWire(); window.scrollTo(0, 0); return;

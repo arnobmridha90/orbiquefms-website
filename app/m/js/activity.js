@@ -79,7 +79,9 @@ function actMatch(e, q) {
   var b = e.booking ? bk(e.booking) : null;
   if (b && (matchBookingCode(q, b) || wordsMatch(q, cust(b.cust).name) || phoneMatch(q, cust(b.cust).phone))) return true;
   if (e.cust && wordsMatch(q, cust(e.cust).name)) return true;
-  if (e.car) { var c = car(e.car); if (c && normPlate(c.plate).indexOf(normPlate(q)) >= 0) return true; }
+  /* a plate (with or without the space) finds the car's own entries and everything on its bookings */
+  var np = normPlate(q);
+  if (np.length >= 3) { var ids = [e.car, b && b.car]; for (var i = 0; i < ids.length; i++) { var c = ids[i] && car(ids[i]); if (c && normPlate(c.plate).indexOf(np) >= 0) return true; } }
   return wordsMatch(q, e.text + ' ' + who(e.by));
 }
 
@@ -98,7 +100,7 @@ VIEWS.activity = function (r) {
   var rows = shown.map(function (e) { var d = dayWord(e.at), sep = d !== lastDay ? '<div class="act-day">' + esc(d === 'Today' || d === 'Yesterday' ? d : dLong(e.at)) + '</div>' : ''; lastDay = d; return sep + actRowHtml(e); }).join('');
   var filtered = ACT.p || ACT.from || ACT.to || q;
   var html = topbar('Activity', { back: '#more', sub: list.length + (list.length === 1 ? ' entry' : ' entries') }) + '<main class="act-main-wrap">' +
-    '<label class="search">' + I('search') + '<input id="acQ" type="search" placeholder="Booking number or name" value="' + esc(ACT.q) + '" autocomplete="off" enterkeyhint="search"></label>' +
+    '<label class="search">' + I('search') + '<input id="acQ" type="search" placeholder="Booking, name or plate" value="' + esc(ACT.q) + '" autocomplete="off" enterkeyhint="search"></label>' +
     '<div class="act-filters"><label class="field"><span>Person</span><select class="inp" id="acP"><option value="">Everyone</option>' + people.map(function (p) { return '<option value="' + p.id + '"' + (ACT.p === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '<option value="system"' + (ACT.p === 'system' ? ' selected' : '') + '>Customers, website and system</option></select></label>' +
     '<div class="two"><label class="field"><span>From</span><input class="inp" type="date" id="acF" value="' + esc(ACT.from) + '" max="' + toLocalInput(new Date()) + '"></label><label class="field"><span>To</span><input class="inp" type="date" id="acT" value="' + esc(ACT.to) + '" max="' + toLocalInput(new Date()) + '"></label></div>' +
     (filtered ? '<button type="button" class="btn link act-clear" id="acClear">Clear filters</button>' : '') + '</div>' +

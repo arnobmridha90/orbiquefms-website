@@ -124,7 +124,12 @@ function m4outRows(per, opts) {
     rows.push({ at: x.at, amt: x.amt, t1: x.kind, t2: (x.src === 'job' ? 'Service job' : 'Car papers') + (x.paidTo ? ' · ' + x.paidTo : '') + (x.car ? ' · ' + ((car(x.car) || {}).plate || '') : ''), kind: x.src, link: x.car ? '#car/' + x.car : '' });
   });
   (S.expenses || []).forEach(function (e) { if (!e.voided && !e.toStaff && !(hideHP && e.kind === 'Hire purchase') && m4inRange(e.at, per.from, per.to) && new Date(e.at) <= new Date()) rows.push({ at: e.at, amt: +e.amt || 0, t1: e.kind, t2: (e.agentFee ? 'Handover fee · ' + who(e.by) : (e.paidTo || who(e.by))) + (e.car ? ' · ' + ((car(e.car) || {}).plate || '') : ''), kind: e.agentFee ? 'fee' : 'exp', link: e.booking ? '#booking/' + e.booking : '' }); });
-  (S.refunds || []).forEach(function (r) { if (!r.voided && +r.amt > 0 && m4inRange(r.at, per.from, per.to)) { var b = bk(r.booking) || {}; rows.push({ at: r.at, amt: +r.amt, t1: 'Deposit returned', t2: (b.code || '') + ' · ' + (b.cust ? cust(b.cust).name : '') + ' · ' + r.method, kind: 'ref', link: b.id ? '#booking/' + b.id : '' }); } });
+  (S.refunds || []).forEach(function (r) {
+    if (r.voided || !(+r.amt > 0) || !m4inRange(r.at, per.from, per.to)) return;
+    var b = bk(r.booking) || {}, t2 = (b.code || '') + ' · ' + (b.cust ? cust(b.cust).name : '') + ' · ' + r.method, pt = Deposit.refundParts(r), link = b.id ? '#booking/' + b.id : '';
+    if (pt.dep > 0.004) rows.push({ at: r.at, amt: pt.dep, t1: 'Deposit returned', t2: t2, kind: 'ref', link: link });
+    if (pt.rent > 0.004) rows.push({ at: r.at, amt: pt.rent, t1: 'Rent and charges refunded', t2: t2 + ' · cancelled', kind: 'rent', link: link });
+  });
   /* the card company keeps its charge: Money in counts the full card payment, so the charge goes out here and Net matches what reaches the bank */
   S.bookings.forEach(function (b) { (b.payments || []).forEach(function (p) {
     if (p.voided || p.method !== 'Card' || p.afterCharge == null || !m4inRange(p.at, per.from, per.to) || new Date(p.at) > new Date()) return;
@@ -194,10 +199,10 @@ function m4open(k, per, F) {
       '<div class="sec"><h2>' + rows.length + ' payment' + (rows.length === 1 ? '' : 's') + '</h2></div>' + (rows.length ? m4pagedShell('Name, booking ID, plate or reference') : '<div class="list"><div class="empty">No payments in this period</div></div>');
     paged = { items: rows, html: m4payCard, match: function (r, q) { var c = car(r.b.car) || {}; return Pickers.bookingMatches(r.b, q) || wordsMatch(q, (r.p.ref || '') + ' ' + (c.plate || '')) || (normPlate(q).length >= 3 && normPlate(c.plate).indexOf(normPlate(q)) >= 0); } };
   } else if (k === 'out' || k === 'net') {
-    var out = F.out, ex = m4sum(out.filter(function (r) { return r.kind === 'exp'; }), function (r) { return r.amt; }), jb = m4sum(out.filter(function (r) { return r.kind === 'job' || r.kind === 'paper'; }), function (r) { return r.amt; }), fee = m4sum(out.filter(function (r) { return r.kind === 'fee'; }), function (r) { return r.amt; }), rf = m4sum(out.filter(function (r) { return r.kind === 'ref'; }), function (r) { return r.amt; }), cc = m4sum(out.filter(function (r) { return r.kind === 'card'; }), function (r) { return r.amt; });
+    var out = F.out, ex = m4sum(out.filter(function (r) { return r.kind === 'exp'; }), function (r) { return r.amt; }), jb = m4sum(out.filter(function (r) { return r.kind === 'job' || r.kind === 'paper'; }), function (r) { return r.amt; }), fee = m4sum(out.filter(function (r) { return r.kind === 'fee'; }), function (r) { return r.amt; }), rf = m4sum(out.filter(function (r) { return r.kind === 'ref'; }), function (r) { return r.amt; }), rr = m4sum(out.filter(function (r) { return r.kind === 'rent'; }), function (r) { return r.amt; }), cc = m4sum(out.filter(function (r) { return r.kind === 'card'; }), function (r) { return r.amt; });
     title = k === 'out' ? 'Money out' : 'Net';
     body = '<div class="card m4-sum">' + (k === 'net' ? '<div class="sumline"><span>Money in</span><span class="money">' + rm(F.inn.total) + '</span></div>' : '') +
-      '<div class="sumline"><span>Expenses</span><span class="money">' + (k === 'net' ? '-' : '') + rm(ex) + '</span></div>' + (jb ? '<div class="sumline"><span>Service jobs and car papers</span><span class="money">' + (k === 'net' ? '-' : '') + rm(jb) + '</span></div>' : '') + '<div class="sumline"><span>Handover fees</span><span class="money">' + (k === 'net' ? '-' : '') + rm(fee) + '</span></div><div class="sumline"><span>Deposits returned</span><span class="money">' + (k === 'net' ? '-' : '') + rm(rf) + '</span></div>' +
+      '<div class="sumline"><span>Expenses</span><span class="money">' + (k === 'net' ? '-' : '') + rm(ex) + '</span></div>' + (jb ? '<div class="sumline"><span>Service jobs and car papers</span><span class="money">' + (k === 'net' ? '-' : '') + rm(jb) + '</span></div>' : '') + '<div class="sumline"><span>Handover fees</span><span class="money">' + (k === 'net' ? '-' : '') + rm(fee) + '</span></div><div class="sumline"><span>Deposits returned</span><span class="money">' + (k === 'net' ? '-' : '') + rm(rf) + '</span></div>' + (rr ? '<div class="sumline"><span>Rent refunded (cancelled bookings)</span><span class="money">' + (k === 'net' ? '-' : '') + rm(rr) + '</span></div>' : '') +
       (cc ? '<div class="sumline"><span>Card charges</span><span class="money">' + (k === 'net' ? '-' : '') + rm(cc) + '</span></div>' : '') +
       '<div class="sumline big"><span>' + (k === 'net' ? 'Net' : 'Total') + '</span><span class="money">' + rm(k === 'net' ? F.net : F.outT) + '</span></div></div>' +
       (k === 'net' ? '<p class="small muted m4-note">Money in counts every payment received, deposits included. Money out counts expenses, service jobs and car papers, handover fees, deposits given back and the charges the card company keeps. Reports uses the same figures.</p>' : '') +
@@ -243,7 +248,10 @@ var BankIn = (function () {
     if (!can('expenses.add') && !office()) { say('Ask the owner for access to record a bank-in'); return; }
     var now = new Date(), st = { staff: o.staff && (o.staff === S.me || office()) ? o.staff : S.me, slip: null, hash: null, read: null, busy: false };
     var keep = { amt: '', date: toLocalInput(now), time: toTimeInput(now), ref: '', note: '' };
-    var sh = sheet('<div id="biBody"></div>', null, { stack: !!o.stack, full: true });
+    var sh = sheet('<div id="biBody"></div>', null, { stack: !!o.stack, full: true, guard: function () {
+      if (st.saved) return null; if (sh && sh.isConnected) grab();
+      return st.slip || String(keep.amt).trim() || String(keep.ref).trim() || String(keep.note).trim() ? { title: 'Close without saving?', text: 'The ' + (st.slip ? 'slip and the ' : '') + 'details you typed will be lost.', ok: 'Close anyway', cancel: 'Keep editing' } : null;
+    } });
     var grab = function () { ['amt', 'date', 'time', 'ref', 'note'].forEach(function (k) { var el = $('#bi_' + k, sh); if (el) keep[k] = el.value; }); };
     var draw = function () {
       if (!sh.isConnected) return;
@@ -308,7 +316,7 @@ var BankIn = (function () {
       var rec = { id: uid(), staff: st.staff, amt: amt, at: when.toISOString(), slip: st.slip, slipHash: st.hash, ref: keep.ref.trim(), note: keep.note.trim(), by: S.me, created: new Date().toISOString(), voided: false, voidReason: null };
       S.bankIns = S.bankIns || []; S.bankIns.push(rec);
       audit('Bank-in of ' + rm(amt) + ' saved for ' + who(st.staff) + (rec.ref ? ' (ref ' + rec.ref + ')' : ''), { link: '#cash' });
-      save(); closeSheet();
+      st.saved = true; save(); closeSheet();
       notify('pay', 'Bank-in of ' + rm(amt) + ' saved.', st.staff === S.me ? '' : 'For ' + who(st.staff), '#cash', { self: true });
       if (o.onDone) o.onDone(rec);
       render(false, true);
@@ -536,11 +544,14 @@ function instSheet(id) {
   var st = { with: 'Bank transfer' };
   var sh = sheet(sheetHead('Mark instalment paid', c.plate + ' · ' + c.make + ' ' + c.model) +
     '<div class="card dep-due"><span>Due ' + esc(instDay(r.due)) + '</span><b class="money">' + rm(r.amt) + '</b></div>' +
-    '<label class="field"><span>Paid on</span><input class="inp" type="date" id="imOn" max="' + today + '" value="' + (r.due <= today ? r.due : today) + '"><small class="err" id="imOnErr"></small></label>' +
+    '<label class="field"><span>Paid on</span><input class="inp" type="date" id="imOn" max="' + today + '" value="' + today + '"><small class="err" id="imOnErr"></small></label>' +
+    (r.due < today ? '<div class="chiprow m4-imchips"><button type="button" class="fchip on" data-imon="' + today + '">Today</button><button type="button" class="fchip" data-imon="' + r.due + '">On the due day, ' + esc(instDay(r.due)) + '</button></div>' : '') +
     '<label class="field"><span>Amount paid (optional)</span><div class="rmfield"><input class="inp num" id="imAmt" inputmode="decimal" placeholder="' + money2(r.amt) + '"></div><small class="hint">Leave empty if you paid the amount due. Type it only if you paid a different amount.</small><small class="err" id="imAmtErr"></small></label>' +
     '<div class="field"><span>Paid with</span><div class="seg" id="imWith">' + ['Bank transfer', 'Cash', 'Card', 'Other'].map(function (m) { return '<button type="button" class="' + (m === st.with ? 'on' : '') + '">' + m + '</button>'; }).join('') + '</div></div>' +
     '<div class="sheet-foot"><button type="button" class="btn big" id="imGo">' + I('check', 2.4) + 'Mark paid</button></div>', null, {});
   segPick('#imWith', function (t) { st.with = t; });
+  $$('[data-imon]', sh).forEach(function (b) { b.onclick = function () { var i = $('#imOn', sh); i.value = b.dataset.imon; i.dispatchEvent(new Event('change', { bubbles: true })); $$('[data-imon]', sh).forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
+  $('#imOn', sh).addEventListener('change', function () { var v = this.value; $$('[data-imon]', sh).forEach(function (x) { x.classList.toggle('on', x.dataset.imon === v); }); });
   $('#imGo', sh).onclick = function () {
     var on = $('#imOn', sh).value, typed = $('#imAmt', sh).value.trim(), amt = typed ? parseMoney(typed) : r.amt, ok = true;
     $('#imOnErr', sh).textContent = ''; $('#imAmtErr', sh).textContent = '';

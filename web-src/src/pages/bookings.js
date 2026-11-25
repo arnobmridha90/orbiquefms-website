@@ -302,7 +302,7 @@ function bkStatusDialog(x, kind) {
     },
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Update', onClick: function (d) {
       var v = UI.form(d.body).st, patch = {}; if ((pay ? x.pay || '' : x.status) === v) return;
-      patch[pay ? 'pay' : 'status'] = v; if (!pay && v === 'Agreement Signed' && !x.submitted) { patch.submitted = true; patch.submittedAt = NOW(); }
+      patch[pay ? 'pay' : 'status'] = v; /* Agreement Signed also switches Is Submitted on (applyStatusRules) */
       var label = pay ? 'the payment status' : 'the booking status';
       /* the car may have been given to someone else while this booking was cancelled or completed */
       var bad = !pay ? bkReviveProblem(x, patch) : '';
@@ -442,7 +442,7 @@ function bkExport(from, to, f) {
   var byCar = cars.map(function (c) { var r = rows.filter(function (z) { return z.x.car === c; }), days = sum(r.map(function (z) { return z.n; })); return [carLbl(c), c.plate, r.length, days, nDays ? Math.round(days / nDays * 1000) / 10 + '%' : '0%', sum(r.map(function (z) { return (z.x.rent - z.x.disc) * z.n / z.x.days; })), sum(r.map(function (z) { return z.x.deliv * z.n / z.x.days; })), sum(r.map(function (z) { return z.x.ret * z.n / z.x.days; })), sum(r.map(function (z) { return z.x.dmg * z.n / z.x.days; })), sum(r.map(function (z) { return z.incIn; }))].map(function (v) { return typeof v === 'number' ? Math.round(v * 100) / 100 : v; }); });
   var gen = UI.fmt.dateTime(NOW()) + ' by ' + DB.actor(), title = b.name + ' booking and income report';
   var summary = [[title], ['Bookings, income per car and per day. All amounts in Malaysian Ringgit (RM).'], [], ['Period', UI.fmt.date(from) + ' to ' + UI.fmt.date(to) + ' (' + nDays + ' days)'], ['Generated', gen], ['Cars', car ? bkCarLabel(car) : 'All cars'], ['Booking statuses', f.status || 'Confirmed, Agreement Sent, Agreement Signed, Car Delivered, Car Returned, Completed'], [],
-    ['Key figures'], ['Total income', tot(function (z) { return z.incIn; })], ['Rental income', tot(function (z) { return (z.x.rent - z.x.disc) * z.n / z.x.days; })], ['Delivery fee', tot(function (z) { return z.x.deliv * z.n / z.x.days; })], ['Return fee', tot(function (z) { return z.x.ret * z.n / z.x.days; })], ['Damage coverage', tot(function (z) { return z.x.dmg * z.n / z.x.days; })], ['Deposits held (not income)', tot(function (z) { return z.x.dep; })], ['Bookings', rows.length], ['Rental days', tot(function (z) { return z.n; })], ['Average income per booking', rows.length ? Math.round(tot(function (z) { return z.incIn; }) / rows.length * 100) / 100 : 0], ['Average rental length (days)', rows.length ? Math.round(sum(rows.map(function (z) { return z.x.days; })) / rows.length * 10) / 10 : 0], [],
+    ['Key figures'], ['Total income', tot(function (z) { return z.incIn; })], ['Rental income', tot(function (z) { return (z.x.rent - z.x.disc) * z.n / z.x.days; })], ['Delivery fee', tot(function (z) { return z.x.deliv * z.n / z.x.days; })], ['Return fee', tot(function (z) { return z.x.ret * z.n / z.x.days; })], ['Damage coverage', tot(function (z) { return z.x.dmg * z.n / z.x.days; })], ['Deposits on bookings (not income)', tot(function (z) { return z.x.dep; })], ['Bookings', rows.length], ['Rental days', tot(function (z) { return z.n; })], ['Average income per booking', rows.length ? Math.round(tot(function (z) { return z.incIn; }) / rows.length * 100) / 100 : 0], ['Average rental length (days)', rows.length ? Math.round(sum(rows.map(function (z) { return z.x.days; })) / rows.length * 10) / 10 : 0], [],
     ['By car'], ['Car', 'Plate', 'Bookings', 'Days booked', 'Utilisation', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Total income']].concat(byCar).concat([['Total', '', rows.length, tot(function (z) { return z.n; }), '', sum(byCar.map(function (r) { return r[5]; })), sum(byCar.map(function (r) { return r[6]; })), sum(byCar.map(function (r) { return r[7]; })), sum(byCar.map(function (r) { return r[8]; })), sum(byCar.map(function (r) { return r[9]; }))], []]);
   var group = function (key, label) { var m = {}; rows.forEach(function (z) { var k = z.x[key] || 'None'; m[k] = m[k] || [0, 0]; m[k][0]++; m[k][1] += z.incIn; }); summary.push([label, 'Bookings', 'Total income']); Object.keys(m).forEach(function (k) { summary.push([k, m[k][0], Math.round(m[k][1] * 100) / 100]); }); summary.push([]); };
   group('method', 'By payment method'); group('pay', 'By payment status');
@@ -453,7 +453,7 @@ function bkExport(from, to, f) {
     daily.push([ds, de].concat(vals).concat([Math.round(sum(vals.map(function (v) { return v || 0; })) * 100) / 100]));
   }
   daily.push(['Total', ''].concat(cars.map(function (c, j) { return Math.round(sum(daily.slice(3).map(function (r) { return r[2 + j] || 0; })) * 100) / 100; })).concat([Math.round(sum(daily.slice(3).map(function (r) { return r[r.length - 1]; })) * 100) / 100]));
-  var bk = [['Booking ID', 'Status', 'Customer', 'IC / Passport (middle hidden)', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days\n(whole booking)', 'Daily rate', 'Rent\n(whole booking)', 'Discount\n(whole booking)', 'Rental income\n(whole booking)', 'Delivery fee\n(whole booking)', 'Return fee\n(whole booking)', 'Damage coverage\n(whole booking)', 'Total income\n(whole booking)', 'Deposit held\n(whole booking)', 'Total payable\n(whole booking)', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period']].concat(rows.map(function (z) {
+  var bk = [['Booking ID', 'Status', 'Customer', 'IC / Passport (middle hidden)', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days\n(whole booking)', 'Daily rate', 'Rent\n(whole booking)', 'Discount\n(whole booking)', 'Rental income\n(whole booking)', 'Delivery fee\n(whole booking)', 'Return fee\n(whole booking)', 'Damage coverage\n(whole booking)', 'Total income\n(whole booking)', 'Deposit\n(whole booking)', 'Total payable\n(whole booking)', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period']].concat(rows.map(function (z) {
     var x = z.x; return [x.code, x.status, x.cust.name, UI.fmt.ic(x.cust.ic), x.cust.phone, carLbl(x.car), x.car.plate, x.start, x.end, x.days, x.rate, x.rent, x.disc, x.rent - x.disc, x.deliv, x.ret, x.dmg, z.inc, x.dep, x.payable, x.method, x.pay || 'None', x.created, z.n, z.incIn];
   }));
   DB.log('Exported', 'Booking', '', DB.actor() + ' downloaded the bookings report for ' + UI.fmt.date(from) + ' to ' + UI.fmt.date(to));
@@ -528,13 +528,13 @@ function bkOpenBooking(code, prefill) {
   var custOf = function (c0) { c0 = c0 || {}; var em = c0.emergency || {}; return { name: c0.name || '', phone: c0.phone || '', email: c0.email || '', address: c0.address || '', nat: c0.nat || 'Malaysian', ic: c0.ic || '', licenceNo: c0.licenceNo || '', licenceExp: c0.licenceExp || null, emName: em.name || '', emPhone: em.phone || '', emRel: em.rel || '' }; };
   var cust = custOf(p);
   if (!x && !p) { if (prefill.name) cust.name = String(prefill.name); if (prefill.phone) cust.phone = bkTidyPhone(String(prefill.phone)); }
-  var check = { files: [], read: null, results: null, valid: null, filled: '', why: '', fill: false, error: '' }, dirty = false, saved = false, offData = null, carCtl = null, custCtl = null, avail = { key: '', res: { free: true } }, prevEnd = v.end;
+  var notMatch = null, carNote = null, check = { files: [], read: null, results: null, valid: null, filled: '', why: '', fill: false, error: '' }, dirty = false, saved = false, offData = null, carCtl = null, custCtl = null, avail = { key: '', res: { free: true } }, prevEnd = v.end;
   var onPage = S.page === 'bookings' && CUR && CUR.ctx;
   var refLocked = function () { var f = dr && dr.body ? form() : {}; var e = f.end ? UI.parseDate(f.end) : v.end; return !canPickRefunded({ end: e, pay: x ? x.pay : '' }); };
 
   /* ---- field builders ---- */
   var money = function (k, label, req, o) { o = o || {}; return UI.input({ key: k, label: label, type: 'number', value: v[k], required: req, readonly: !amt, step: '0.01', min: 0, placeholder: o.ph, prefix: 'RM' }); };
-  var sect = function (title, icon, inner, o) { o = o || {}; return '<section class="bkx-sec' + (o.coll ? ' coll' : '') + (o.shut ? ' shut' : '') + '"' + (o.id ? ' id="' + o.id + '"' : '') + '><div class="bkx-sec-h"' + (o.coll ? ' role="button" tabindex="0" data-bkx-tog' : '') + '>' + i(icon) + '<span class="grow">' + title + '</span>' + (o.act || '') + (o.coll ? i('chevron-down', 'bkx-chev') : '') + '</div><div class="bkx-sec-b">' + inner + '</div></section>'; };
+  var sect = function (title, icon, inner, o) { o = o || {}; return '<section class="bkx-sec' + (o.coll ? ' coll' : '') + (o.shut ? ' shut' : '') + (o.cls ? ' ' + o.cls : '') + '"' + (o.id ? ' id="' + o.id + '"' : '') + '><div class="bkx-sec-h"' + (o.coll ? ' role="button" tabindex="0" data-bkx-tog' : '') + '>' + i(icon) + '<span class="grow">' + title + '</span>' + (o.act || '') + (o.coll ? i('chevron-down', 'bkx-chev') : '') + '</div><div class="bkx-sec-b">' + inner + '</div></section>'; };
   var pkgOpts = [['', 'No damage cover']].concat(d.damagePackages.map(function (pk) { return [pk.id, bkPkgLabel(pk)]; })).concat([['manual', 'Set by hand']]);
 
   function checkerHtml() {
@@ -542,21 +542,48 @@ function bkOpenBooking(code, prefill) {
       return '<label class="btn ' + b2[3] + ' sm">' + i(b2[2]) + b2[1] + '<input type="file" accept="' + (/^(ic|passport|dl)$/.test(b2[0]) ? 'image/*' : 'image/*,.pdf') + '" hidden data-bkx-chk="' + b2[0] + '"></label>';
     }).join('') + '</div><p class="b2">Reading a card fills in the customer and checks our blacklist. Everything uploaded is saved with the booking.</p><div id="bkx-chk-out"></div></div>';
   }
+  /* the picked customer in one card: name, phone, IC and licence, with Edit details */
+  function csumHtml() {
+    if (!p) return '';
+    var c = custOf(p), le = c.licenceExp ? new Date(c.licenceExp) : null, bits = [esc(c.phone || 'No phone')];
+    if (c.ic) bits.push('IC ' + esc(cuSeeIc() ? c.ic : UI.fmt.ic(c.ic)));
+    bits.push(le ? 'Licence until ' + UI.fmt.date(le) : 'No licence expiry on file');
+    return '<div class="bkx-csum">' + UI.avatar(c.name) + '<div class="grow"><b>' + esc(c.name) + '</b><small>' + bits.join(' · ') + '</small></div>' + UI.btn('Edit details', { kind: 't', size: 'sm', icon: 'pencil', attrs: { 'data-bkx-cdet': 1, 'aria-expanded': 'false' } }) + '</div>';
+  }
+  function setFold(on) {
+    var sec = dr.body.querySelector('#bkx-s-cust'); if (!sec) return; sec.classList.toggle('bkx-cfold', !!on);
+    var bt = sec.querySelector('[data-bkx-cdet]'); if (bt) { bt.setAttribute('aria-expanded', on ? 'false' : 'true'); bt.lastChild.textContent = on ? 'Edit details' : 'Hide details'; }
+  }
+  /* an existing customer with the phone or IC typed for a new one (not picked from the list) */
+  function custMatch(f) {
+    if (p || ro) return null;
+    var ph = normPhone(f.phone || ''), icn = String(f.ic || '').replace(/[\s-]/g, '').toUpperCase();
+    return d.people.filter(function (q) { return q.id !== notMatch && ((ph.length > 6 && normPhone(q.phone) === ph) || (icn.length > 5 && String(q.ic || '').replace(/[\s-]/g, '').toUpperCase() === icn)); })[0] || null;
+  }
+  function custBookings(q) { return d.bookings.filter(function (z) { return z.cust === q; }).length; }
+  /* the licence runs out before the rental ends: '' or the warning */
+  function licenceIssue(f, e) {
+    var le = f.licenceExp ? UI.parseDate(f.licenceExp) : null; if (!le || isNaN(le) || !e) return '';
+    var end = new Date(le); end.setHours(23, 59, 59, 0); if (end >= e) return '';
+    return end < NOW() ? 'Licence expired on ' + UI.fmt.date(le) + '.' : 'Licence runs out on ' + UI.fmt.date(le) + ', before the return on ' + UI.fmt.date(e) + '.';
+  }
   function formHtml() {
     var h = '<div class="bkx-form">';
     var hChk = isNew && can('customers.check_ic') ? sect('Read IC or licence', 'shield-search', checkerHtml(), { id: 'bkx-s-chk', coll: true, shut: bkIsPhone() }) : '';
     /* 1. customer */
-    var hCust = sect('Customer', 'user', (isNew && !ro ? '<div class="bkx-cpick" id="bkx-cpick"></div>' : '') + '<div class="bkx-g">' +
-      UI.input({ key: 'name', label: 'Full Name', value: cust.name, required: true, style: 'grid-column:span 2', attrs: { autocomplete: 'off' } }) + UI.input({ key: 'phone', label: 'Phone', type: 'tel', value: cust.phone, required: true, placeholder: '+60 12 345 6789' }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: cust.email }) +
+    /* a customer picked on a new booking shows as one short card (their details are already on file); "Edit details"
+       opens the full fields. A new customer gets the fields straight away. */
+    var hCust = sect('Customer', 'user', (isNew && !ro ? '<div class="bkx-cpick" id="bkx-cpick"></div>' : '') + (isNew ? '<div id="bkx-csum">' + csumHtml() + '</div>' : '') + '<div id="bkx-lic"></div><div class="bkx-cdet"><div class="bkx-g">' +
+      UI.input({ key: 'name', label: 'Full Name', value: cust.name, required: true, style: 'grid-column:span 2', attrs: { autocomplete: 'off' } }) + UI.input({ key: 'phone', label: 'Phone', type: 'tel', value: cust.phone, required: true, placeholder: '+60 12 345 6789' }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: cust.email }) + '<div class="full" id="bkx-match"></div>' +
       UI.input({ key: 'ic', label: 'IC / Passport no.', value: cuSeeIc() || isNew ? cust.ic : UI.fmt.ic(cust.ic), readonly: !cuSeeIc() && !isNew, help: !cuSeeIc() && !isNew ? 'Middle hidden for you' : '' }) + UI.input({ key: 'nat', label: 'Nationality', value: cust.nat, placeholder: 'Type to search', attrs: { list: 'bkx-nats' } }) +
       UI.input({ key: 'licenceNo', label: 'Licence no.', value: cust.licenceNo }) + UI.dateField({ key: 'licenceExp', label: 'Licence expiry', value: cust.licenceExp, chips: false }) +
       UI.input({ key: 'address', label: 'Residential Address', value: cust.address, style: 'grid-column:1 / -1' }) +
       '<datalist id="bkx-nats">' + LISTS.nationalities.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>' +
-      '<div class="bkx-subh">' + i('phone-call') + 'Emergency contact</div><div class="bkx-g3">' + UI.input({ key: 'emName', label: 'Name', value: cust.emName }) + UI.input({ key: 'emPhone', label: 'Phone', type: 'tel', value: cust.emPhone }) + UI.input({ key: 'emRel', label: 'Relationship', value: cust.emRel, attrs: { list: 'bkx-rels' }, placeholder: 'Relative, Sibling, Colleague' }) + '<datalist id="bkx-rels">' + LISTS.relationships.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>', { id: 'bkx-s-cust' });
+      '<div class="bkx-subh">' + i('phone-call') + 'Emergency contact</div><div class="bkx-g3">' + UI.input({ key: 'emName', label: 'Name', value: cust.emName }) + UI.input({ key: 'emPhone', label: 'Phone', type: 'tel', value: cust.emPhone }) + UI.input({ key: 'emRel', label: 'Relationship', value: cust.emRel, attrs: { list: 'bkx-rels' }, placeholder: 'Relative, Sibling, Colleague' }) + '<datalist id="bkx-rels">' + LISTS.relationships.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div></div>', { id: 'bkx-s-cust', cls: isNew && p ? 'bkx-cfold' : '' });
     if (p && can('customer_notes.view')) hCust += '<section class="bkx-sec" id="bkx-notes"></section>';
     if (x && can('customers.check_ic')) hCust += sect('Check IC', 'id-badge-2', '<div id="bkx-ic"></div>', { coll: true, shut: true });
     /* 2. car and dates */
-    var hCar = sect('Car and dates', 'car', '<div class="bkx-g"><div class="full" id="bkx-carpick"></div>' +
+    var hCar = sect('Car and dates', 'car', '<div class="bkx-g"><div class="full" id="bkx-carpick"></div><div class="full" id="bkx-carnote" hidden></div>' +
       UI.dateTimeField({ key: 'start', label: 'Rental start', value: v.start, required: true, style: 'grid-column:span 2', disabled: ro }) +
       UI.dateTimeField({ key: 'end', label: 'Rental end', value: v.end, required: true, style: 'grid-column:span 2', chips: false, disabled: ro }) +
       (ro ? '' : '<div class="full bkx-lens" role="group" aria-label="Rental length"><span class="b2">Length</span>' + BK_LENS.map(function (l) { return '<button type="button" class="ui-fchip" data-bkx-len="' + l[0] + '">' + l[1] + '</button>'; }).join('') + '<span class="bkx-durtx" id="bkx-durtx"></span></div>') +
@@ -643,7 +670,7 @@ function bkOpenBooking(code, prefill) {
       var fe = el.querySelector('#bkx-fees'); if (fe) fe.innerHTML = feesHtml();
       carCtl = UI.carPicker(el.querySelector('#bkx-carpick'), { key: 'car', label: 'Car', required: true, value: v.car, start: v.start, end: v.end, exceptId: x ? x.code : undefined, disabled: ro,
         cars: d.cars.filter(function (c) { return c.fleet !== 'Sold' || (x && x.car === c); }), placeholder: 'Find the car by its plate',
-        onChange: function (id, car) { dirty = true; clearErr('car'); if (car) fillCarPrices(car); recalc(); } });
+        onChange: function (id, car) { dirty = true; clearErr('car'); if (car) carPrices(car); recalc(); } });
       var cp = el.querySelector('#bkx-cpick');
       if (cp) custCtl = UI.combo(cp, { key: 'custPick', label: 'Find a customer', placeholder: pre ? pre.name : 'Search by name, phone or IC', title: 'Find a customer', searchPlaceholder: 'Name, phone or IC', value: pre ? pre.id : '', recentKey: 'bk-cust-' + B().id,
         help: 'Leave it empty for a new customer and type the details below.', emptyText: 'No customers yet.', noMatchHelp: 'No match. Type the details below to add a new customer.',
@@ -674,6 +701,21 @@ function bkOpenBooking(code, prefill) {
     cuDocsMount(dc, docs, { readonly: ro, person: p, fromCustomer: fromCustomer || null, onChange: function () { dirty = true; },
       extra: x && can('deposits.view') ? '<div class="cu-doc" id="bkx-slip"><div class="cu-doc-h">Deposit refund slip</div>' + (x.refundSlip ? '<div class="cu-doc-f"><button type="button" class="cu-link ellip" data-bs="slipopen">' + esc(x.refundSlip.name) + '</button></div>' : x.pay === 'Refund Pending' ? '<label class="btn o sm cu-up">' + i('upload') + 'Upload refund slip<input type="file" accept="image/*,.pdf" hidden data-bs-slip></label>' : '<div class="cu-none">The deposit is not waiting to be returned yet. It can be recorded once the booking is Refund Pending.</div>') + '</div>' : '' });
   }
+  /* a new booking takes the car's prices. An existing one keeps the prices agreed with the customer (a car swapped after a
+     breakdown usually keeps them) and offers the new car's prices under the field. */
+  function carPrices(c) {
+    var box = dr.body.querySelector('#bkx-carnote'); carNote = null; if (box) { box.hidden = true; box.innerHTML = ''; }
+    if (isNew) { fillCarPrices(c); return; }
+    if (!amt) return;
+    var r = calcNow(), cur = { rate: r.num('rate'), hourly: r.num('hourly'), dep: r.num('dep') };
+    if (!(cur.rate > 0)) { fillCarPrices(c); return; }
+    if (cur.rate === +c.rate && cur.hourly === +c.hourly && cur.dep === +c.deposit) return;
+    carNote = c;
+    var hr = cur.hourly !== +c.hourly ? ', ' + UI.fmt.money(c.hourly) + '/hour' : '';
+    box.innerHTML = UI.alert('<b>' + esc(c.plate) + ' has other prices:</b> ' + UI.fmt.money(c.rate) + '/day' + hr + ', deposit ' + UI.fmt.money(c.deposit) + '. This booking keeps ' + UI.fmt.money(cur.rate) + '/day and deposit ' + UI.fmt.money(cur.dep) + ' unless you change them.' +
+      '<div class="row wrap gap6 bkx-cpb">' + UI.btn('Use new prices', { kind: 'tonal', size: 'sm', attrs: { 'data-bkx-cp': 'use' } }) + UI.btn('Keep ' + UI.fmt.money(cur.rate) + '/day', { kind: 'o', size: 'sm', attrs: { 'data-bkx-cp': 'keep' } }) + '</div>', 'pri', { html: true, icon: 'tag' });
+    box.hidden = false;
+  }
   function fillCarPrices(c) {
     if (amt) { setVal('rate', c.rate); setVal('hourly', c.hourly); setVal('dep', c.deposit); }
     else { v.rate = c.rate; v.hourly = c.hourly; v.dep = c.deposit; ['rate', 'hourly', 'dep'].forEach(function (f2) { setVal(f2, v[f2]); }); }
@@ -686,6 +728,7 @@ function bkOpenBooking(code, prefill) {
     var le = field('licenceExp'); if (le) UI.setDateField(le, c.licenceExp ? new Date(c.licenceExp) : null, true);
     CU_DOCS.forEach(function (dc) { var k = dc[0]; if (q && q.docs && q.docs[k] && !docs[k]) docs[k] = Object.assign({}, q.docs[k]); if (!q && docs[k] && docs[k].fromCust) docs[k] = null; });
     if (q) CU_DOCS.forEach(function (dc) { if (docs[dc[0]] && q.docs && q.docs[dc[0]] && docs[dc[0]].name === q.docs[dc[0]].name) docs[dc[0]].fromCust = true; });
+    var cs = dr.body.querySelector('#bkx-csum'); if (cs) cs.innerHTML = csumHtml(); if (isNew) setFold(!!q);
     mountDocs(q ? q.docs : null); drawBanner(); recalc();
     if (q) UI.toast('Filled in ' + q.name + '\'s details' + (CU_DOCS.some(function (dc) { return q.docs && q.docs[dc[0]]; }) ? ' and documents' : '') + '.', { ms: 2500 });
   }
@@ -727,11 +770,19 @@ function bkOpenBooking(code, prefill) {
       else if (!ro && b.soon) al.push(UI.alert('Inside the ' + plural(b.gapH, 'hour') + ' gap between rentals. ' + b.soon + '. Check the car can be cleaned in time.', 'warn'));
       else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + 'The car is free for these dates.</div>');
     } else if (r.s && r.e && carCtl) { var k3 = '|' + +r.s + '|' + +r.e; if (avail.key !== k3) { avail.key = k3; carCtl.setDates(r.s, r.e, x ? x.code : undefined); } } }
+    /* road tax and insurance must cover the rental */
+    var stA = f.status || (x ? x.status : 'Pending'), live = stA !== 'Completed' && stA !== 'Cancelled';
+    var pp = live && f.car && r.s && r.e && r.e > r.s ? carPaperIssues(f.car, r.s, r.e) : [];
+    if (pp.length) { var pc = carById(f.car); al.unshift(UI.alert('<b>Papers to renew before ' + esc(pc ? pc.plate : 'the car') + ' goes out:</b> ' + pp.map(function (z) { return esc(z.text); }).join('. ') + '. Renew ' + (pp.length > 1 ? 'them' : 'it') + ' on Maintenance before the handover.', 'bad', { html: true, icon: 'file-alert' })); }
     if (isNew && !ro && r.s && r.s < NOW() - 6e4) al.unshift(UI.alert('The pick-up is in the past (' + UI.fmt.dt(r.s) + '). Is this a late entry? You will be asked to confirm on Create.', 'warn'));
     var nm = (f.name || '').trim().toLowerCase(), icn = (f.ic || '').replace(/[\s-]/g, ''), ph = normPhone(f.phone || '');
     var bl = d.people.filter(function (q) { return q.blacklist && q !== (x && x.cust) && ((nm && q.name.toLowerCase() === nm) || (icn.length > 5 && String(q.ic).replace(/[\s-]/g, '') === icn) || (ph.length > 6 && normPhone(q.phone) === ph)); })[0];
     if (bl || (p && p.blacklist && isNew)) al.push(UI.alert('Warning: This customer matches a blacklisted customer record. Please verify before proceeding.', 'bad', { icon: 'ban' }));
     var ab = body.querySelector('#bkx-alerts'); if (ab) ab.innerHTML = al.join('');
+    var li = body.querySelector('#bkx-lic'), lw = live ? licenceIssue(f, r.e) : ''; if (li) li.innerHTML = lw ? UI.alert(lw + ' Ask for the renewed licence before the car goes out.', 'bad', { icon: 'license' }) : '';
+    var mb = body.querySelector('#bkx-match'), mt = custMatch(f);
+    if (mb) mb.innerHTML = mt ? UI.alert('<b>This ' + (normPhone(f.phone || '').length > 6 && normPhone(mt.phone) === normPhone(f.phone || '') ? 'phone number' : 'IC number') + ' belongs to ' + esc(mt.name) + '</b> (' + esc(mt.phone) + ', ' + plural(custBookings(mt), 'booking') + ').' +
+      '<div class="row wrap gap6 bkx-cpb">' + UI.btn('Use ' + mt.name, { kind: 'tonal', size: 'sm', attrs: { 'data-bkx-mt': mt.id } }) + UI.btn('This is someone else', { kind: 'o', size: 'sm', attrs: { 'data-bkx-mt': '' } }) + '</div>', 'warn', { html: true, icon: 'user-question' }) : '';
     var sg = body.querySelector('.bkx-sigimg'), sig = byId(d.signatures, f.signature); if (sg) sg.innerHTML = sig ? '<img src="' + sig.img + '" alt="' + esc(sig.name) + '">' : '';
     /* Deposit Refunded follows the end date (lock date rule) */
     var ps = field('pay'); if (ps) { var o2 = ps.querySelector('option[value="Deposit Refunded"]'), lk = refLocked(); if (o2 && ps.value !== 'Deposit Refunded') { o2.disabled = lk; o2.textContent = lk ? BK_REF_OFF : 'Deposit Refunded'; } }
@@ -742,7 +793,7 @@ function bkOpenBooking(code, prefill) {
   function liveRules(trigger) {
     if (!chSt) return; var f = form(), rl = dr.body.querySelector('#bkx-rule'); if (!rl) return;
     var r = applyStatusRules(x || { status: 'Pending', pay: '' }, { status: f.status, pay: f.pay, submitted: f.submitted, dep: calcNow().num('dep') });
-    if (trigger && (trigger === 'status' || trigger === 'submitted')) { if (r.status && r.status !== f.status) setVal('status', r.status); if (r.pay != null && r.pay !== f.pay) setVal('pay', r.pay); }
+    if (trigger && (trigger === 'status' || trigger === 'submitted')) { if (r.status && r.status !== f.status) setVal('status', r.status); if (r.pay != null && r.pay !== f.pay) setVal('pay', r.pay); var sw = field('submitted'); if (sw && r.submitted && !sw.checked) sw.checked = true; }
     rl.textContent = (r.notes || []).join(' ');
   }
 
@@ -772,11 +823,13 @@ function bkOpenBooking(code, prefill) {
     miss.forEach(function (m) { setErr(m[0], m[1]); });
     var first = miss[0], w = wrapOf(first[0]); if (!w) return;
     var sec = w.closest('.bkx-sec'); if (sec) sec.classList.remove('shut');
+    if (w.closest('.bkx-cdet')) setFold(false);
     try { w.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) { w.scrollIntoView(); }
     var fo = first[0] === 'car' ? w.querySelector('.ui-cbx-btn') : w.querySelector('input:not([type="hidden"]),select');
     if (fo) setTimeout(function () { try { fo.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 300);
   }
-  function save(sure) {
+  function save(sure, how) {
+    how = how || {};
     var r = calcNow(), f = r.f;
     var miss = validate(r);
     if (miss.length) {
@@ -791,22 +844,62 @@ function bkOpenBooking(code, prefill) {
     if (stW.block) { UI.toast(stW.block, { tone: 'warn', ms: 6000 }); showErrors([['status', 'Not yet: the pick-up is still to come']]); return false; }
     var payNew = !x ? 0 : amt ? r.c.payable : bkCalc({ start: r.s, end: r.e, rate: x.rate, hourly: x.hourly, dep: x.dep, disc: x.disc, deliv: x.deliv, ret: x.ret, others: x.others, covDaily: r.pk ? r.pk.daily : 0 }).payable;
     var overNew = x ? bookingOverpaid(x, payNew) : 0, overGrew = overNew > bookingOverpaid(x || '') + 0.004;
+    var again = function (extra) { return function (ch) { return ch ? save(sure, Object.assign({}, how, extra(ch))) : false; }; };
+    /* who the booking is for. Typed details that match a customer on file (phone or IC), without picking them, ask first:
+       their record is never overwritten by a new name. A picked customer is renamed only when staff say so. */
+    var typedName = f.name.trim().replace(/\s+/g, ' ');
+    var match = !p && !how.who ? custMatch(f) : null;
+    if (match) return bkAsk({ title: 'Is this ' + match.name + '?', text: 'The ' + (normPhone(match.phone) === normPhone(f.phone) ? 'phone number ' + match.phone : 'IC number') + ' belongs to ' + match.name + ', who has ' + plural(custBookings(match), 'booking') + '. Book for ' + match.name + ', or add ' + typedName + ' as a new customer?',
+      buttons: [{ label: 'Go back', value: false, kind: 'g' }, { label: 'New customer', value: 'new', kind: 'o' }, { label: 'Use ' + match.name, value: 'use', kind: 'c' }] }).then(again(function (ch) { return { who: ch, match: match }; }));
+    var person = how.who === 'new' ? null : p || (how.who === 'use' ? how.match : null);
+    if (person && how.who !== 'use' && !how.rename && typedName.toLowerCase() !== String(person.name || '').trim().replace(/\s+/g, ' ').toLowerCase()) {
+      var nb0 = custBookings(person);
+      return bkAsk({ title: 'Rename ' + person.name + '?', text: 'This changes the name on ' + person.name + '\'s customer record' + (nb0 ? ' and on all ' + plural(nb0, 'booking') : '') + ' to ' + typedName + '. Booking for someone else, such as a family member? Add them as a new customer instead.',
+        buttons: [{ label: 'Go back', value: false, kind: 'g' }, { label: 'New customer', value: 'new', kind: 'o' }, { label: 'Rename', value: 'rename', kind: 'c' }] }).then(again(function (ch) { return ch === 'new' ? { who: 'new' } : { rename: true }; }));
+    }
+    var payTo = chSt ? f.pay || '' : '', payTot = x && !amt ? payNew : r.c.payable, got = x ? bkRecv(x) : 0;
+    var payNeed = payTo === 'Full Payment Received' ? payTot : payTo === 'Deposit Received' ? r.num('dep') : 0;
+    var payAsk = !how.payOk && payNeed > 0.004 && got < payNeed - 0.004 && (!x || payTo !== (x.pay || ''));
     if (!sure) {
       var asks = [];
+      var stA = f.status || (x ? x.status : 'Pending'), live = stA !== 'Completed' && stA !== 'Cancelled';
+      var lw = live ? licenceIssue(f, r.e) : '', le0 = person && person.licenceExp ? +new Date(person.licenceExp) : 0, le1 = f.licenceExp ? +UI.parseDate(f.licenceExp) : 0;
+      if (lw && (isNew || +r.e !== +x.end || le0 !== le1)) asks.push(lw + ' Ask for the renewed licence before the car goes out.');
+      var pp = live ? carPaperIssues(f.car, r.s, r.e) : [], carCh = isNew || f.car !== x.car.id || +r.s !== +x.start || +r.e !== +x.end;
+      if (pp.length && carCh) asks.push((carById(f.car) || {}).plate + ': ' + pp.map(function (z) { return z.text; }).join('. ') + '. Renew ' + (pp.length > 1 ? 'them' : 'it') + ' before the car goes out.');
       if (isNew && r.s < NOW() - 6e4) asks.push('The pick-up (' + UI.fmt.dt(r.s) + ') is in the past. Is this a late entry for a rental that already started?');
       if (stW.ask) asks.push(stW.ask);
       if (overGrew) asks.push('The customer has paid ' + UI.fmt.money(overNew) + ' more than the new total of ' + UI.fmt.money(payNew) + '. After saving, the booking shows ' + UI.fmt.money(overNew) + ' to give back.');
-      if (asks.length) return UI.confirm({ title: isNew ? 'Create this booking?' : 'Save the changes to ' + x.code + '?', text: asks.join(' '), ok: isNew ? 'Create anyway' : 'Save anyway', cancel: 'Go back' }).then(function (y) { return y ? save(true) : false; });
+      /* a payment status that says money came in, with no payment recorded: record it, or save as typed */
+      if (payAsk) asks.push('The payment status says ' + payTo + ', but ' + (got > 0.004 ? 'only ' + UI.fmt.money(got) + ' is recorded' : 'no payment is recorded') + '. Record ' + UI.fmt.money(payNeed - got) + ' now so it shows in the books?');
+      if (asks.length) {
+        var okL = isNew ? 'Create anyway' : 'Save anyway', recOk = payAsk && can('billing.record_payment');
+        return bkAsk({ title: isNew ? 'Create this booking?' : 'Save the changes to ' + x.code + '?', html: asks.map(function (a) { return '<p class="ui-ctext">' + esc(a) + '</p>'; }).join(''),
+          buttons: [{ label: 'Go back', value: false, kind: 'g' }].concat(recOk ? [{ label: okL, value: 'ok', kind: 'o' }, { label: 'Record payment', value: 'rec', kind: 'c' }] : [{ label: okL, value: 'ok', kind: 'c' }]) })
+          .then(function (ch) { return ch ? save(true, Object.assign({}, how, { payOk: true, recordPay: ch === 'rec' })) : false; });
+      }
     }
     var car = carById(f.car), c = r.c, pk = r.pk, so = (f.startOpt || 'Not chosen').split('|'), eo = (f.endOpt || 'Not chosen').split('|');
     var sOpt = handoverOptions('start').filter(function (o) { return o.value === f.startOpt; })[0], eOpt = handoverOptions('end').filter(function (o) { return o.value === f.endOpt; })[0];
     var phone = f.phone.trim();
-    /* the customer: the one picked, else the same person when the IC or phone matches */
-    var icIn = !cuSeeIc() && !isNew ? (p ? p.ic : '') : (f.ic || '').trim();
-    var person = p || d.people.filter(function (q) { return (icIn && String(q.ic).replace(/[\s-]/g, '') === icIn.replace(/[\s-]/g, '')) || normPhone(q.phone) === normPhone(phone); })[0];
-    var pPatch = { name: f.name.trim(), phone: phone, email: f.email, address: f.address, nat: f.nat || 'Malaysian', ic: icIn || (person ? person.ic : ''), licenceNo: f.licenceNo, licenceExp: f.licenceExp ? UI.parseDate(f.licenceExp) : null, emergency: { name: f.emName, phone: f.emPhone, rel: f.emRel } };
+    /* the customer (decided above): a new record, or the one on file. An existing record only takes the fields that were
+       filled in, so a field left empty never blanks it, and the name changes only after "Rename". "Use" (a match by phone
+       or IC) only fills the gaps in their record. */
+    var icIn = !cuSeeIc() && !isNew ? (p ? p.ic : '') : (f.ic || '').trim(), tx = function (k) { return String(f[k] || '').trim(); };
+    var pPatch = { name: typedName, phone: phone, email: tx('email'), address: tx('address'), nat: tx('nat') || 'Malaysian', ic: icIn, licenceNo: tx('licenceNo'), licenceExp: f.licenceExp ? UI.parseDate(f.licenceExp) : null, emergency: { name: tx('emName'), phone: tx('emPhone'), rel: tx('emRel') } };
+    if (person) {
+      var gapsOnly = how.who === 'use', up = {}, em = Object.assign({}, person.emergency || {}), emCh = false;
+      var put = function (k, val) { if (val == null || val === '' || (val instanceof Date && isNaN(val))) return; if (gapsOnly && person[k]) return; if (String(person[k] == null ? '' : person[k]) !== String(val)) up[k] = val; };
+      if (how.rename) up.name = typedName;
+      ['phone', 'email', 'address', 'ic', 'licenceNo'].forEach(function (k) { put(k, pPatch[k]); });
+      if (tx('nat')) put('nat', tx('nat'));
+      if (pPatch.licenceExp && !(gapsOnly && person.licenceExp) && +new Date(person.licenceExp || 0) !== +pPatch.licenceExp) up.licenceExp = pPatch.licenceExp;
+      ['name', 'phone', 'rel'].forEach(function (k) { var val = pPatch.emergency[k]; if (val && !(gapsOnly && em[k]) && em[k] !== val) { em[k] = val; emCh = true; } });
+      if (emCh) up.emergency = em;
+      if (Object.keys(up).length) DB.update('people', person, up, { silent: !up.name, text: up.name ? DB.actor() + ' renamed customer ' + person.name + ' to ' + up.name : undefined, where: 'Customer' });
+    }
+    if (how.who === 'new' && p) Object.keys(docs).forEach(function (k) { if (docs[k] && docs[k].fromCust) docs[k] = null; });
     if (!person) person = DB.add('people', Object.assign({ id: 'cus-' + (d.people.length + 1) + '-' + Date.now().toString(36), i: d.people.length, since: NOW(), flag: '', docs: {}, blacklist: null, notes: [], icCheck: check.results ? { at: NOW(), by: DB.actor(), valid: !!check.valid, results: check.results, cardName: check.read ? check.read.name : '' } : null }, pPatch), { where: 'Customer', text: DB.actor() + ' added customer ' + pPatch.name });
-    else DB.update('people', person, pPatch, { silent: true });
     if (isNew) { CU_DOCS.forEach(function (dc) { if (!docs[dc[0]] && person.docs && person.docs[dc[0]]) docs[dc[0]] = Object.assign({}, person.docs[dc[0]]); else if (docs[dc[0]] && person.docs && !person.docs[dc[0]]) person.docs[dc[0]] = docs[dc[0]]; }); }
     Object.keys(docs).forEach(function (k) { if (docs[k]) delete docs[k].fromCust; });
     var rec = { car: car, start: r.s, end: r.e, days: c.days, rate: r.num('rate'), hourly: r.num('hourly'), dep: r.num('dep'), disc: r.num('disc'), deliv: r.num('deliv'), ret: r.num('ret'), others: r.num('others'), rent: c.rent, dmg: c.cover, payable: c.payable,
@@ -816,13 +909,16 @@ function bkOpenBooking(code, prefill) {
     if (!amt) { if (x) ['rate', 'hourly', 'dep', 'disc', 'deliv', 'ret', 'others'].forEach(function (k) { rec[k] = x[k]; }); var c2 = bkCalc({ start: r.s, end: r.e, rate: rec.rate, hourly: rec.hourly, dep: rec.dep, disc: rec.disc, deliv: rec.deliv, ret: rec.ret, others: rec.others, covDaily: pk ? pk.daily : 0 }); rec.rent = c2.rent; rec.payable = c2.payable; rec.dmg = c2.cover; rec.days = c2.days; }
     rec.status = chSt ? f.status : (x ? x.status : 'Pending'); rec.pay = chSt ? f.pay : (x ? x.pay : '');
     if (chSt && rec.pay === 'Deposit Refunded' && !(x && x.pay === 'Deposit Refunded') && !canPickRefunded({ end: r.e, pay: x ? x.pay : '' })) rec.pay = x ? x.pay : '';
-    var rules = applyStatusRules(x, rec), notes = rules.notes || []; rec.status = rules.status; rec.pay = rules.pay;
+    var rules = applyStatusRules(x, rec), notes = rules.notes || []; rec.status = rules.status; rec.pay = rules.pay; rec.submitted = !!rules.submitted;
     /* paid more than the new total: the whole booking is paid, and the extra waits to go back (To give back) */
     if (overGrew) { if (['', 'Deposit due', 'Deposit Received'].indexOf(rec.pay || '') >= 0) { rec.pay = 'Full Payment Received'; notes.push('Payment status set to Full Payment Received.'); } notes.push(UI.fmt.money(overNew) + ' to give back to the customer.'); }
     if (rec.submitted && !(x && x.submittedAt)) rec.submittedAt = NOW();
+    /* "Record payment": the payment, once recorded, moves the payment status itself */
+    if (how.recordPay) { rec.pay = x ? x.pay || '' : ''; notes = notes.filter(function (nt) { return !/^Payment status set/.test(nt); }); }
     saved = true;
+    var recAfter = function (code) { if (how.recordPay) setTimeout(function () { API.recordPayment(code); }, 250); };
     var tail2 = notes.length ? ' ' + notes.join(' ') : '';
-    if (x) { DB.update('bookings', x, rec, { text: DB.actor() + ' changed booking ' + x.code }); UI.toast('Booking ' + x.code + ' updated.' + tail2, { ms: notes.length ? 6000 : 3500 }); return true; }
+    if (x) { DB.update('bookings', x, rec, { text: DB.actor() + ' changed booking ' + x.code }); UI.toast('Booking ' + x.code + ' updated.' + tail2, { ms: notes.length ? 6000 : 3500 }); recAfter(x.code); return true; }
     var n = Math.max.apply(0, d.bookings.map(function (z) { return z.n; }).concat([B().startNo || 0])) + 1, code2 = B().code + '-' + String(n).padStart(5, '0'), hx = function () { return Math.random().toString(16).slice(2, 10); };
     var nb = Object.assign({ n: n, code: code2, id: code2, received: 0, agent: '', created: NOW(), inspected: false, formId: B().id.slice(0, 3) + '-' + hx(), agentToken: 'agt-' + hx(), submittedAt: rec.submitted ? NOW() : null, ip: '', agentIds: [] }, rec);
     if (nb.submitted) nb.custSig = { typed: person.name };
@@ -832,6 +928,7 @@ function bkOpenBooking(code, prefill) {
     var ld = leadId && D().leads ? byId(D().leads, leadId) : null;
     if (ld) DB.update('leads', ld, { status: 'closed', booking: code2, heldUntil: null, reason: 'Booked', closedAt: NOW() }, { where: 'Lead', text: DB.actor() + ' booked the lead of ' + (ld.name || ld.phone) + ' as ' + code2 });
     UI.toast('Booking ' + code2 + ' created.' + tail2 + ' Send the booking form to ' + person.name + '.', { ms: 6000, action: { label: 'Send form', run: function () { bkSendForm(nb); } } });
+    recAfter(code2);
     return true;
   }
 
@@ -877,6 +974,9 @@ function bkOpenBooking(code, prefill) {
   dr.el.addEventListener('click', function (ev) {
     var t = ev.target, b2;
     if ((b2 = t.closest('[data-bkx-tog]'))) { b2.parentNode.classList.toggle('shut'); return; }
+    if ((b2 = t.closest('[data-bkx-cdet]'))) { var cs0 = dr.body.querySelector('#bkx-s-cust'); setFold(!(cs0 && cs0.classList.contains('bkx-cfold'))); return; }
+    if ((b2 = t.closest('[data-bkx-cp]'))) { var cn = carNote, nb2 = dr.body.querySelector('#bkx-carnote'); carNote = null; if (nb2) { nb2.hidden = true; nb2.innerHTML = ''; } if (cn && b2.getAttribute('data-bkx-cp') === 'use') { fillCarPrices(cn); dirty = true; recalc(); UI.toast('Prices set to ' + cn.plate + '\'s: ' + UI.fmt.money(cn.rate) + '/day, deposit ' + UI.fmt.money(cn.deposit) + '.', { ms: 3000 }); } return; }
+    if ((b2 = t.closest('[data-bkx-mt]'))) { var mid = b2.getAttribute('data-bkx-mt'); if (mid && custCtl) custCtl.set(mid); else { var m0 = custMatch(form()); notMatch = m0 ? m0.id : null; recalc(); } return; }
     if ((b2 = t.closest('[data-bkx-sum]'))) { API.openSummons(b2.getAttribute('data-bkx-sum')); return; }
     if ((b2 = t.closest('[data-bkx-len]'))) {
       var s = UI.dateFieldValue(field('start')), e = UI.dateFieldValue(field('end')), L = b2.getAttribute('data-bkx-len'); if (!s) { UI.toast('Pick the rental start first.', { tone: 'warn' }); return; }
@@ -974,6 +1074,16 @@ function bkOpenBooking(code, prefill) {
     out.innerHTML = h ? '<div class="bkx-chk-res">' + h + '</div>' : '';
   }
   return dr;
+}
+
+/* a question with its own buttons: bkAsk({title, text | html, buttons: [{label, value, kind}]}) -> promise of the value
+   (false when closed) */
+function bkAsk(o) {
+  return new Promise(function (res) {
+    var done = false, fin = function (val) { if (!done) { done = true; res(val); } };
+    UI.dialog({ title: o.title, width: 'sm', alert: true, body: o.html || '<p class="ui-ctext">' + esc(o.text) + '</p>', onClose: function () { fin(false); },
+      buttons: o.buttons.map(function (b) { return { label: b.label, kind: b.kind, onClick: function () { fin(b.value); } }; }) });
+  });
 }
 
 /* ---------------- send the booking form (WhatsApp message, made-up send) ---------------- */

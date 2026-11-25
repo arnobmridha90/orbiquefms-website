@@ -93,7 +93,9 @@ function avList(st) {
 }
 function avCard(x, st, kind) {
   var c = x.c, bz = x.bz, rent = calcBooking({ start: st.from, end: st.to, rates: { daily: c.rate, hourly: c.hourly } }).rent;
-  var note = kind === 'check' ? '<div class="av-note amber">' + I('clock') + esc(bz.soon) + '</div>' : kind === 'booked' ? '<div class="av-note red">' + I('lock') + esc(bz.reason) + '</div>' : '';
+  var hd = kind !== 'booked' ? heldFor(c.id, st.from, st.to) : null;
+  var note = (hd ? '<div class="av-note amber">' + I('wa') + 'Held for ' + esc(hd.name) + ' on WhatsApp, ' + hd.min + ' min left</div>' : '') +
+    (kind === 'check' ? '<div class="av-note amber">' + I('clock') + esc(bz.soon) + '</div>' : kind === 'booked' ? '<div class="av-note red">' + I('lock') + esc(bz.reason) + '</div>' : '');
   var act = kind === 'booked' ? (bz.booking ? '<a class="btn sm ghost" href="#booking/' + bz.booking.id + '">Open ' + esc(bz.booking.code) + '</a>' : '') :
     can('bookings.create') ? '<a class="btn sm' + (kind === 'check' ? ' ghost' : '') + '" href="' + hashWith('new', { car: c.id, start: st.from.toISOString(), end: st.to.toISOString() }) + '">' + I('plus', 2.2) + 'Book this car</a>' : '';
   return '<div class="card av-card ' + kind + '"><div class="av-top"><span class="av-pic">' + carSVG(c.color, c.shape) + '</span><div class="grow"><div class="av-plate">' + esc(c.plate) + '</div><div class="small muted av-model">' + esc(c.make + ' ' + c.model + ' · ' + (c.type || '') + ' · ' + c.color) + '</div></div>' +

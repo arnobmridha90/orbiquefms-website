@@ -120,7 +120,7 @@ function smsMessage(s) {
     '\nFine: ' + UI.fmt.money(s.fine) + (s.fee ? ', our admin fee: ' + UI.fmt.money(s.fee) : '') + '\nAmount to pay us: ' + UI.fmt.money(s.asked || s.fine + (s.fee || 0)) + '\n\n' +
     (acct.length ? 'Please transfer to: ' + acct.join(', ') + '.' : 'Please tell us how you would like to pay.') + '\nUse ' + (s.booking || s.notice || 'the notice number') + ' as the payment reference and send us the slip. Thank you.';
 }
-function smsWaLink(phone, text) { var digits = String(phone || '').replace(/\D/g, ''); return digits.length >= 9 ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent(text) : ''; }
+function smsWaLink(phone, text) { return UI.waNumber(phone).replace(/\D/g, '').length >= 9 ? UI.waLink(phone, text) : ''; }
 
 /* ---------------- the form (Add a summons and the Details block) ---------------- */
 function smsFormHtml(v, o) {

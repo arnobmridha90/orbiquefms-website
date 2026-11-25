@@ -39,6 +39,21 @@ function taskName(b, end) {
 function taskIsMine(t) { return (t.staff || []).indexOf(S.me) >= 0; }
 function taskCanEdit(t) { return can('tasks.edit') || (t && t.by === S.me && can('tasks.create')); }
 function taskCanWork(t) { return taskCanEdit(t) || taskIsMine(t); } /* status, note, photos, voice */
+/* a delivery or return job whose handover is still ahead: it closes only through the handover checklist */
+function taskHoLocked(t) {
+  var b = t && t.booking ? bk(t.booking) : null; if (!b) return false;
+  if (/^Delivery/.test(t.type || '')) return UPCOMING.indexOf(b.bookingStatus) >= 0;
+  if (/^Return/.test(t.type || '')) return UPCOMING.indexOf(b.bookingStatus) >= 0 || b.bookingStatus === 'Car Delivered';
+  return false;
+}
+/* the statuses this person may pick in the editor: someone who only works the job cannot cancel it, and a handover job is never ticked done by hand */
+function taskStatusChoices(t, full) {
+  return TASK_STATUSES.filter(function (s) { if (s === 'Cancelled' && !full) return false; if (s === 'Completed' && taskHoLocked(t) && t.status !== 'Completed') return false; return true; });
+}
+/* tell the people who give out jobs (tasks.assign), one note each */
+function taskTellManagers(t, title, body) {
+  (S.staff || []).filter(function (p) { return p.id !== S.me && p.loginActive !== false && p.hasLogin !== false && canP(p, 'tasks.assign'); }).forEach(function (p) { notify('job', title, body, '#task/' + t.id, { to: p.id, from: S.me, silentToast: true }); });
+}
 
 /* ---------- WhatsApp to staff (simulated) ---------- */
 function taskSendWa(t, ids) {
@@ -249,7 +264,9 @@ VIEWS.task = function (r) {
     '<div class="formcard"><h3>' + I('users') + 'Staff</h3><div class="tk-people">' + (people.length ? people.map(function (p) { return '<span class="tk-person"><span class="av xs" style="background:' + avColor(p.name) + '">' + initials(p.name) + '</span>' + esc(p.id === S.me ? p.name + ' (me)' : p.name) + '</span>'; }).join('') : '<span class="muted small">Nobody chosen yet</span>') + '</div>' +
     (assign ? '<button type="button" class="btn ghost" id="tkStaff">' + I('users') + (people.length ? 'Change staff' : 'Choose staff') + '</button>' : '') + '<small class="err" id="tkStaffErr"></small></div>' +
     tkWaHtml(t) +
-    '<div class="formcard"><h3>' + I('task') + 'Status</h3><div class="seg" id="tkSt">' + TASK_STATUSES.map(function (s) { return '<button type="button" class="' + (t.status === s ? 'on' : '') + '"' + (work ? '' : ' disabled') + '>' + s + '</button>'; }).join('') + '</div>' +
+    '<div class="formcard"><h3>' + I('task') + 'Status</h3><div class="seg" id="tkSt">' + taskStatusChoices(ed.orig || t, full).map(function (s) { return '<button type="button" class="' + (t.status === s ? 'on' : '') + '"' + (work ? '' : ' disabled') + '>' + s + '</button>'; }).join('') + '</div>' +
+    (!ed.isNew && taskHoLocked(ed.orig || t) && t.status !== 'Completed' ? '<p class="hint tk-lockhint">' + I('lock') + (/^Return/.test(t.type || '') ? 'Closes when you finish the take back.' : 'Closes when you finish the handover.') + '</p>' : '') +
+    (!ed.isNew && !full && work && taskIsMine(ed.orig) && t.status !== 'Completed' && t.status !== 'Cancelled' ? '<button type="button" class="btn ghost tk-cant" id="tkCant">' + I('warn') + 'I can’t do this job</button>' : '') +
     '<label class="field"><span>Note</span><textarea class="inp ho-ta" id="tkNote" maxlength="1000" placeholder="Address, who to meet, what to bring"' + (work ? '' : ' disabled') + '>' + esc(t.note || '') + '</textarea></label></div>' +
     '<div class="formcard"><h3>' + I('camera') + 'Photos</h3><div class="tk-photos">' + (t.photos || []).map(function (p, i) {
       return '<div class="tk-ph"><span class="thumb"><img alt="" src="' + imgSrc(p.src) + '"></span><input class="inp" data-cap="' + i + '" maxlength="120" placeholder="Caption" value="' + esc(p.caption || '') + '"' + (work ? '' : ' disabled') + '>' + (work ? '<button type="button" class="iconbtn" data-pdel="' + i + '" aria-label="Remove photo">' + I('trash') + '</button>' : '') + '</div>';
@@ -298,6 +315,7 @@ function tkEdWire() {
     Pickers.staff({ multi: true, title: 'Who does it?', selected: t.staff || [], preferIds: pref.here, upIds: pref.others, onPick: function (list) { t.staff = list.map(function (p) { return p.id; }); tkEd.dirty = true; render(false, true); } });
   };
   segPick('#tkSt', function (s) { t.status = s; tkEd.dirty = true; });
+  var cant = $('#tkCant'); if (cant) cant.onclick = function () { tkCantDo(tkEd.orig); };
   var ph = $('#tkPh'); if (ph) ph.onclick = function () { tkCollect(); Media.photo({ maxPx: 900, quality: .6 }).then(function (r) { if (!tkEd || tkEd.t !== t) return; t.photos.push({ src: r.dataUrl, caption: '' }); if (r.note) say(r.note); tkEd.dirty = true; render(false, true); var c = $$('[data-cap]'); if (c.length) c[c.length - 1].focus(); }, function () {}); };
   var ps = $('#tkPhS'); if (ps) ps.onclick = function () { tkCollect(); t.photos.push({ src: 'demo:photo:Task photo ' + (t.photos.length + 1), caption: '' }); tkEd.dirty = true; render(false, true); };
   $$('[data-pdel]').forEach(function (el) { el.onclick = function () { tkCollect(); var i = +el.dataset.pdel, p = t.photos.splice(i, 1)[0]; tkEd.dirty = true; render(false, true); undoSnack('Photo removed', function () { if (tkEd && tkEd.t === t) { t.photos.splice(i, 0, p); render(false, true); } }); }; });
@@ -310,7 +328,7 @@ function tkEdWire() {
     if (!tkEd.dirty) { leave(); return; }
     tkCollect(); tkAskDiscard().then(function (y) { if (y) leave(); });
   };
-  var sv = $('#tkSave'); if (sv) sv.onclick = tkSave;
+  var sv = $('#tkSave'); if (sv) sv.onclick = function () { tkSave(); };
   var dl = $('#tkDel'); if (dl) dl.onclick = function () {
     confirm({ icon: 'danger', title: 'Delete this task?', text: '“' + t.name + '” and its photos and voice notes will be removed.', ok: 'Delete task', cancel: 'Keep it', danger: true }).then(function (ok) {
       if (!ok) return; var o = tkEd.orig, i = S.tasks.indexOf(o); if (i < 0) return;
@@ -319,8 +337,36 @@ function tkEdWire() {
     });
   };
 }
-function tkSave() {
-  var t = tkCollect(), ok = true, isNew = tkEd.isNew;
+/* the person a job is given to hands it back: they come off it, the job stays open and the people who give out jobs are told */
+function tkCantDo(o) {
+  if (!o) return;
+  var sh = sheet(sheetHead('Hand this job back?', o.name) +
+    '<p class="lead">You come off this job. It stays open, and the people who give out jobs are told so they can give it to someone else.</p>' +
+    '<label class="field"><span>Why? (optional)</span><input class="inp" id="tkCantWhy" maxlength="200" placeholder="For example: I am at the airport until 3 PM"></label>' +
+    '<div class="sheet-foot stack"><button type="button" class="btn" id="tkCantGo">Hand it back</button><button type="button" class="btn link" onclick="closeSheet()">Keep the job</button></div>', null, { stack: true });
+  $('#tkCantGo', sh).onclick = function () {
+    var why = $('#tkCantWhy', sh).value.trim(), b = o.booking ? bk(o.booking) : null;
+    o.staff = (o.staff || []).filter(function (s) { return s !== S.me; }); if (o.wa) delete o.wa[S.me];
+    if (o.status === 'In Progress' && !o.staff.length) o.status = 'Pending';
+    if (b && b.assigned && !(S.tasks || []).some(function (x) { return x !== o && x.booking === b.id && x.status !== 'Cancelled' && x.status !== 'Completed' && (x.staff || []).indexOf(S.me) >= 0; })) b.assigned = b.assigned.filter(function (a) { return a !== S.me; });
+    var text = myName() + ' handed back the job ' + o.name + (why ? ': ' + why : '');
+    if (b) bLog(b, text); else audit(text, { link: '#task/' + o.id });
+    taskTellManagers(o, 'Job handed back: ' + o.name, myName() + (why ? ': ' + why : ' cannot do it') + (o.staff.length ? '' : '. Nobody is on it now.'));
+    save(); tkEd = null; closeSheet(true); setTimeout(function () { goBack('#tasks'); setTimeout(function () { say('Job handed back. The managers are told.'); }, 120); }, 60);
+  };
+}
+function tkSave(okCancel) {
+  var t0 = tkCollect();
+  /* cancelling a job: ask first, and tell the people who give out jobs */
+  if (!tkEd.isNew && t0.status === 'Cancelled' && tkEd.orig && tkEd.orig.status !== 'Cancelled' && !okCancel) {
+    if (!taskCanEdit(tkEd.orig)) { say('Ask a manager to cancel this job'); return; }
+    var bb = t0.booking ? bk(t0.booking) : null;
+    confirm({ icon: 'warn', title: 'Cancel this job?', text: t0.name + (bb && taskHoLocked(tkEd.orig) ? '. ' + bb.code + ' still needs this ' + (/^Return/.test(t0.type || '') ? 'take back' : 'handover') + ', so nobody will be on it.' : '.') + ' The people who give out jobs are told.', ok: 'Cancel the job', cancel: 'Keep it', primary: 'cancel', danger: true })
+      .then(function (y) { if (y) tkSave(true); });
+    return;
+  }
+  if (!tkEd.isNew && t0.status === 'Completed' && tkEd.orig && tkEd.orig.status !== 'Completed' && taskHoLocked(tkEd.orig)) { say(/^Return/.test(t0.type || '') ? 'It closes when you finish the take back' : 'It closes when you finish the handover'); return; }
+  var t = t0, ok = true, isNew = tkEd.isNew, wasCancel = !isNew && t.status === 'Cancelled' && tkEd.orig && tkEd.orig.status !== 'Cancelled';
   t.name = t.name.trim().replace(/\s+/g, ' ');
   if (!t.name) { $('#tkNameErr').textContent = 'Give the task a name.'; $('#tkName').classList.add('bad'); ok = false; }
   if (!t.at) { $('#tkAtErr').textContent = 'Choose the date and time.'; ok = false; }
@@ -343,6 +389,7 @@ function tkSave() {
   if (oldB) drop(oldB, before);
   if (b) { b.assigned = b.assigned || []; if (o.status !== 'Cancelled') (o.staff || []).forEach(function (s) { if (b.assigned.indexOf(s) < 0) b.assigned.push(s); }); bLog(b, (isNew ? 'Task made: ' : 'Task changed: ') + o.name + ' (' + o.staff.map(who).join(', ') + ')', tkEd.ch && Object.keys(tkEd.ch).length ? tkEd.ch : null); }
   else audit((isNew ? 'Task made: ' : 'Task changed: ') + o.name, { link: '#task/' + o.id });
+  if (wasCancel) taskTellManagers(o, 'Job cancelled: ' + o.name, 'Cancelled by ' + myName() + (b ? ' · ' + b.code : ''));
   save();
   var msg = isNew ? 'Task saved' + (added.length ? '. WhatsApp sent to ' + added.map(function (s) { return firstName(who(s)); }).join(', ') : '') : 'Changes saved' + (added.length ? '. WhatsApp sent to ' + added.map(function (s) { return firstName(who(s)); }).join(', ') : '');
   tkEd = null;

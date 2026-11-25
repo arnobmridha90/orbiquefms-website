@@ -240,7 +240,8 @@ function car(id) { return byId(S.cars, id); }
 function cust(id) { return byId(S.customers, id) || { id: id, name: 'Unknown customer', phone: '' }; }
 function bk(id) { return byId(S.bookings, id); }
 function staff(id) { return byId(S.staff, id); }
-function me() { return staff(S.me) || { id: S.me, name: 'Guest', role: 'readonly' }; }
+/* nobody signed in: a person with no role, so canP(me(), ...) is false for everything */
+function me() { return staff(S.me) || { id: S.me, name: 'Guest', role: '', codes: [] }; }
 function myName() { return me().name; }
 function firstName(n) { return String(n || '').split(' ')[0]; }
 /* how to greet a customer in a message: the full name when it is 3 words or fewer ('Lim Chee Keong'), else the part before bin / binti / a/l / a/p,
@@ -485,6 +486,19 @@ function busy(carId, start, end, exceptId) {
   return out;
 }
 function isFree(carId, start, end, exceptId) { return busy(carId, start, end, exceptId).free; }
+/* a car the WhatsApp assistant is holding for a customer (30 min after it offered it), for dates that touch start..end: { w, name, min } or null.
+   A hold does not block the car, it is a warning so two people do not promise the same car. exceptLead: the chat the booking is made from. */
+function heldFor(carId, start, end, exceptLead) {
+  var n = Date.now(), s = start ? new Date(start).getTime() : null, e = end ? new Date(end).getTime() : null, hit = null;
+  (S.wa || []).forEach(function (w) {
+    var l = w.lead; if (hit || !l || l.car !== carId || !l.holdUntil || w.id === exceptLead) return;
+    if (new Date(l.holdUntil).getTime() <= n || w.status === 'Booked' || w.status === 'Closed') return;
+    if (s != null && e != null && l.start) { var ls = new Date(l.start).getTime(), le = l.end ? new Date(l.end).getTime() : ls + DAY; if (!(ls < e && le > s)) return; }
+    hit = w;
+  });
+  return hit ? { w: hit, name: hit.name || hit.phone || 'a customer', min: Math.max(1, Math.ceil((new Date(hit.lead.holdUntil).getTime() - n) / MIN)) } : null;
+}
+function heldChip(h, cls) { return h ? '<span class="chip tone-amber ' + (cls || '') + '">Held for ' + esc(firstName(h.name)) + ', ' + h.min + ' min</span>' : ''; }
 function carNow(carId) { /* the booking the car is on now, or null */
   var n = Date.now(); return S.bookings.filter(function (b) { return b.car === carId && (b.bookingStatus === 'Car Delivered' || (blocksCar(b) && new Date(b.start) <= n && new Date(bkHoldEnd(b)) > n)); })[0] || null;
 }
@@ -854,6 +868,23 @@ function _guardAsk(rec) {
   return true;
 }
 function closeAllSheets() { _dropSheets(SHEETS.length, true); }
+/* a guard for a form sheet: asks before closing once anything in it was changed. var g = formGuard(); var sh = sheet(html, after, { guard: g }); g.arm(sh);
+   extra(): state that is not in an input (a photo, a picked car). The save path closes with closeSheet(false, true). */
+function formGuard(extra, text) {
+  var el = null, base = null;
+  var ser = function () {
+    return Array.prototype.map.call(el.querySelectorAll('input,textarea,select,.seg button,[aria-pressed],.on[data-f],.on[data-v]'), function (x) {
+      if (x.tagName === 'BUTTON' || x.hasAttribute('aria-pressed')) return x.classList.contains('on') ? '1' : '0';
+      return x.type === 'checkbox' || x.type === 'radio' ? (x.checked ? '1' : '0') : x.value;
+    }).join('\u0001') + '\u0002' + (extra ? JSON.stringify(extra()) : '');
+  };
+  var g = function () {
+    if (!el || !el.isConnected || base == null) return null;
+    return ser() !== base ? { title: 'Close without saving?', text: text || 'What you typed will be lost.', ok: 'Close anyway', cancel: 'Keep editing' } : null;
+  };
+  g.arm = function (sh) { el = sh; try { base = ser(); } catch (e) { base = null; } return sh; };
+  return g;
+}
 window.addEventListener('popstate', function (e) {
   if (_ignorePop > 0) { _ignorePop--; return; }
   var st = e.state && e.state.fmsSheet, idx = -1;

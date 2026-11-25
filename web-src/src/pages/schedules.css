@@ -221,3 +221,6 @@
 .sc-smdlg .sc-sm > .card-b{padding:0}
 .pg-schedules .sc-q{width:min(360px,100%)}
 @media (max-width:760px){.pg-schedules .sc-q{width:100%}}
+.pg-schedules .sc-papers:empty{display:none}
+.pg-schedules .sc-papers{padding:12px 16px 0}
+.pg-schedules .sc-papers .alert{margin:0}

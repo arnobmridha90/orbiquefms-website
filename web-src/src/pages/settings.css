@@ -136,3 +136,8 @@
   .pg-settings .set-rate,.pg-settings .chip:has(.set-x){min-height:40px}
   .pg-settings .set-fee-rates,.pg-settings .set-tg + .row{gap:8px}
 }
+/* Other places: the fee boxes carry their own labels on a phone, where the column headings are hidden */
+@media (min-width:761px){.pg-settings .set-pl > .inp > label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+@media (max-width:760px){.pg-settings .set-pl{align-items:end}.pg-settings .set-pl > .ib{margin-bottom:2px}}
+/* Menu layout on a phone: the page name on its own line, the group and the arrows below it */
+@media (max-width:560px){.pg-settings .set-mi > .grow{flex:1 1 calc(100% - 40px);white-space:normal;overflow:visible}}

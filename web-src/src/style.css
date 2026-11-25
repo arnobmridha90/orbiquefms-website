@@ -1043,3 +1043,10 @@ svg{display:block}
   .t3-foot{padding:24px 16px}
 }
 @media (max-width:760px){.sx{position:relative}.d-nav,.pm-side{top:0!important;height:100vh!important;z-index:70!important}.d-shell.open .d-scrim,.pm.open .pm-scrim{inset:0!important;z-index:65!important}}
+/* text beside buttons in a wrapping row (card footers, notes with an action): it keeps a readable width and the buttons
+   wrap below it, instead of the text shrinking to one word per line. Empty spacers keep flex:1. */
+.card-f > .grow:not(:empty),.row.wrap > .grow:not(:empty){flex:1 1 220px}
+@media (max-width:560px){.card-f > .grow:not(:empty){flex-basis:100%}}
+/* a note with an action button: the button drops below the text on a narrow screen instead of squeezing it */
+.alert{flex-wrap:wrap}
+.alert > .grow{flex:1 1 200px;min-width:0}

@@ -161,3 +161,12 @@
 .nb-leadd > summary svg { width: 16px; height: 16px; transition: transform .15s; }
 .nb-leadd[open] > summary svg { transform: rotate(180deg); }
 .nb-free { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+/* rental terms the customer can read before signing */
+.nb-terms { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 12px; background: var(--card); }
+.nb-terms summary { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; font-weight: 600; font-size: 14px; cursor: pointer; list-style: none; }
+.nb-terms summary::-webkit-details-marker { display: none; }
+.nb-terms ol { margin: 0; padding: 0 14px 12px 32px; font-size: 13.5px; line-height: 1.45; color: var(--text); }
+.nb-terms li + li { margin-top: 6px; }
+.nb-overlap .btn.link, .nb-licb .btn.link { padding-left: 0; }
+.nb-lens [data-now] svg { width: 15px; height: 15px; }

@@ -44,8 +44,9 @@ function depChip(z) {
   if (s === 'used') return UI.chip('Used for payments', 'info', { title: 'Payments from the deposit took all of it, so nothing goes back' });
   if (s === 'none') return UI.chip('No deposit taken', 'grey', { title: 'The booking had no deposit, so nothing goes back' });
   if (s === 'hand') return UI.chip('Marked by hand', 'grey', { title: 'The payment status was set to Deposit Refunded without recording a refund' });
-  var n = depWaitDays(z);
-  return UI.chip(n ? 'Waiting ' + plural(n, 'day') : 'Waiting since today', n >= 7 ? 'bad' : 'warn');
+  /* amber within the company's refund time (Settings, refundHours), red once it is past it */
+  var n = depWaitDays(z), x = findBooking(z.booking), lim = +(B().refundHours || 24), late = x && (NOW() - x.end) / 36e5 > lim;
+  return UI.chip(n ? 'Waiting ' + plural(n, 'day') : 'Waiting since today', late ? 'bad' : 'warn', { title: late ? 'Past the ' + lim + '-hour refund time' : 'Within the ' + lim + '-hour refund time' });
 }
 function depHow(r) { if (!r) return ''; return r.method === 'None' ? 'Nothing returned: the deductions took all of it' : r.method === 'Cash' ? 'Cash, refunded by ' + r.by : r.method === 'Stripe' ? 'Refunded to the card through Stripe' : 'Online transfer from the bank'; }
 function depLists() {
@@ -316,7 +317,7 @@ PAGES['deposits'] = {
   title: 'Deposit refunds',
   search: [{ label: 'Deposits waiting to be returned', icon: 'cash-banknote', run: function () { go('deposits', { tab: 'refund' }); } }, { label: 'Refund a deposit for any booking', icon: 'cash-banknote', run: function () { depPickBooking(); } }],
   render: function (root, ctx) {
-    var P = ctx.params, tab = P.tab === 'refunded' ? 'refunded' : 'refund', L = depLists(), q = P.q || '', state = (tab === 'refund' ? ['long'] : ['returned', 'used', 'hand', 'none']).indexOf(P.state) >= 0 ? P.state : '', sort = P.sort || '';
+    var P = ctx.params, tab = P.tab === 'refunded' ? 'refunded' : 'refund', L = depLists(), q = P.q || '', state = (tab === 'refund' ? ['long'] : ['returned', 'used', 'hand', 'none']).indexOf(P.state) >= 0 ? P.state : '', sort = P.sort || (tab === 'refund' ? 'status' : 'new');   /* To refund opens with the longest wait on top */
     var m0 = new Date(NOW().getFullYear(), NOW().getMonth(), 1), thisMonth = L.done.filter(function (z) { return z.refund && z.refund.at >= m0 && z.refund.method !== 'None'; });
     var heldWait = sum(L.wait.map(function (z) { return depBasis(z); })), dueWait = sum(L.wait.map(function (z) { return depDue(z); }));
     /* adjustments this month: taken off deposits refunded this month, and payments paid from deposits this month */
@@ -329,7 +330,7 @@ PAGES['deposits'] = {
       '<div class="card stat ui-stat dep-adj" style="--c:var(--info-rgb)"><div class="grow"><div class="l">Adjustments this month</div><div class="dep-adj-r"><span>Taken off deposits</span><b class="num">' + UI.money(takenOff) + '</b></div><div class="dep-adj-r"><span>Used for payments</span><b class="num">' + UI.money(usedM) + '</b></div></div><span class="ic">' + i('receipt-2') + '</span></div></div>' +
       '<div class="card"><div class="dep-tabs" id="dep-tabs"></div><div class="dep-q"><div class="inp srch">' + i('search') + '<input type="search" id="dep-q" data-key="depq" placeholder="Booking ID, customer, plate..." aria-label="Search deposits" value="' + esc(q) + '"></div>' +
       UI.select({ key: 'state', aria: 'Status', value: state, options: [['', tab === 'refund' ? 'All waiting' : 'All refunded']].concat(tab === 'refund' ? [['long', 'Waiting 7 days or more']] : [['returned', 'Returned'], ['used', 'Used for payments'], ['hand', 'Marked by hand'], ['none', 'No deposit taken']]), id: 'dep-state' }) +
-      UI.select({ key: 'sort', aria: 'Order', value: sort, options: [['', 'Newest booking first'], ['status', tab === 'refunded' ? 'Status, earliest first' : 'Longest waiting first'], ['-status', tab === 'refunded' ? 'Status, latest first' : 'Shortest waiting first']], id: 'dep-sort' }) +
+      UI.select({ key: 'sort', aria: 'Order', value: sort, options: [['new', 'Newest booking first'], ['status', tab === 'refunded' ? 'Status, earliest first' : 'Longest waiting first'], ['-status', tab === 'refunded' ? 'Status, latest first' : 'Shortest waiting first']], id: 'dep-sort' }) +
       (q || state ? UI.btn('Clear', { kind: 't', size: 'sm', icon: 'x', attrs: { 'data-clearq': '1' } }) : '') + '</div><div id="dep-t"></div></div>';
     UI.tabs(root.querySelector('#dep-tabs'), { value: tab, items: [{ id: 'refund', label: 'To refund', icon: 'hourglass', count: L.wait.length, tone: 'warn' }, { id: 'refunded', label: 'Refunded', icon: 'circle-check', count: L.done.length, tone: 'grey' }], onChange: function (id) { ctx.setParams({ tab: id === 'refund' ? null : id, page: null, state: null, sort: null }); ctx.refresh(); } });
     var list = tab === 'refund' ? L.wait : L.done;

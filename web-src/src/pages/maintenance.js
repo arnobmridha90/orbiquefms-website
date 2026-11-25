@@ -437,7 +437,7 @@ function mtTabVendors(el, ctx) {
   var t;
   UI.filters(el.querySelector('#mt-vf'), { values: f, fields: [{ type: 'search', key: 'q', placeholder: 'Search workshops' }, { type: 'toggle', key: 'old', label: 'Show workshops no longer in use' }], onChange: function () { t.setRows(rows()); },
     extra: ctx.can('maintenance.manage_vendors') ? '<span class="grow"></span>' + UI.btn('Add a workshop', { size: 'sm', icon: 'plus', attrs: { 'data-vact': 'add' } }) : '' });
-  var contact = function (v) { return '<span class="row gap4">' + (v.phone ? '<a class="ib sm" href="tel:' + esc(v.phone.replace(/\s/g, '')) + '" title="Call ' + esc(v.phone) + '" aria-label="Call" data-stop>' + i('phone') + '</a>' : '') + (v.wa || v.phone ? '<a class="ib sm" href="https://wa.me/' + String(v.wa || v.phone).replace(/\D/g, '') + '" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp" data-stop>' + i('brand-whatsapp') + '</a>' : '') + (v.email ? '<a class="ib sm" href="mailto:' + esc(v.email) + '" title="' + esc(v.email) + '" aria-label="Email" data-stop>' + i('mail') + '</a>' : '') + '</span>'; };
+  var contact = function (v) { return '<span class="row gap4">' + (v.phone ? '<a class="ib sm" href="tel:' + esc(v.phone.replace(/\s/g, '')) + '" title="Call ' + esc(v.phone) + '" aria-label="Call" data-stop>' + i('phone') + '</a>' : '') + (v.wa || v.phone ? '<a class="ib sm" href="' + UI.waLink(v.wa || v.phone) + '" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp" data-stop>' + i('brand-whatsapp') + '</a>' : '') + (v.email ? '<a class="ib sm" href="mailto:' + esc(v.email) + '" title="' + esc(v.email) + '" aria-label="Email" data-stop>' + i('mail') + '</a>' : '') + '</span>'; };
   t = UI.table(el.querySelector('#mt-vt'), {
     columns: [{ key: 'name', label: 'Workshop', sort: true, render: function (r) { return '<b class="fw5">' + esc(r.name) + '</b>' + (r.v.active ? '' : ' ' + UI.chip('Not in use', 'grey')) + '<div class="b2">' + UI.phone(r.v.phone) + '</div>'; } },
       { key: 'kind', label: 'Kind', render: function (r) { return esc(r.v.kind); } },
@@ -822,7 +822,7 @@ function mtPaperForm(o) {
   var start = JSON.stringify(f);
   var title = edit ? 'Edit paper' : old ? 'Renew ' + kind.toLowerCase().replace('puspakom', 'PUSPAKOM') : 'Add a paper';
   function html() {
-    return '<div class="mt-form">' + UI.select({ key: 'car', label: 'Car', required: true, options: mtCarOpts(true), value: f.car, placeholder: 'Choose a car', full: true }) +
+    return '<div class="mt-form"><div class="full mt-pcar"></div>' +
       UI.choice({ key: 'kind', label: 'Type', value: f.kind, options: LISTS.paperTypes, full: true }) + (f.kind === 'Other' ? UI.input({ key: 'name', label: 'What is it?', required: true, value: f.name, full: true, placeholder: 'For example Permit to enter a port' }) : '') +
       UI.dateField({ key: 'until', label: 'Valid until', chips: false, required: f.kind !== 'Car grant', value: f.until, help: f.kind === 'Car grant' ? 'A grant does not expire. Leave empty.' : '' }) + UI.dateField({ key: 'issued', label: 'Issued on (optional)', chips: false, value: f.issued }) +
       UI.input({ key: 'provider', label: f.kind === 'Insurance' ? 'Insurer (optional)' : 'Issued by (optional)', value: f.provider }) + (mtCostsOk() ? UI.input({ key: 'cost', label: 'What it cost', type: 'number', prefix: 'RM', min: 0, step: '0.01', value: f.cost }) : '') +
@@ -834,9 +834,11 @@ function mtPaperForm(o) {
   var box = dr.body.querySelector('.mt-pf');
   function paint() {
     box.innerHTML = html();
+    /* the same searchable car picker as the other fleet forms: type '3326' or 'VMA3326'; sold cars only when already chosen */
+    mtCarPick(box.querySelector('.mt-pcar'), { value: f.car, badges: false, onChange: function (id) { f.car = id || ''; } });
     var z = box.querySelector('.mt-pdz'); if (z) UI.dropzone(z, { accept: 'image/*,.pdf', camera: true, label: 'Add the photo or PDF', onFiles: function (fs) { mtReadFile(fs[0]).then(function (r) { f.file = r; paint(); }, function (e) { UI.toast(e.message, { tone: 'warn' }); }); } });
   }
-  mtBind(box, f, function (k, ev) { if (ev.type === 'change' && (k === 'kind' || k === 'car')) paint(); });
+  mtBind(box, f, function (k, ev) { if (ev.type === 'change' && k === 'kind') paint(); });
   box.addEventListener('click', function (ev) { if (ev.target.closest('[data-pf="rmfile"]')) { f.file = null; paint(); } });
   function save() {
     if (!f.car) { UI.toast('Choose the car', { tone: 'warn' }); return false; }

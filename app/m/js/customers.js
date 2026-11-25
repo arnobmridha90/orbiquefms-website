@@ -74,7 +74,13 @@ var Cust = (function () {
     if (!q) return true;
     if (g.members.some(function (c) { return Pickers.customerMatches(c, q) || wordsMatch(q, c.email); })) return true;
     if (/\d/.test(q) && g.bookings.some(function (b) { return matchBookingCode(q, b); })) return true;
+    if (plateHit(g, q)) return true;
     return false;
+  }
+  /* the latest booking of this customer on a car whose plate matches (3 or more letters and numbers, with or without the space) */
+  function plateHit(g, q) {
+    var np = normPlate(q || ''); if (np.length < 3 || !/\d/.test(np) || !/[A-Z]/.test(np)) return null;
+    return g.bookings.filter(function (b) { var c = car(b.car); return c && normPlate(c.plate).indexOf(np) >= 0; }).sort(function (a, b) { return new Date(b.start) - new Date(a.start); })[0] || null;
   }
   function telOf(p) { return String(p || '').replace(/[^\d+]/g, ''); }
   function flagPref() { var k = (S.prefs && S.prefs.cuFlag) || 'all'; if (!can('customer_notes.view') && k !== 'repeat') k = 'all'; var f = FILTERS.filter(function (x) { return x.k === k; })[0]; if (!f || (f.need && !can(f.need))) k = 'all'; return k; }
@@ -84,7 +90,7 @@ var Cust = (function () {
     if (!can('customers.view')) return { html: topbar('Customers', { back: '#more' }) + '<main>' + noAccess('customers.view') + '</main>' };
     var all = people();
     var html = topbar('Customers', { back: '#more', sub: all.length + ' customers' }) + '<main class="cu-main">' +
-      '<label class="search cu-search">' + I('search') + '<input id="cuq" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Name, phone, IC, email or booking no." value="' + esc(CU.q) + '"><button type="button" class="cu-clear" id="cuclr" aria-label="Clear"' + (CU.q ? '' : ' hidden') + '>' + I('x', 2.2) + '</button></label>' +
+      '<label class="search cu-search">' + I('search') + '<input id="cuq" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Name, phone, IC, plate or booking no." value="' + esc(CU.q) + '"><button type="button" class="cu-clear" id="cuclr" aria-label="Clear"' + (CU.q ? '' : ' hidden') + '>' + I('x', 2.2) + '</button></label>' +
       (can('customer_notes.view') ? '<div class="chiprow cu-chips" id="cuchips"></div>' : '') +
       '<div id="culist"></div></main>';
     return { html: html, after: function () { wireList(all); } };
@@ -117,18 +123,20 @@ var Cust = (function () {
     var label = FILTERS.filter(function (f) { return f.k === k; })[0].label;
     var html = '<div class="cu-count">' + (q || k !== 'all' ? list.length + ' match' + (list.length === 1 ? '' : 'es') + (q ? ' for “' + esc(q) + '”' : '') + (k !== 'all' ? ' in ' + esc(label) : '') : list.length + ' customers, A to Z') + '</div>';
     if (!list.length) html += '<div class="empty card">' + I('users') + '<div>No customer matches' + (q ? ' “' + esc(q) + '”' : '') + (k !== 'all' ? ' in ' + esc(label) : '') + '.</div>' + (k !== 'all' ? '<button type="button" class="btn link" id="cuall">Show everyone</button>' : '') + '</div>';
-    else html += '<div class="list cu-list">' + shown.map(rowHtml).join('') + '</div>' +
+    else html += '<div class="list cu-list">' + shown.map(function (g) { return rowHtml(g, q); }).join('') + '</div>' +
       (list.length > shown.length ? '<button type="button" class="btn ghost cu-more" id="cumore">Load more <span class="muted">(' + (list.length - shown.length) + ' more)</span></button>' : '');
     $('#culist').innerHTML = html;
     var mb = $('#cumore'); if (mb) mb.onclick = function () { CU.shown += 25; draw(all); };
     var ab = $('#cuall'); if (ab) ab.onclick = function () { usePrefs(); S.prefs.cuFlag = 'all'; save(); draw(all); };
   }
-  function rowHtml(g) {
+  function rowHtml(g, q) {
+    var ph = q && !g.members.some(function (m) { return Pickers.customerMatches(m, q); }) ? plateHit(g, q) : null, pc = ph && car(ph.car);
     var c = g.c, n = g.rentals, tel = telOf(c.phone), idTxt = c.ic ? maskIC(c.ic) : c.passport ? maskIC(c.passport) : '';
     return '<div class="cu-row" role="button" tabindex="0" data-open="' + c.id + '" onclick="Cust.open(\'' + c.id + '\')" onkeydown="if(event.key===\'Enter\')Cust.open(\'' + c.id + '\')">' +
       '<span class="av" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</span>' +
       '<span class="cu-mid"><span class="cu-name">' + esc(c.name) + '</span>' +
       '<span class="cu-sub"><span class="nowrap">' + esc(c.phone || 'No phone') + '</span>' + (idTxt ? ' · <span class="nowrap">' + esc(idTxt) + '</span>' : '') + '</span>' +
+      (pc ? '<span class="cu-sub cu-plhit">' + I('car') + 'Rented ' + esc(pc.plate) + ' on ' + esc(dShort(ph.start)) + (new Date(ph.start).getFullYear() !== new Date().getFullYear() ? ' ' + new Date(ph.start).getFullYear() : '') + '</span>' : '') +
       '<span class="cu-sub2"><span class="cu-n' + (n > 1 ? ' many' : '') + '">' + esc(rentalsText(g.stats)) + '</span>' + g.flags.filter(function (f) { return f !== 'Repeat' || g.flags.length < 4; }).slice(0, 3).map(fchip).join('') + '</span></span>' +
       (tel ? '<a class="cu-ic" href="tel:' + esc(tel) + '" aria-label="Call ' + esc(c.name) + '" onclick="event.stopPropagation()">' + I('phone') + '</a>' +
         '<button type="button" class="cu-ic wa" aria-label="WhatsApp ' + esc(c.name) + '" onclick="event.stopPropagation();Share.wa(\'' + esc(c.phone) + '\', \'\')">' + I('wa') + '</button>' : '') + '</div>';
@@ -226,15 +234,25 @@ var Cust = (function () {
   function bookingsHtml(g) {
     var c = g.c, canBook = can('bookings.create');
     if (!can('bookings.view')) return canBook ? '<button type="button" class="btn big cu-again" onclick="Cust.bookAgain(\'' + c.id + '\')">' + I('plus') + 'Book again</button>' : '';
-    var list = g.bookings.slice().sort(function (a, b) { return new Date(b.start) - new Date(a.start); }), more = list.length > 6 && !Cust._all;
-    var shown = more ? list.slice(0, 6) : list;
-    return '<div class="sec"><h2>Bookings (' + list.length + ')</h2></div>' +
-      (list.length ? '<div class="list cu-bks">' + shown.map(function (b) {
+    var list = g.bookings.slice().sort(function (a, b) { return new Date(b.start) - new Date(a.start); });
+    var nowL = list.filter(function (b) { return b.bookingStatus === 'Car Delivered' || b.bookingStatus === 'Car Returned'; });
+    var upL = list.filter(function (b) { return nowL.indexOf(b) < 0 && UPCOMING.indexOf(b.bookingStatus) >= 0; }).reverse();
+    var pastL = list.filter(function (b) { return nowL.indexOf(b) < 0 && upL.indexOf(b) < 0; });
+    Cust._open = Cust._open || {};
+    var card = function (b) {
         var cr = car(b.car) || {};
         return '<a class="card2 cu-bk" href="#booking/' + b.id + '"><div class="c2-main"><div class="c2-t1"><span class="cu-code">' + esc(b.code) + '</span> ' + statusChip(b) + '</div>' +
           '<div class="c2-t2">' + esc((cr.plate || 'No car') + (cr.model ? ' · ' + cr.make + ' ' + cr.model : '')) + '</div><div class="c2-t2">' + esc(dShort(b.start) + ', ' + hm(b.start) + ' → ' + dShort(b.end) + ', ' + hm(b.end)) + (new Date(b.start).getFullYear() !== new Date().getFullYear() ? ' ' + new Date(b.start).getFullYear() : '') + '</div></div>' +
           (can('bookings.see_amounts') && b.bookingStatus !== 'Cancelled' ? '<div class="c2-end money">' + rm(calcBooking(b).payable) + '<small>' + (calcBooking(b).due > 0.99 ? 'due ' + rm(calcBooking(b).due) : 'paid') + '</small></div>' : '<span class="cu-chev">' + I('chev') + '</span>') + '</a>';
-      }).join('') + '</div>' + (more ? '<button type="button" class="btn link cu-all" onclick="Cust._all=true;render(false,true)">Show all ' + list.length + ' bookings</button>' : '') : '<div class="card cu-card cu-none">No bookings yet.</div>') +
+    };
+    var group = function (k, title, items, few) {
+      if (!items.length) return '';
+      var all = Cust._all || Cust._open[k], shown = all ? items : items.slice(0, few);
+      return '<div class="cu-bkh">' + esc(title) + ' <span class="muted">' + items.length + '</span></div><div class="list cu-bks">' + shown.map(card).join('') + '</div>' +
+        (items.length > shown.length ? '<button type="button" class="btn link cu-all" onclick="Cust._open[\'' + k + '\']=true;render(false,true)">Show all ' + items.length + ' ' + title.toLowerCase() + '</button>' : '');
+    };
+    return '<div class="sec"><h2>Bookings (' + list.length + ')</h2></div>' +
+      (list.length ? group('now', 'Now', nowL, 3) + group('up', 'Coming up', upL, 3) + group('past', 'Past', pastL, 4) : '<div class="card cu-card cu-none">No bookings yet.</div>') +
       (canBook ? '<button type="button" class="btn big cu-again" onclick="Cust.bookAgain(\'' + c.id + '\')">' + I('plus') + (list.length ? 'Book again' : 'Make a booking') + '</button>' : '');
   }
 
@@ -253,14 +271,15 @@ var Cust = (function () {
     var f = function (k, label, v, type, extra) { return '<label class="field"><span>' + esc(label) + '</span><input class="inp" id="ce_' + k + '" type="' + (type || 'text') + '" value="' + esc(v || '') + '"' + (extra || '') + '><div class="err" id="ce_' + k + '_err"></div></label>'; };
     var nats = ['Malaysian', 'Singaporean', 'Indonesian', 'Thai', 'Bangladeshi', 'Filipino', 'Chinese', 'Indian', 'British', 'Australian', 'Japanese', 'Other'];
     if (c.nationality && nats.indexOf(c.nationality) < 0) nats.unshift(c.nationality);
-    sheet(sheetHead('Edit details', c.name) + '<div class="cu-form">' +
+    var g = formGuard();
+    var shE = sheet(sheetHead('Edit details', c.name) + '<div class="cu-form">' +
       f('name', 'Full name', c.name, 'text', ' autocomplete="off"') + f('phone', 'Phone', c.phone, 'tel', ' inputmode="tel"') + f('email', 'Email', c.email, 'email', ' inputmode="email" autocapitalize="off"') +
       '<label class="field"><span>Nationality</span><select class="inp" id="ce_nat">' + nats.map(function (n) { return '<option' + (n === (c.nationality || 'Malaysian') ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>' +
       f('ic', 'IC number', c.ic, 'text', ' inputmode="numeric" placeholder="900101-14-5678"') + f('passport', 'Passport number', c.passport, 'text', ' autocapitalize="characters"') +
       '<div class="cu-2">' + f('lic', 'Licence number', c.licenceNo, 'text', ' autocapitalize="characters"') + f('exp', 'Licence expiry', c.licenceExp, 'date') + '</div>' +
       '<label class="field"><span>Address</span><textarea class="inp" id="ce_addr" rows="2">' + esc(c.address || '') + '</textarea></label>' +
       '<div class="cu-sub-h">Emergency contact</div>' + f('ename', 'Name', em.name) + '<div class="cu-2">' + f('ephone', 'Phone', em.phone, 'tel', ' inputmode="tel"') + f('erel', 'Relation', em.relation) + '</div>' +
-      '</div><div class="sheet-foot"><button type="button" class="btn" id="ce_save">Save details</button></div>', function (sh) {
+      '</div><div class="sheet-foot"><button type="button" class="btn" id="ce_save">Save details</button></div>', { guard: g, after: function (sh) {
         $('#ce_save', sh).onclick = function () {
           var v = function (k) { return $('#ce_' + k, sh).value.trim(); }, bad = false;
           $$('.err', sh).forEach(function (e) { e.textContent = ''; }); $$('.inp.bad', sh).forEach(function (e) { e.classList.remove('bad'); });
@@ -276,11 +295,11 @@ var Cust = (function () {
           Object.keys(next).forEach(function (k) { if (String(c[k] || '') !== String(next[k] || '')) changes[labels[k]] = [k === 'ic' ? maskIC(c[k]) : c[k] || '', k === 'ic' ? maskIC(next[k]) : next[k] || '']; });
           var ne = { name: v('ename'), phone: v('ephone') ? fmtPhone(v('ephone')) : '', relation: v('erel') };
           if (JSON.stringify(ne) !== JSON.stringify({ name: em.name || '', phone: em.phone || '', relation: em.relation || '' })) changes['Emergency contact'] = [em.name || '', ne.name];
-          if (!Object.keys(changes).length) { closeSheet(); say('Nothing changed'); return; }
+          if (!Object.keys(changes).length) { closeSheet(false, true); say('Nothing changed'); return; }
           var go = function () {
             Object.assign(c, next); c.emergency = ne;
             audit('Changed the details of ' + c.name, { cust: c.id, changes: changes, link: '#customer/' + c.id });
-            save(); closeSheet(); refresh(); say('Details saved');
+            save(); closeSheet(false, true); refresh(); say('Details saved');
           };
           /* an IC or passport that belongs to someone else would join two people into one: ask first */
           var other = sameIdOther(c, next);
@@ -289,7 +308,8 @@ var Cust = (function () {
           confirm({ icon: 'warn', title: 'This ' + (next.ic && keyOfId(next.ic) === keyOfId(next.ic || next.passport) ? 'IC' : 'number') + ' is already used by ' + other.name, text: other.name + ' has ' + on + ' booking' + (on === 1 ? '' : 's') + '. If you save, ' + c.name + ' and ' + other.name + ' show as one customer with all their bookings and money together. Same person?', ok: 'Yes, same person', cancel: 'Fix the number', primary: 'cancel' })
             .then(function (y) { if (y) setTimeout(go, 40); else setTimeout(function () { var i = $('#ce_' + (next.ic ? 'ic' : 'passport')); if (i) { i.classList.add('bad'); i.focus(); } }, 60); });
         };
-      });
+      } });
+    g.arm(shE);
   }
   function noteSheet(custId, noteId) {
     var c = byId(S.customers, custId); if (!c) return;
@@ -297,13 +317,14 @@ var Cust = (function () {
     if (n ? !can('customer_notes.edit') : !can('customer_notes.add')) { say('Ask the owner for note access'); return; }
     var flag = n ? n.flag : 'info', pinned = n ? !!n.pinned : false;
     var bks = S.bookings.filter(function (b) { return b.cust === custId; }).sort(function (a, b) { return new Date(b.start) - new Date(a.start); }).slice(0, 8);
-    sheet(sheetHead(n ? 'Edit note' : 'Add a note', 'About ' + c.name + '. Every staff member sees it on this customer’s bookings.') +
+    var gN = formGuard(function () { return flag; }, 'The note you wrote will be lost.');
+    var shN = sheet(sheetHead(n ? 'Edit note' : 'Add a note', 'About ' + c.name + '. Every staff member sees it on this customer’s bookings.') +
       '<div class="cu-flags" id="cn_flags">' + NOTE_FLAGS.map(function (f) { return '<button type="button" class="cu-flag t-' + f.tone + (f.k === flag ? ' on' : '') + '" data-f="' + f.k + '">' + I(f.icon) + '<b>' + esc(f.label) + '</b><small>' + esc(f.hint) + '</small></button>'; }).join('') + '</div>' +
       '<label class="field"><span>What should staff know?</span><textarea class="inp cu-ta" id="cn_text" rows="3" placeholder="For example: always returns the car late, remind about the late fee.">' + esc(n ? n.text : '') + '</textarea><div class="err" id="cn_err"></div></label>' +
       '<div class="chiprow cu-phr">' + PHRASES.map(function (p) { return '<button type="button" class="fchip" data-p="' + esc(p) + '">' + I('plus', 2.2) + esc(p) + '</button>'; }).join('') + '</div>' +
       (bks.length ? '<label class="field"><span>From a booking (optional)</span><select class="inp" id="cn_bk"><option value="">Not about one booking</option>' + bks.map(function (b) { return '<option value="' + b.id + '"' + (n && n.booking === b.id ? ' selected' : '') + '>' + esc(b.code + ' · ' + dShort(b.start) + ' · ' + ((car(b.car) || {}).plate || '')) + '</option>'; }).join('') + '</select></label>' : '') +
       '<label class="cu-pinrow"><span class="grow"><b>Pin to the top</b><small>Pinned notes show first, and in the warning on new bookings</small></span><span class="sw"><input type="checkbox" id="cn_pin"' + (pinned ? ' checked' : '') + '><i></i></span></label>' +
-      '<div class="sheet-foot"><button type="button" class="btn" id="cn_save">' + (n ? 'Save note' : 'Add note') + '</button></div>', function (sh) {
+      '<div class="sheet-foot"><button type="button" class="btn" id="cn_save">' + (n ? 'Save note' : 'Add note') + '</button></div>', { guard: gN, after: function (sh) {
         $$('#cn_flags button', sh).forEach(function (b) { b.onclick = function () { $$('#cn_flags button', sh).forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); flag = b.dataset.f; }; });
         var ta = $('#cn_text', sh);
         $$('.cu-phr button', sh).forEach(function (b) { b.onclick = function () { var t = ta.value.trim(); ta.value = t ? t.replace(/[.\s]*$/, '') + '. ' + b.dataset.p + '.' : b.dataset.p + '.'; $('#cn_err', sh).textContent = ''; ta.classList.remove('bad'); }; });
@@ -315,10 +336,11 @@ var Cust = (function () {
           S.notes = S.notes || [];
           if (n) { var ch = {}; if (n.text !== t) ch.Text = [n.text, t]; if (n.flag !== flag) ch.Flag = [n.flag, flag]; n.text = t; n.flag = flag; n.pinned = pin; n.booking = bid; audit('Changed a note about ' + c.name, { cust: c.id, changes: ch, link: '#customer/' + c.id }); }
           else { S.notes.push({ id: uid(), cust: c.id, flag: flag, text: t, pinned: pin, by: S.me, at: new Date().toISOString(), booking: bid }); audit('Added a ' + (NOTE_FLAGS.filter(function (x) { return x.k === flag; })[0].label) + ' note about ' + c.name, { cust: c.id, link: '#customer/' + c.id }); }
-          save(); closeSheet(); refresh(); say(n ? 'Note saved' : 'Note added');
+          save(); closeSheet(false, true); refresh(); say(n ? 'Note saved' : 'Note added');
         };
         if (!n) setTimeout(function () { try { ta.focus({ preventScroll: true }); } catch (e) {} }, 320);
-      });
+      } });
+    gN.arm(shN);
   }
   function togglePin(id) { var n = byId(S.notes, id); if (!n || !can('customer_notes.edit')) return; n.pinned = !n.pinned; save(); refresh(); say(n.pinned ? 'Pinned to the top' : 'Unpinned'); }
   function delNote(id) {
@@ -334,18 +356,35 @@ var Cust = (function () {
       confirm({ icon: 'warn', title: 'This customer has no IC / Passport No.', text: 'The blacklist works on the IC or passport number. Add it to the customer’s details first.', ok: can('customers.edit') ? 'Add the IC now' : 'OK', cancel: 'Not now' }).then(function (ok) { if (ok && can('customers.edit')) editSheet(id); });
       return;
     }
-    sheet(sheetHead('Blacklist ' + c.name + '?', 'IC / passport ' + maskIC(c.ic || c.passport) + '. Staff will see a red warning when they book this person.') +
+    var gB = formGuard(null, 'The reason you wrote will be lost.');
+    var shB = sheet(sheetHead('Blacklist ' + c.name + '?', 'IC / passport ' + maskIC(c.ic || c.passport) + '. Staff will see a red warning when they book this person.') +
       '<label class="field"><span>Why? (required)</span><textarea class="inp" id="bl_reason" rows="3" placeholder="What happened"></textarea><div class="err" id="bl_err"></div></label>' +
       '<div class="chiprow cu-phr">' + BL_REASONS.map(function (p) { return '<button type="button" class="fchip" data-p="' + esc(p) + '">' + esc(p) + '</button>'; }).join('') + '</div>' +
-      '<div class="sheet-foot"><button type="button" class="btn danger solid" id="bl_go">' + I('lock') + 'Blacklist customer</button></div>', function (sh) {
+      blUpcoming(c, false) +
+      '<div class="sheet-foot"><button type="button" class="btn danger solid" id="bl_go">' + I('lock') + 'Blacklist customer</button></div>', { guard: gB, after: function (sh) {
         var ta = $('#bl_reason', sh);
         $$('.cu-phr button', sh).forEach(function (b) { b.onclick = function () { ta.value = b.dataset.p; $('#bl_err', sh).textContent = ''; ta.classList.remove('bad'); }; });
         $('#bl_go', sh).onclick = function () {
           var t = ta.value.trim(); if (t.length < 3) { $('#bl_err', sh).textContent = 'Write the reason, so other staff know what happened'; ta.classList.add('bad'); ta.focus(); return; }
           c.blacklist = { reason: t, by: S.me, at: new Date().toISOString() };
-          audit('Blacklisted ' + c.name + ': ' + t, { cust: c.id, link: '#customer/' + c.id }); save(); closeSheet(); refresh(); say('Customer added to the blacklist');
+          audit('Blacklisted ' + c.name + ': ' + t, { cust: c.id, link: '#customer/' + c.id }); save(); closeSheet(false, true); refresh();
+          var up = blUpcomingList(c);
+          if (!up.length) { say('Customer added to the blacklist'); return; }
+          up.forEach(function (b) { bLog(b, 'Customer blacklisted: ' + t); }); save();
+          setTimeout(function () {
+            sheet(sheetHead(c.name + ' is blacklisted', 'Decide what to do with the booking' + (up.length > 1 ? 's' : '') + ' still coming up') + blUpcoming(c, true) +
+              '<div class="sheet-foot"><button type="button" class="btn ghost" onclick="closeSheet()">Done</button></div>');
+          }, 320);
         };
-      });
+      } });
+    gB.arm(shB);
+  }
+  /* bookings of this customer that are still coming up or running */
+  function blUpcomingList(c) { return S.bookings.filter(function (b) { return b.cust === c.id && (UPCOMING.indexOf(b.bookingStatus) >= 0 || b.bookingStatus === 'Car Delivered'); }).sort(function (a, b) { return new Date(a.start) - new Date(b.start); }); }
+  function blUpcoming(c, after) {
+    var up = blUpcomingList(c); if (!up.length) return '';
+    return '<div class="banner amber bl-up">' + I('warn') + '<div class="grow"><b>' + up.length + ' booking' + (up.length > 1 ? 's' : '') + (after ? ' still open' : ' coming up') + '.</b> ' + (after ? 'Open each one to cancel it or keep it.' : 'Blacklisting does not cancel them.') +
+      '<div class="list bl-uplist">' + up.map(function (b) { return '<a class="card2" href="#booking/' + b.id + '"><div class="c2-main"><div class="c2-t1">' + esc(b.code) + ' · ' + esc((car(b.car) || {}).plate || '') + '</div><div class="c2-t2">' + esc(when(b.start)) + '</div></div>' + statusChip(b) + '</a>'; }).join('') + '</div></div></div>';
   }
   function unblacklist(id) {
     var c = byId(S.customers, id); if (!c || !c.blacklist || !can('customers.blacklist_edit')) return;
@@ -409,7 +448,7 @@ var Cust = (function () {
   }
 
   VIEWS.customers = listView;
-  VIEWS.customer = function (r) { if (Cust._for !== r.a) { Cust._all = false; Cust._for = r.a; } return pageView(r); };
+  VIEWS.customer = function (r) { if (Cust._for !== r.a) { Cust._all = false; Cust._open = {}; Cust._for = r.a; } return pageView(r); };
   return {
     open: function (id) { location.hash = '#customer/' + id; },
     edit: editSheet, note: noteSheet, pin: togglePin, delNote: delNote, blacklist: blacklistSheet, unblacklist: unblacklist,

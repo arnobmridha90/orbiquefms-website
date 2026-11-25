@@ -11,8 +11,27 @@ VIEWS.chat = function (r) {
       '<p class="small muted" style="margin:12px 4px">Everyone on the team sees this chat. Booking numbers like ' + esc((S.bookings[0] || {}).code || bookingCode(1)) + ' turn into links.</p>';
   } else html += waListHtml();
   html += '</main>';
-  return { html: html };
+  return { html: html, after: tab === 'wa' ? waWireSearch : null };
 };
+/* the customer chat search: name, phone, a booking number, the car's plate or words from the chat */
+var CHQ = '';
+VIEW_STATE.push(function () { CHQ = ''; });
+function waMatch(c, q) {
+  if (!q) return true;
+  var d = digits(q), np = normPlate(q), L = c.lead || {}, b = c.bookingId ? bk(c.bookingId) : L.bookingId ? bk(L.bookingId) : null, cr = L.car ? car(L.car) : null;
+  if (wordsMatch(q, c.name || '')) return true;
+  if (d.length >= 3 && digits(c.phone || '').indexOf(d.replace(/^0/, '')) >= 0) return true;
+  if (b && matchBookingCode(q, b)) return true;
+  if (np.length >= 3 && cr && normPlate(cr.plate).indexOf(np) >= 0) return true;
+  var lq = q.toLowerCase();
+  return lq.length >= 3 && (c.msgs || []).some(function (m) { return String(m.text || '').toLowerCase().indexOf(lq) >= 0; });
+}
+function waWireSearch() {
+  var q = $('#chq'); if (!q) return;
+  var t = null, draw = function () { var box = $('#chlist'); if (box) box.innerHTML = waListBody(); };
+  q.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { CHQ = q.value; draw(); }, 100); });
+  wireSearchClear(q, function () { CHQ = ''; draw(); });
+}
 var leadsOn = function () { return typeof Leads !== 'undefined' && can('leads.view'); };
 VIEW_STATE.push(function () { if (typeof Leads !== 'undefined') Leads.tab = 'all'; });
 /* re-draw the thread but keep what is half typed in the message box (text, cursor and keyboard) */
@@ -54,10 +73,22 @@ function waListHtml() {
     if (tab !== 'all') sorted = sorted.filter(function (c) { return c.lead && Leads.inTab(c, tab); });
     if (tab === 'waiting') sorted.sort(function (a, b) { return new Date((a.lead || {}).at || 0) - new Date((b.lead || {}).at || 0); });
   }
-  html += sorted.length ? '<div class="list">' + sorted.map(waRow).join('') + '</div>' :
-    '<div class="empty card">' + I('chat') + '<div>' + ({ waiting: 'Nobody is waiting for staff. Nice!', mine: 'You are not handling any customer right now.', assistant: 'The assistant is not chatting with anyone.', closed: 'No closed chats yet.' }[Leads.tab] || 'No chats yet.') + '</div></div>';
+  html += '<label class="search ch-search">' + I('search') + '<input id="chq" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Name, phone, booking or plate" value="' + esc(CHQ) + '">' + searchClearBtn('chq', CHQ) + '</label>';
+  html += '<div id="chlist">' + waListBody(sorted) + '</div>';
   html += '<button type="button" class="btn link ch-demo" onclick="Leads.simulateNew()">' + I('bell') + 'Demo: a new customer writes</button>';
   return html;
+}
+function waListBody(sorted) {
+  if (!sorted) {
+    sorted = S.wa.slice().sort(function (a, b) { return new Date(lastMsg(b).at) - new Date(lastMsg(a).at); });
+    var tab = leadsOn() ? Leads.tab || 'all' : 'all';
+    if (tab !== 'all') sorted = sorted.filter(function (c) { return c.lead && Leads.inTab(c, tab); });
+    if (tab === 'waiting') sorted.sort(function (a, b) { return new Date((a.lead || {}).at || 0) - new Date((b.lead || {}).at || 0); });
+  }
+  var q = CHQ.trim(), found = sorted.filter(function (c) { return waMatch(c, q); });
+  if (q && !found.length) return '<div class="empty card">' + I('search') + '<div>No chat matches “' + esc(q) + '”.</div></div>';
+  return (q ? '<div class="small muted ch-count">' + found.length + ' match' + (found.length === 1 ? '' : 'es') + ' for “' + esc(q) + '”</div>' : '') + (found.length ? '<div class="list">' + found.map(waRow).join('') + '</div>' :
+    '<div class="empty card">' + I('chat') + '<div>' + ({ waiting: 'Nobody is waiting for staff. Nice!', mine: 'You are not handling any customer right now.', assistant: 'The assistant is not chatting with anyone.', closed: 'No closed chats yet.' }[typeof Leads !== 'undefined' ? Leads.tab : ''] || 'No chats yet.') + '</div></div>');
 }
 function dotHtml(n) { return n ? '<span class="dot">' + n + '</span>' : ''; }
 function linkCodes(t) { return esc(t).replace(new RegExp('\\b(' + (B().codePrefix || B().code) + '-\\d{5})\\b', 'g'), function (m) { var b = S.bookings.filter(function (x) { return x.code === m; })[0]; return b ? '<a href="#booking/' + b.id + '" style="color:inherit;text-decoration:underline">' + m + '</a>' : m; }); }

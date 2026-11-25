@@ -261,3 +261,15 @@
   .bkx-jump::-webkit-scrollbar{display:none}
   .bkx-jump .ui-fchip{flex:none;height:40px;padding:0 14px;font-size:14px;background:var(--paper)}
 }
+/* a picked customer: one card, details folded away until "Edit details" */
+.bkx-csum{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface2,var(--hover))}
+.bkx-csum:empty,#bkx-csum:empty{display:none}
+.bkx-csum .grow{min-width:0}
+.bkx-csum b{display:block;font-size:14.5px;overflow-wrap:anywhere}
+.bkx-csum small{display:block;color:var(--text2);font-size:12.5px;overflow-wrap:anywhere}
+.bkx-csum .btn{min-height:40px;flex:none}
+.bkx-cfold .bkx-cdet{display:none}
+#bkx-lic:empty,#bkx-match:empty{display:none}
+#bkx-lic .alert{margin-bottom:10px}
+.bkx-cpb{margin-top:8px}
+.bkx-cpb .btn{min-height:40px}

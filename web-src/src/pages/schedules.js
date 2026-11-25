@@ -39,13 +39,16 @@ function scSamplePhoto(label, k) {
 }
 
 /* ---------------- the details dialog ---------------- */
+/* a car going out with road tax or insurance that has run out (or runs out before the return): the warning on the card */
+function scPapers(h, x) { return h.kind === 'Delivery' && x.status !== 'Cancelled' && x.status !== 'Completed' ? carPaperIssues(x.car, x.start, x.end) : []; }
+function scPaperAlert(h, x) { var pp = scPapers(h, x); return pp.length ? UI.alert('<b>Do not hand over yet:</b> ' + pp.map(function (z) { return esc(z.text); }).join('. ') + '. Renew ' + (pp.length > 1 ? 'them' : 'it') + ' on Maintenance first.', 'bad', { html: true, icon: 'file-alert' }) : ''; }
 function scDetails(h, ctx) {
   var x = findBooking(h.booking); if (!x) return null;
   var money = can('bookings.see_amounts') || can('calendar.see_amounts'), staff = scStaff(x), c = x.car;
   var sec = function (t, b) { return '<section class="sc-dsec"><h3>' + t + '</h3>' + b + '</section>'; };
   var row = function (l, v, cls) { return '<div class="sc-mrow' + (cls ? ' ' + cls : '') + '"><span>' + l + '</span><b>' + v + '</b></div>'; };
-  var body = sec('Customer information', '<div class="sc-who">' + UI.avatar(x.cust.name) + '<div><b>' + esc(x.cust.name) + '</b><span>' + esc(x.cust.email || '') + '</span>' + UI.phone(x.cust.phone, { wa: true }) + '</div></div>' +
-      '<a class="btn o sm sc-wa" href="https://wa.me/' + String(x.cust.phone || '').replace(/\D/g, '') + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Open WhatsApp Chat</a>') +
+  var body = scPaperAlert(h, x) + sec('Customer information', '<div class="sc-who">' + UI.avatar(x.cust.name) + '<div><b>' + esc(x.cust.name) + '</b><span>' + esc(x.cust.email || '') + '</span>' + UI.phone(x.cust.phone, { wa: true }) + '</div></div>' +
+      '<a class="btn o sm sc-wa" href="' + UI.waLink(x.cust.phone) + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Open WhatsApp Chat</a>') +
     sec('Assigned vehicle', '<div class="sc-car">' + carsThumb(c, 'sc-ph') + '<div><b>' + esc(carName(c)) + '</b><span class="sc-plate">' + esc(c.plate) + '</span><span>' + esc(c.color) + '</span></div></div>') +
     sec('Schedule and note details', '<div class="sc-kv">' + UI.kv(h.kind === 'Delivery' ? 'Starting date and time' : 'Ending date and time', UI.fmt.dateTime(h.at)) + UI.kv('Handover', esc(scLabel(h))) +
       UI.kv('Assigned staff', staff.length ? staff.map(function (e2) { return esc(e2.name); }).join(', ') : 'No staff assigned') + UI.kv(h.kind === 'Delivery' ? 'Delivery / pickup note' : 'Return / drop-off note', esc(h.note || '-')) + '</div>') +
@@ -102,7 +105,7 @@ function scFlow(kind, code, onClose) {
       return stepper() + '<div class="sc-scr"><div class="sc-logo">' + carSVG(x.car.color, x.car.shape, { label: carName(x.car) }) + '</div><h2>Vehicle Condition Check</h2><p>Please complete the inspection when you receive the vehicle.</p>' +
         '<label class="sc-fl">Booking ID</label><div class="sc-ro"><span>' + x.code + '</span>' + i('circle-check') + '</div>' +
         '<div class="sc-warn">' + i('clock') + 'You must complete this inspection within 15 minutes of vehicle handover.</div>' + pbtn('Start Inspection', 'start') +
-        '<p class="sc-help">Need help? <a href="https://wa.me/' + String(B().phone || '').replace(/\D/g, '') + '" target="_blank" rel="noopener">Contact WhatsApp</a></p></div>';
+        '<p class="sc-help">Need help? <a href="' + UI.waLink(B().phone) + '" target="_blank" rel="noopener">Contact WhatsApp</a></p></div>';
     }
     if (kind === 'agent' && f.step === 'capture') {
       var n = agentDone(), tot = SC_AGENT_SLOTS.length + 1, w = kmWarn(), lo = lastOdo();
@@ -249,7 +252,7 @@ function scSendLink(x, kind) {
   var to = kind === 'agent' ? (e ? e.wa : '') : x.cust.phone, name = kind === 'agent' ? (e ? e.name.split(' ')[0] : '') : x.cust.name.split(' ')[0];
   var txt = kind === 'agent' ? 'Hi' + (name ? ' ' + name : '') + ', here is the handover check for ' + x.code + ' (' + x.car.plate + ', ' + x.cust.name + ', ' + UI.fmt.dateTime(x.start) + '). Take the 4 photos and type the odometer reading: ' + siteLink(x, 'agent')
     : 'Hi ' + name + ', thank you for renting with ' + B().name + '. Please take a few photos of the car (' + x.car.plate + ') within 15 minutes of the handover: ' + siteLink(x, 'customer');
-  var url = 'https://wa.me/' + String(to || '').replace(/\D/g, '') + '?text=' + encodeURIComponent(txt);
+  var url = UI.waLink(to, txt) || 'https://wa.me/?text=' + encodeURIComponent(txt);
   UI.dialog({ title: 'Send on WhatsApp', width: 'sm', body: '<div class="tsk-wa"><div class="tsk-wa-to">' + i('brand-whatsapp') + '<span>To ' + (to ? esc(kind === 'agent' ? e.name : x.cust.name) + ' ' + UI.phone(to) : (kind === 'agent' ? 'no staff with a WhatsApp number is assigned yet: choose the chat in WhatsApp' : 'the customer')) + '</span></div><div class="tsk-bubble">' + esc(txt) + '</div></div>',
     buttons: [{ label: 'Copy message', kind: 'o', onClick: function () { UI.copy(txt, { label: 'Message copied' }); return false; } }, { label: 'Open WhatsApp', icon: 'brand-whatsapp', onClick: function () { window.open(url, '_blank', 'noopener'); DB.log('Sent', 'Booking', x.code, DB.actor() + ' sent the ' + (kind === 'agent' ? 'agent handover' : 'customer photo check') + ' link of ' + x.code + ' on WhatsApp'); } }] });
 }
@@ -259,13 +262,13 @@ DATA_INIT.push(function (d, b) {
   if (d.staffMsgLog) return;
   d.company.staffMsg = d.company.staffMsg || { nightlyOn: true, nightly: '23:30', remindOn: true, remindMin: 30 };
   var R = rng(5150 + b.id.length * 7), base = typeof TODAY !== 'undefined' ? TODAY : new Date(2026, 9, 19, 14, 32), out = [];
-  var emps = d.employees || [];
+  var emps = (d.employees || []).filter(function (e) { return e.active !== false; });
   for (var day = 3; day >= 0; day--) {
     emps.forEach(function (e, k) {
       if (day === 0 && k > 1) return;
       var at = new Date(base.getFullYear(), base.getMonth(), base.getDate() - day - 1, 23, 30, Math.floor(R() * 50));
       var ok = !!e.wa && e.active !== false && !(k === emps.length - 1 && day % 2 === 0);
-      out.push({ id: 'smg-' + out.length, at: at, to: e.id, kind: 'Nightly schedule', text: 'Tomorrow: ' + (1 + Math.floor(R() * 4)) + ' handovers', ok: ok, error: ok ? '' : e.active === false ? 'The agent is switched off' : 'Not on WhatsApp' });
+      out.push({ id: 'smg-' + out.length, at: at, to: e.id, kind: 'Nightly schedule', text: 'Tomorrow: ' + plural(1 + Math.floor(R() * 4), 'handover'), ok: ok, error: ok ? '' : 'Not on WhatsApp' });
     });
   }
   (d.tasks || []).filter(function (t) { return t.at < base && t.at > new Date(base.getTime() - 3 * DAY); }).slice(0, 8).forEach(function (t) {
@@ -284,7 +287,7 @@ function scStaffMsgCard(el, redraw) {
     UI.switch({ key: 'remindOn', label: 'Remind staff before a job', checked: sm.remindOn, disabled: !canEdit }) + UI.input({ key: 'remindMin', label: 'Minutes before the job', type: 'number', min: 5, max: 240, value: sm.remindMin, disabled: !canEdit }) + '</div>' +
     '<div class="row wrap gap8 mt8">' + (canEdit ? UI.btn('Save', { icon: 'device-floppy', size: 'sm', attrs: { 'data-sm': 'save' } }) + UI.btn("Send tonight's schedule now", { kind: 'o', size: 'sm', icon: 'send', attrs: { 'data-sm': 'now' } }) : UI.alert('Changing these needs "Edit tasks".', 'warn', { icon: 'lock' })) + '</div>' +
     '<div class="row wrap gap8 sc-smh"><b class="grow">Sent messages</b><label class="row gap6 b2"><span class="sw"><input type="checkbox" data-sm="only"' + (st.only ? ' checked' : '') + '><span></span></span>Only failed (' + (d.staffMsgLog || []).filter(function (x) { return !x.ok; }).length + ')</label></div>' +
-    (log.length ? '<div class="sc-smlog">' + log.slice(0, st.n).map(function (x) { return '<div class="sc-sml">' + UI.chip(x.ok ? 'Sent' : 'Failed', x.ok ? 'ok' : 'bad') + '<div class="grow"><b>' + esc(who(x.to)) + '</b> <span class="b2">' + esc(x.kind) + ': ' + esc(x.text) + '</span>' + (x.error ? '<div class="b2 sc-bad">' + esc(x.error) + '</div>' : '') + '</div><span class="b2 nw">' + UI.fmt.dateTime(x.at) + '</span>' + (!x.ok && canEdit ? UI.btn('Try again', { kind: 't', size: 'sm', attrs: { 'data-sm': 'retry', 'data-v': x.id } }) : '') + '</div>'; }).join('') + '</div>' + (log.length > st.n ? '<div class="mt8">' + UI.btn('Show more', { kind: 't', size: 'sm', icon: 'chevron-down', attrs: { 'data-sm': 'more' } }) + '</div>' : '') : '<p class="b2 faint">Nothing here.</p>') + '</div></div>';
+    (log.length ? '<div class="sc-smlog">' + log.slice(0, st.n).map(function (x) { return '<div class="sc-sml">' + UI.chip(x.ok ? 'Sent' : 'Failed', x.ok ? 'ok' : 'bad') + '<div class="grow"><b>' + esc(who(x.to)) + '</b> <span class="b2">' + esc(x.kind) + ': ' + esc(x.text) + '</span>' + (x.error ? '<div class="b2 sc-bad">' + esc(x.error) + '</div>' : '') + '</div><span class="b2 nw">' + UI.fmt.dateTime(x.at) + '</span>' + (!x.ok && canEdit && x.error !== 'The agent is switched off' ? UI.btn('Try again', { kind: 't', size: 'sm', attrs: { 'data-sm': 'retry', 'data-v': x.id } }) : '') + '</div>'; }).join('') + '</div>' + (log.length > st.n ? '<div class="mt8">' + UI.btn('Show more', { kind: 't', size: 'sm', icon: 'chevron-down', attrs: { 'data-sm': 'more' } }) + '</div>' : '') : '<p class="b2 faint">Nothing here.</p>') + '</div></div>';
   var again = function () { (redraw || function () { scStaffMsgCard(el); })(); };
   var send = function (e, kind, text) { var ok = !!e.wa && e.active !== false; var rec = { id: 'smg-' + Date.now().toString(36) + e.id, at: NOW(), to: e.id, kind: kind, text: text, ok: ok, error: ok ? '' : e.active === false ? 'The agent is switched off' : 'No WhatsApp number' }; d.staffMsgLog.unshift(rec); return rec; };
   el.onclick = function (ev) {
@@ -299,7 +302,8 @@ function scStaffMsgCard(el, redraw) {
     } else if (a === 'now') {
       var tmr = new Date(NOW()); tmr.setHours(0, 0, 0, 0); tmr = new Date(tmr.getTime() + DAY);
       var res = { ok: 0, bad: 0 };
-      d.employees.forEach(function (e) {
+      /* switched-off agents get nothing (not a failure anyone can fix here) */
+      d.employees.filter(function (e) { return e.active !== false; }).forEach(function (e) {
         var n = handovers(d).filter(function (h) { return h.at >= tmr && h.at < new Date(tmr.getTime() + DAY) && scStaff(findBooking(h.booking) || { agentIds: [], code: '' }).some(function (z) { return z.id === e.id; }); }).length;
         var r = send(e, 'Nightly schedule', n ? 'Tomorrow: ' + plural(n, 'handover') : 'Tomorrow: no handovers'); if (r.ok) res.ok++; else res.bad++;
       });
@@ -372,6 +376,7 @@ PAGES['schedules'] = {
       var fb = function (icon, label, attrs, dis) { return '<button type="button" class="sc-fb"' + attrs + (dis ? ' disabled title="' + dis + '"' : '') + '>' + i(icon) + '<span>' + label + '</span></button>'; };
       return '<article class="card sc-card' + (u && u.tone === 'bad' ? ' bad' : u ? ' warn' : '') + '" data-ho="' + h.id + '">' +
         '<header class="sc-ch"><span class="sc-kind ' + (del ? 'del' : 'ret') + '">' + esc(scKind(h, x)) + '</span><span class="sc-id">' + x.code + '</span>' + (u ? UI.chip(u.text, u.tone) : '') + '<span class="grow"></span>' + UI.status('booking', x.status) + UI.chip('Payment: ' + (x.pay || 'None'), PAY_COLORS[x.pay] || 'grey') + '</header>' +
+        (del ? '<div class="sc-papers">' + scPaperAlert(h, x) + '</div>' : '') +
         '<div class="sc-cb"><div class="sc-cust"><div class="sc-who">' + UI.avatar(x.cust.name) + '<div><b>' + esc(x.cust.name) + '</b><span>' + esc(x.cust.email || '') + '</span>' + UI.phone(x.cust.phone, { wa: true }) + '</div></div>' +
         '<div class="sc-cap">Assigned staff</div><div class="sc-staff">' + i('user') + (staff.length ? staff.map(function (e2) { return esc(e2.name); }).join(', ') : '<span class="faint">No staff assigned</span>') + '</div>' + (del ? '<div class="sc-checks">' + scChecks(h, x) + '</div>' : '') + '</div>' +
         '<div class="sc-car">' + carsThumb(c, 'sc-ph') + '<div><b>' + esc(carName(c)) + '</b><span class="sc-plate">' + esc(c.plate) + '</span><span>' + esc(c.color) + '</span></div></div>' +
@@ -389,7 +394,7 @@ PAGES['schedules'] = {
       var u = scUrgency(h, x), del = h.kind === 'Delivery', staff = scStaff(x);
       return '<div class="sc-line' + (u && u.tone === 'bad' ? ' bad' : u ? ' warn' : '') + '" data-ho="' + h.id + '" role="button" tabindex="0" data-act="details"><span class="sc-lt"><b>' + tm(h.at) + '</b><small>' + h.at.getDate() + ' ' + MON[h.at.getMonth()] + '</small></span><span class="sc-kind sm ' + (del ? 'del' : 'ret') + '">' + esc(scKind(h, x)) + '</span>' +
         '<span class="sc-lm"><b>' + esc(x.cust.name) + '</b><span class="b2">' + x.code + ' · ' + esc(x.car.plate) + ' · ' + esc(carModel(x.car)) + (staff.length ? ' · ' + esc(staff.map(function (z) { return z.name.split(' ')[0]; }).join(', ')) : '') + '</span></span>' +
-        '<span class="sc-lc">' + (u ? UI.chip(u.text, u.tone) : '') + (del ? scChecks(h, x, true) : '') + UI.status('booking', x.status) + '</span></div>';
+        '<span class="sc-lc">' + (scPapers(h, x).length ? UI.chip(scPapers(h, x)[0].short, 'bad', { icon: 'file-alert' }) : '') + (u ? UI.chip(u.text, u.tone) : '') + (del ? scChecks(h, x, true) : '') + UI.status('booking', x.status) + '</span></div>';
     }
     function draw() {
       var all = base(), kind = st.kind;

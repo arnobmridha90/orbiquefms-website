@@ -72,9 +72,8 @@ function teamWirePw(el, getUser, who) {
   var wa = el.querySelector('[data-tm-wa]'); if (wa) wa.addEventListener('click', function () {
     var w = (who && who()) || {}, un = getUser() || '';
     var msg = 'Hi' + (w.name ? ' ' + w.name.split(' ')[0] : '') + ', here is your sign-in for the ' + B().name + ' dashboard.\nUsername: ' + un + '\nPassword: ' + f.value + '\nPlease keep it to yourself.';
-    var num = String(w.phone || '').replace(/\D/g, '');
-    window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
-    if (!num) UI.toast('No WhatsApp number saved for them, so choose the chat in WhatsApp.', { tone: 'info' });
+    window.open(UI.waLink(w.phone, msg) || 'https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+    if (!UI.waNumber(w.phone)) UI.toast('No WhatsApp number saved for them, so choose the chat in WhatsApp.', { tone: 'info' });
   });
   up();
 }

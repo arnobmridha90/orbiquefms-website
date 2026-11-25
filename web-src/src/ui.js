@@ -81,7 +81,13 @@ var UI = (function () {
     plural: plural
   };
   /* phone numbers never wrap */
-  U.phone = function (p, o) { if (!p) return '<span class="faint">-</span>'; o = o || {}; return '<span class="ui-phone">' + e(p) + (o.wa ? ' <a class="ui-wa" href="https://wa.me/' + String(p).replace(/\D/g, '') + '" target="_blank" rel="noopener" title="Open WhatsApp chat" data-stop>' + i('brand-whatsapp') + '</a>' : '') + '</span>'; };
+  /* WhatsApp needs the international number: '+44 20 ...' stays, a local '012-345 6789' takes the company's country code
+     from settings ('+60123456789'). UI.waNumber(p) -> '+60123456789' or ''; UI.waLink(p, text) -> 'https://wa.me/60123456789?text=...' or ''. */
+  U.waNumber = function (p) { var s = String(p || '').replace(/[^\d+]/g, ''); if (!s.replace(/\D/g, '')) return ''; if (s.charAt(0) === '+') return '+' + s.replace(/\D/g, ''); if (s.charAt(0) === '0') { var co = (typeof D === 'function' && D() && D().company) || {}; return (co.countryCode || '+60') + s.slice(1); } return '+' + s; };
+  U.waLink = function (p, text) { var n = U.waNumber(p).replace(/\D/g, ''); return n ? 'https://wa.me/' + n + (text ? '?text=' + encodeURIComponent(text) : '') : ''; };
+  /* a phone typed in local form ('012-345 6789') shows with the company's country code, like the rest ('+60 12-345 6789') */
+  U.phoneText = function (p) { var s = String(p || '').trim(); if (/^0/.test(s)) { var co = (typeof D === 'function' && D() && D().company) || {}; return (co.countryCode || '+60') + ' ' + s.slice(1); } return s; };
+  U.phone = function (p, o) { if (!p) return '<span class="faint">-</span>'; o = o || {}; return '<span class="ui-phone">' + e(U.phoneText(p)) + (o.wa ? ' <a class="ui-wa" href="' + U.waLink(p) + '" target="_blank" rel="noopener" title="Open WhatsApp chat" data-stop>' + i('brand-whatsapp') + '</a>' : '') + '</span>'; };
   U.money = function (v, o) { return '<span class="ui-money num">' + U.fmt.money(v, o) + '</span>'; };
 
   /* ---------------- statuses and chips ---------------- */
@@ -200,10 +206,12 @@ var UI = (function () {
       var bar = o.selectable && selKeys.length ? '<div class="ui-selbar"><b>' + e(selText) + '</b>' + (other ? '<span class="b2">(' + other + ' on other pages)</span>' : '') + '<button type="button" class="btn t sm" data-ui-clear>Clear</button><span class="grow"></span>' + (o.bulk ? o.bulk(selKeys) : '') + '</div>' : '';
       var cards = o.card ? '<div class="ui-cards">' + (shown.length ? shown.map(function (r, k) { var key = keyOf(r); return '<div class="ui-card' + (o.onRowClick ? ' click' : '') + (st.sel[key] ? ' on' : '') + '" data-k="' + e(key) + '"' + (o.onRowClick ? ' tabindex="0" role="button"' : '') + '>' + (o.selectable ? '<label class="cb ui-card-ck" data-stop><input type="checkbox" data-ui-row="' + e(key) + '" aria-label="Tick"' + (st.sel[key] ? ' checked' : '') + '><span class="box">' + i('check') + '</span></label>' : '') + o.card(r, k) + '</div>'; }).join('') : emptyHtml) + '</div>' : '';
       var pager = '';
-      if (paged && rows.length > Math.min.apply(0, o.pageSizes || [10])) {
+      /* the Rows box always lists the page size in use (a page may ask for 15 when the usual choices are 10, 25, 50, 100) */
+      var sizes = (o.pageSizes || [10, 25, 50, 100]).slice(); [o.pageSize, st.size].forEach(function (n) { if (typeof n === 'number' && n > 0 && sizes.indexOf(n) < 0) sizes.push(n); }); sizes.sort(function (a, b) { return a - b; });
+      if (paged && rows.length > Math.min.apply(0, sizes)) {
         var from = rows.length ? (st.page - 1) * st.size + 1 : 0, to = Math.min(rows.length, st.page * st.size), nums = [];
         for (var p = 1; p <= pages; p++) if (p === 1 || p === pages || Math.abs(p - st.page) <= 1) nums.push(p); else if (nums[nums.length - 1] !== '…') nums.push('…');
-        pager = '<div class="pager ui-pager"><span>Showing ' + from + ' to ' + to + ' of ' + rows.length + '</span><span class="row gap8"><label class="row gap6 b2">Rows<span class="inp"><select data-ui-size aria-label="Rows per page">' + (o.pageSizes || [10, 25, 50, 100]).map(function (n) { return '<option' + (n === st.size ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></span></label>' +
+        pager = '<div class="pager ui-pager"><span>Showing ' + from + ' to ' + to + ' of ' + rows.length + '</span><span class="row gap8"><label class="row gap6 b2">Rows<span class="inp"><select data-ui-size aria-label="Rows per page">' + sizes.map(function (n) { return '<option' + (n === st.size ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></span></label>' +
           '<span class="pgs"><button type="button" data-ui-page="' + (st.page - 1) + '"' + (st.page === 1 ? ' disabled' : '') + ' aria-label="Previous page">' + i('chevron-left') + '</button>' + nums.map(function (n) { return n === '…' ? '<span class="ui-gap">…</span>' : '<button type="button" data-ui-page="' + n + '" aria-current="' + (n === st.page) + '">' + n + '</button>'; }).join('') + '<button type="button" data-ui-page="' + (st.page + 1) + '"' + (st.page === pages ? ' disabled' : '') + ' aria-label="Next page">' + i('chevron-right') + '</button></span></span></div>';
       }
       el.innerHTML = '<div class="ui-tbl' + (o.density === 'compact' ? ' compact' : '') + (o.sticky !== false ? ' sticky' : '') + (o.card ? ' has-cards' : '') + '">' + bar +
@@ -428,7 +436,10 @@ var UI = (function () {
       var t = ev.target, x;
       if (t === wrap && ctrl._down && o.dismissable !== false) { ctrl.close(); return; }
       if (t.closest('[data-ui-x]')) { ctrl.close(); return; }
-      if ((x = t.closest('[data-ui-fb]'))) { var b = (o.foot || o.buttons)[+x.getAttribute('data-ui-fb')]; if (!b) return; var r = b.onClick ? b.onClick(ctrl, ev) : null; if (b.close !== false && r !== false && !(r && r.then)) ctrl.close(true); else if (r && r.then) r.then(function (v) { if (v !== false && b.close !== false) ctrl.close(true); }); return; }
+      if ((x = t.closest('[data-ui-fb]'))) { var b = (o.foot || o.buttons)[+x.getAttribute('data-ui-fb')]; if (!b) return; /* a plain Cancel or Close (no onClick, or dismiss: true) goes through the same unsaved-changes check as Esc, X and
+           the backdrop; a button that did its job (onClick returned anything but false) closes without asking */
+        if (!b.onClick || b.dismiss) { if (b.onClick) b.onClick(ctrl, ev); if (b.close !== false) ctrl.close(); return; }
+        var r = b.onClick(ctrl, ev); if (b.close !== false && r !== false && !(r && r.then)) ctrl.close(true); else if (r && r.then) r.then(function (v) { if (v !== false && b.close !== false) ctrl.close(true); }); return; }
     });
     var offData = o.live ? on('data', function () { if (!ctrl.closed) ctrl.refresh(); }) : null;
     layer().appendChild(wrap);
@@ -921,11 +932,12 @@ var UI = (function () {
     opts.items = function () {
       var cars = (o.cars || D().cars).filter(function (c) { return !o.hideInactive || c.fleet === 'Active' || c.id === opts.value; });
       var rows = cars.map(function (c) {
-        var b = busy(c, opts.start || null, opts.end || null, opts.exceptId), badge = null, rank = 0;
+        var b = busy(c, opts.start || null, opts.end || null, opts.exceptId), badge = null, rank = 0, pi;
         if (o.badges !== false) {
           if (b.kind === 'fleet') { badge = { text: b.reason, tone: 'grey' }; rank = 3; }
           else if (b.kind === 'workshop') { badge = { text: b.reason, tone: 'warn' }; rank = 2; }
           else if (b.kind === 'booking') { badge = { text: b.reason, tone: 'bad' }; rank = 1; }
+          else if (opts.start && (pi = carPaperIssues(c, opts.start, opts.end || null)).length) { badge = { text: pi[0].short + (pi.length > 1 ? ', ' + pi[1].kind.toLowerCase() + ' too' : ''), tone: 'bad' }; rank = 0.9; }
           else if (opts.start) { badge = { text: b.soon ? 'Check: ' + b.soon.charAt(0).toLowerCase() + b.soon.slice(1) + ' (gap is ' + b.gapH + ' hr' + (b.gapH === 1 ? '' : 's') + ')' : 'Free', tone: b.soon ? 'warn' : 'ok' }; if (b.soon) rank = 0.5; }
         }
         return { value: c.id, label: c.plate, sub: carName(c) + ' · ' + c.color, badge: badge, kw: normPlate(c.plate) + ' ' + c.make + ' ' + c.model + ' ' + c.color + ' ' + c.type + ' #' + c.serial, rank: rank, car: c, busy: b,

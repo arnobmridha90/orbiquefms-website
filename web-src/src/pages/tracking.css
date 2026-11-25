@@ -80,3 +80,9 @@
   .tr-pin .tr-ring{r:22px}
   .tr-scale text,.tr-north text{font-size:26px}
 }
+/* who has the car now */
+.pg-tracking .tr-who{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-size:13px;color:var(--text2);min-width:0}
+.pg-tracking .tr-who > i{font-size:15px;color:var(--text3);flex:none}
+.pg-tracking .tr-who b{color:var(--text);font-weight:600}
+.pg-tracking .tr-who .inv-link{min-height:32px}
+.pg-tracking .tr-mc .tr-who{margin:2px 0}

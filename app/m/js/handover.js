@@ -26,16 +26,19 @@ function hoDraftsWrite(all) {
     return false;
   }
 }
-function hoDraftGet(id, dir) { return hoDrafts()[id + ':' + dir] || null; }
-function hoDraftPut(st) { var all = hoDrafts(); st.at = new Date().toISOString(); all[st.bookingId + ':' + st.dir] = st; return hoDraftsWrite(all); }
-function hoDraftDrop(id, dir) { var all = hoDrafts(); delete all[id + ':' + dir]; hoDraftsWrite(all); }
+/* a draft belongs to the person who started it (key booking:dir:staff), so the next person who signs in on the same phone never carries it on */
+function hoMine(d) { return !!d && !!S && d.by === S.me; }
+function hoDraftGet(id, dir) { var d = hoDrafts()[id + ':' + dir + ':' + (S && S.me)]; return hoMine(d) ? d : null; }
+function hoDraftPut(st) { var all = hoDrafts(); st.at = new Date().toISOString(); st.by = st.by || S.me; if (st.by !== S.me) return true; all[st.bookingId + ':' + st.dir + ':' + st.by] = st; return hoDraftsWrite(all); }
+/* the handover is done or started over: every draft of it goes, whoever started it */
+function hoDraftDrop(id, dir) { var all = hoDrafts(), pre = id + ':' + dir; Object.keys(all).forEach(function (k) { if (k === pre || k.indexOf(pre + ':') === 0) delete all[k]; }); hoDraftsWrite(all); }
 function hoValid(b, dir) { return !!b && (dir === 'in' ? b.bookingStatus === 'Car Delivered' : UPCOMING.indexOf(b.bookingStatus) >= 0); }
 function HANDOVER_DRAFTS() {
   if (!S) return [];
   var all = hoDrafts(), out = [];
   Object.keys(all).forEach(function (k) {
     var d = all[k], b = bk(d.bookingId);
-    if (!hoValid(b, d.dir)) return;
+    if (!hoMine(d) || !hoValid(b, d.dir)) return;
     if (!d.step && !d.idPhoto && !d.licPhoto && !d.km && !(d.car && Object.keys(d.car).length)) return; /* opened and closed without doing anything */
     out.push({ bookingId: d.bookingId, dir: d.dir, step: d.step || 0, steps: hoSteps(d.dir).length, at: d.at, code: b.code, plate: (car(b.car) || {}).plate || '' });
   });
@@ -60,6 +63,12 @@ function hoHoursText(h) { return h + ' hour' + (h === 1 ? '' : 's'); }
 /* amounts in the checklist follow the booking page: roles that cannot see amounts or set deposit adjustments record what they found, the office sets the money */
 function hoSeesMoney() { return can('bookings.see_amounts') || can('deposits.edit_deductions'); }
 function hoEarlyText(ms) { var d = Math.floor(ms / DAY), h = Math.round((ms - d * DAY) / HOUR); if (h === 24) { d++; h = 0; } return d ? d + ' day' + (d === 1 ? '' : 's') + (h ? ' ' + hoHoursText(h) : '') : hoHoursText(Math.max(1, h)); }
+/* another booking that still has this booking's car out (Car Delivered), or null */
+function hoCarOutWith(b) { return (S.bookings || []).filter(function (x) { return x.id !== b.id && x.car === b.car && x.bookingStatus === 'Car Delivered'; })[0] || null; }
+function hoCarOutText(b, o) {
+  var c = car(b.car) || {};
+  return (c.plate || 'The car') + ' is still out with ' + cust(o.cust).name + ' (' + o.code + ')' + (isLate(o) ? ', ' + lateInfo(o.end).text + ' late' : ', due back ' + dShort(o.end) + ' ' + hm(o.end));
+}
 function hoCloseTasks(b, dir) {
   var re = dir === 'in' ? /^(Return|Collect|Drop)/i : /^(Delivery|Pick|Hand)/i, n = 0;
   (S.tasks || []).forEach(function (t) { if (t.booking === b.id && (t.status === 'Pending' || t.status === 'In Progress') && (re.test(t.type || '') || re.test(t.name || ''))) { t.status = 'Completed'; t.doneAt = new Date().toISOString(); t.doneBy = S.me; n++; } });
@@ -74,13 +83,28 @@ var Handover = (function () {
     var b = bk(bookingId);
     if (!b) { say('Booking not found'); return; }
     if (!hoValid(b, dir)) { say(dir === 'in' ? 'This car is not out on rent (' + b.bookingStatus + ')' : 'This booking is ' + b.bookingStatus + ': nothing to hand over'); return; }
+    var other = dir === 'out' ? hoCarOutWith(b) : null;
+    if (other) { stillOut(b, other); return; }
     var st = hoDraftGet(b.id, dir), resumed = !!st;
-    if (!st) st = { bookingId: b.id, dir: dir, step: 0, car: {}, fuel: '', km: '', note: '', date: '', time: '', dmg: '', dmgPhotos: [], dmgNote: '', keep: {} };
+    if (!st) st = { bookingId: b.id, dir: dir, step: 0, car: {}, fuel: '', km: '', note: '', date: '', time: '', dmg: '', dmgPhotos: [], dmgNote: '', keep: {}, by: S.me };
+    /* a time filled in by itself is 'now', so a resumed draft moves it to the real now; a time the person typed is kept */
+    if (resumed && st.autoTime && st.date) { st.date = toLocalInput(new Date()); st.time = toTimeInput(new Date()); }
     st.car = st.car || {}; st.keep = st.keep || {}; st.dmgPhotos = st.dmgPhotos || [];
     if (st.step >= hoSteps(dir).length) st.step = hoSteps(dir).length - 1;
     var sh = sheet('<div class="hoc" id="hoBody"></div>', null, { full: true, stack: SHEETS.length > 0, cls: 'ho-sheet', noSwipe: true, onClose: function () { if (cur && cur.sh === sh) { var nt = $('#hoNote', sh), dn = $('#hoDmgNote', sh); if (nt) cur.st.note = nt.value; if (dn) cur.st.dmgNote = dn.value; persist(); cur = null; if (/^#(home|schedule|tasks|booking\/)/.test(location.hash || '#home') || !location.hash) render(false, true); } } });
     cur = { st: st, b: b, sh: sh, resumed: resumed, err: '' };
     draw();
+  }
+
+  function stillOut(b, o) {
+    var canIn = can('bookings.change_status') || can('bookings.edit') || (o.assigned || []).indexOf(S.me) >= 0;
+    sheet(sheetHead('Hand over ' + ((car(b.car) || {}).plate || ''), b.code + ' · ' + cust(b.cust).name) +
+      '<div class="banner red">' + I('car') + '<div><b>' + esc(hoCarOutText(b, o)) + '.</b> Take it back first, or give ' + esc(b.code) + ' another car.</div></div>' +
+      '<div class="sheet-foot stack">' + (canIn ? '<button type="button" class="btn" id="hoSoIn">' + I('in') + 'Take back first</button>' : '') +
+      (can('bookings.edit') ? '<button type="button" class="btn ghost" id="hoSoCar">Change car</button>' : '') + '<button type="button" class="btn link" onclick="closeSheet()">Close</button></div>', function (sh) {
+        var a = $('#hoSoIn', sh); if (a) a.onclick = function () { closeSheet(true); setTimeout(function () { start(o.id, 'in'); }, 320); };
+        var c2 = $('#hoSoCar', sh); if (c2) c2.onclick = function () { closeSheet(true); setTimeout(function () { editBk(b.id); }, 320); };
+      }, { stack: SHEETS.length > 0 });
   }
 
   /* ---------- drawing ---------- */
@@ -92,7 +116,7 @@ var Handover = (function () {
   function draw(focus) {
     if (!cur) return;
     var st = cur.st, b = cur.b, c = car(b.car) || {}, cu = cust(b.cust), steps = hoSteps(st.dir), s = steps[st.step], last = st.step === steps.length - 1, out = st.dir === 'out';
-    if ((s.id === 'time' || s.id === 'deposit') && !st.date) { st.date = toLocalInput(new Date()); st.time = toTimeInput(new Date()); }
+    if ((s.id === 'time' || s.id === 'deposit') && !st.date) { st.date = toLocalInput(new Date()); st.time = toTimeInput(new Date()); st.autoTime = true; }
     var head = '<div class="sheet-head"><div class="grow"><h3>' + (out ? 'Hand over ' : 'Take back ') + esc(c.plate || '') + '</h3><p class="lead">' + esc(cu.name) + ' · ' + esc(placeText(b, out ? 'pick' : 'ret')) + '</p></div>' +
       '<button class="iconbtn" type="button" id="hoX" aria-label="Close">' + I('x', 2.2) + '</button></div>' +
       '<div class="ho-prog" aria-hidden="true">' + steps.map(function (x, i) { return '<i class="' + (i < st.step ? 'done' : i === st.step ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
@@ -115,6 +139,8 @@ var Handover = (function () {
       if (!b.submitted) warn += '<div class="banner amber">' + I('warn') + '<div><b>The agreement is not signed yet.</b> Ask the customer to sign the booking form before you hand over the keys.<div class="ho-bact"><button type="button" class="btn sm ghost" id="hoForm">' + I('copy') + 'Copy form link</button><button type="button" class="btn sm ghost" id="hoFormWa">' + I('wa') + 'Send on WhatsApp</button></div></div></div>';
       if (m.due > 0 && b.bookingStatus !== 'Cancelled') warn += '<div class="banner red">' + I('cash') + '<div><b class="money">' + rm(m.due) + ' still due</b>' + (m.depositReceived < m.deposit ? ' (deposit ' + rm(Math.max(0, m.deposit - m.depositReceived)) + ' not received)' : '') + '. Collect it before the car goes out.' +
         (can('billing.record_payment') ? '<div class="ho-bact"><button type="button" class="btn sm" id="hoPay">' + I('cash') + 'Record payment</button></div>' : '') + '</div></div>';
+      var depLeft = typeof payDepositLeft === 'function' && m.depositReceived > 0 ? payDepositLeft(b) : null;
+      if (depLeft != null && depLeft < m.depositReceived - 0.004) warn += '<div class="banner amber">' + I('bank') + '<div><b>Deposit used for payments: ' + rm(depLeft) + ' left</b> of the ' + rm(m.depositReceived) + ' received. The car goes out with less security. Collect the deposit again if you can.</div></div>';
       if (!warn) warn = '<div class="banner green">' + I('check') + '<div>Agreement signed and nothing due. Good to go.</div></div>';
       return warn + '<p class="ho-ask">Take a photo of the customer’s ID and driving licence.</p><div class="ho-slots two">' + slot('idPhoto', 'IC or passport', st.idPhoto) + slot('licPhoto', 'Driving licence', st.licPhoto) + '</div>' + sampleBtn('papers');
     }
@@ -148,7 +174,7 @@ var Handover = (function () {
         if (out && Math.abs(diff) > 2 * HOUR) info = '<div class="banner amber">' + I('clock') + '<div>This is <b>' + hoHoursText(Math.round(h)) + ' ' + (diff > 0 ? 'after' : 'before') + '</b> the planned start (' + esc(when === null ? '' : dShort(plan) + ', ' + hm(plan)) + '). Check the time.</div></div>';
         if (!out) { var lh = hoLateH(b, when); info = lh ? '<div class="banner red">' + I('clock') + '<div><b>' + lateInfo(b.end, when).text + ' late, charged ' + hoHoursText(lh) + '.</b> It was due back ' + esc(dShort(plan) + ', ' + hm(plan)) + '. You can keep a late fee from the deposit in the next step.</div></div>' : (diff < -HOUR ? '<div class="banner amber">' + I('clock') + '<div><b>Back ' + hoEarlyText(-diff) + ' early.</b> It was due back ' + esc(dShort(plan) + ', ' + hm(plan)) + '. The car is free for new bookings from the return time.</div></div>' : '<div class="banner green">' + I('check') + '<div>On time. It was due back ' + esc(dShort(plan) + ', ' + hm(plan)) + '.</div></div>'); }
       }
-      return '<p class="ho-ask">' + (out ? 'When did the customer get the car?' : 'When did the car come back?') + ' It is set to now.</p>' +
+      return '<p class="ho-ask">' + (out ? 'When did the customer get the car?' : 'When did the car come back?') + (st.autoTime ? ' It is set to now.' : when ? ' You set ' + esc(dShort(when) + ', ' + hm(when)) + (Date.now() - when > 30 * MIN ? ' (' + esc(ago(when)) + ')' : '') + '.' : '') + '</p>' +
         '<div class="ho-two"><label class="field"><span>Date</span><input class="inp" type="date" id="hoDate" value="' + esc(st.date) + '" max="' + toLocalInput(new Date()) + '"></label><label class="field"><span>Time</span><input class="inp" type="time" id="hoTime" value="' + esc(st.time) + '"></label></div>' +
         '<button type="button" class="btn link ho-now" id="hoNow">' + I('clock') + 'Set to now</button>' + info + (out ? summary() + gpsHtml() : '');
     }
@@ -231,11 +257,11 @@ var Handover = (function () {
     $$('[data-del]', sh).forEach(function (el) { el.onclick = function () { var i = +el.dataset.del, p = st.dmgPhotos.splice(i, 1)[0]; persist(); draw(); undoSnack('Photo removed', function () { if (!cur) return; st.dmgPhotos.splice(i, 0, p); persist(); draw(); }); }; });
     var dn = $('#hoDmgNote', sh); if (dn) dn.oninput = function () { st.dmgNote = dn.value; hoClearErr(); };
     if (id === 'time') {
-      if (!st.date) { st.date = toLocalInput(new Date()); st.time = toTimeInput(new Date()); }
+      if (!st.date) { st.date = toLocalInput(new Date()); st.time = toTimeInput(new Date()); st.autoTime = true; }
       var dI = $('#hoDate', sh), tI = $('#hoTime', sh);
       dI.value = st.date; tI.value = st.time;
-      dI.onchange = tI.onchange = function () { st.date = dI.value; st.time = tI.value; cur.err = ''; persist(); draw(); };
-      $('#hoNow', sh).onclick = function () { st.date = toLocalInput(new Date()); st.time = toTimeInput(new Date()); cur.err = ''; persist(); draw(); };
+      dI.onchange = tI.onchange = function () { st.date = dI.value; st.time = tI.value; st.autoTime = false; cur.err = ''; persist(); draw(); };
+      $('#hoNow', sh).onclick = function () { st.date = toLocalInput(new Date()); st.time = toTimeInput(new Date()); st.autoTime = true; cur.err = ''; persist(); draw(); };
     }
     $$('[data-keep]', sh).forEach(function (el) {
       el.onclick = function () {
@@ -343,6 +369,7 @@ var Handover = (function () {
     tick();
   }
   function finish(c0) {
+    if (c0.st.autoTime) { var nw = new Date(); c0.st.date = toLocalInput(nw); c0.st.time = toTimeInput(nw); }
     var st = c0.st, b = c0.b, out = st.dir === 'out', at = hoWhen(st).toISOString(), km = +st.km, c = car(b.car), gps = st.gps || hoGps();
     var trusted = st.trusted !== false;
     S.odometer = S.odometer || [];

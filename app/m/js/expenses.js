@@ -147,12 +147,16 @@ VIEWS.expenses = function (r) {
   var all = can('expenses.view_all'), thisMonth = exMonthOf(new Date());
   if (EXV.month > thisMonth) EXV.month = thisMonth;
   var rng = exMonthRange(EXV.month), rows = exRows(rng.from, rng.to, { all: all });
-  var prevR = exMonthRange(exStepMonth(EXV.month, -1)), prevTot = exSum(exRows(prevR.from, prevR.to, { all: all }));
+  /* this month is not over yet: compare with last month up to the same day, not with the whole of last month */
+  var prevR = exMonthRange(exStepMonth(EXV.month, -1)), partial = EXV.month === thisMonth, nowD = new Date();
+  if (partial) { var lastDay = new Date(prevR.to.getTime() - DAY).getDate(); prevR = { from: prevR.from, to: new Date(prevR.from.getFullYear(), prevR.from.getMonth(), Math.min(nowD.getDate(), lastDay), nowD.getHours(), nowD.getMinutes(), nowD.getSeconds()) }; }
+  var prevTot = exSum(exRows(prevR.from, prevR.to, { all: all }));
   var shown = exSort(rows.filter(function (x) { return exMatches(x); }), EXV.order), total = exSum(rows), shownTot = exSum(shown), nf = exFilterCount() + (EXV.q.trim() ? 1 : 0);
   var monthName = EX_MONTHS[+EXV.month.slice(5, 7) - 1];
   /* summary */
   var pct = prevTot > 0 ? Math.round((total - prevTot) / prevTot * 100) : null;
-  var cmp = pct === null ? '' : pct === 0 ? 'About the same as ' + exMonthLabel(exStepMonth(EXV.month, -1)) : Math.abs(pct) + '% ' + (pct > 0 ? 'more' : 'less') + ' than ' + EX_MONTHS[+exStepMonth(EXV.month, -1).slice(5, 7) - 1];
+  var prevName = EX_MONTHS[+exStepMonth(EXV.month, -1).slice(5, 7) - 1];
+  var cmp = pct === null ? '' : pct === 0 ? 'About the same as ' + (partial ? 'by this day in ' + prevName : exMonthLabel(exStepMonth(EXV.month, -1))) : Math.abs(pct) + '% ' + (pct > 0 ? 'more' : 'less') + ' than ' + (partial ? 'by this day in ' : '') + prevName;
   var parts = function (s) { return exSum(rows.filter(function (x) { return x.src === s; })); };
   var byKind = {}; rows.filter(exCounts).forEach(function (x) { byKind[x.kind] = (byKind[x.kind] || 0) + x.amt; });
   var kinds = Object.keys(byKind).map(function (k) { return { k: k, v: byKind[k] }; }).sort(function (a, b) { return b.v - a.v; });

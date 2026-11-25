@@ -61,3 +61,11 @@ textarea.inp.dep-ta.big { height: 170px; font-size: 15px; }
 .dep-row .c2-end { padding-top: 2px; }
 .dep-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .dep-chips { align-items: center; }
+/* reopen: also remove what was kept with the refund */
+.dep-kwrow { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: 12px; margin: 4px 0 12px; min-height: 44px; }
+.dep-kwrow > span:last-child { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.dep-kwrow small { color: var(--muted); font-size: 12.5px; }
+.dep-earlier { margin-bottom: 8px; }
+.dep-sm { margin: 10px 0 0; }
+.dep-smrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.dep-smrow .btn.sm { min-height: 40px; }

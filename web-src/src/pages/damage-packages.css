@@ -13,7 +13,7 @@
 .dp-ex b{color:var(--text)}
 .dp-ex.faint{border-style:dashed;background:transparent}
 .dp-card{display:flex;flex-direction:column;gap:10px;min-width:0}
-.dp-card-n{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.dp-card-n{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px 12px}
 .dp-card-n span{display:flex;flex-direction:column;min-width:0}
 .dp-card-n small{font-size:11.5px;color:var(--text3)}
 .dp-card-n b{color:var(--text);font-weight:600;font-size:14px;white-space:nowrap}

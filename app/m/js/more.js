@@ -58,7 +58,9 @@ VIEWS.more = function () {
   return { html: html };
 };
 function moreSignOut() {
-  confirm({ title: 'Sign out?', text: 'You will need your username and password to sign in again on this phone.', ok: 'Sign out', cancel: 'Stay signed in' }).then(function (ok) { if (ok) signOut(); });
+  var dr = typeof HANDOVER_DRAFTS === 'function' ? HANDOVER_DRAFTS() : [];
+  var hoLine = dr.length ? '<div class="banner amber">' + I('key') + '<div><b>You have ' + (dr.length === 1 ? 'a handover in progress for ' + esc(dr[0].plate) + ' (' + esc(dr[0].code) + ')' : dr.length + ' handovers in progress (' + esc(dr.map(function (d) { return d.plate; }).join(', ')) + ')') + '.</b> It stays on this phone for you, and nobody else who signs in here can carry it on.</div></div>' : '';
+  confirm({ icon: dr.length ? 'warn' : '', title: 'Sign out?', text: 'You will need your username and password to sign in again on this phone.', html: hoLine, ok: 'Sign out', cancel: 'Stay signed in', primary: dr.length ? 'cancel' : 'ok' }).then(function (ok) { if (ok) signOut(); });
 }
 function resetDemo() {
   confirm({ icon: 'warn', title: 'Reset the demo?', text: 'Your dummy bookings, payments and chats for ' + B().short + ' will be replaced by fresh made-up data.', ok: 'Reset', cancel: 'Keep my data', danger: true }).then(function (ok) { if (ok) doResetDemo(); });

@@ -12,7 +12,7 @@ function wsFeed(b) {
   var revs = d.reviews.slice().sort(function (a, z) { return a.order - z.order; });
   var logos = h.logos.slice().sort(function (a, z) { return a.order - z.order; });
   var socials = h.socials.filter(function (s) { return s.active; }).sort(function (a, z) { return a.order - z.order; });
-  var wa = String(h.formNumber || b.phone || '').replace(/\D/g, '');
+  var wa = UI.waNumber(h.formNumber || b.phone || '').replace(/\D/g, '');
   return {
     faq: faqs.length ? '<div class="ws-faq">' + faqs.slice(0, 8).map(function (f, k) { return '<details' + (k === 0 ? ' open' : '') + '><summary><span>' + esc(f.q) + '</span><b aria-hidden="true">+</b></summary><p>' + esc(f.a) + '</p></details>'; }).join('') + '</div>' : '',
     reviews: revs.length ? '<div class="ws-sec ws-revs"><h2>What renters say</h2><div class="ws-rev-grid">' + revs.slice(0, 6).map(function (r) { return '<figure class="ws-rev">' + wsStars(r.rating) + '<blockquote>' + esc(r.text) + '</blockquote><figcaption>' + (r.photo ? '<img src="' + r.photo + '" alt="">' : '<span class="ws-av">' + esc(initials(r.name)) + '</span>') + '<span><b>' + esc(r.name) + '</b><small>' + UI.fmt.month(r.date) + '</small></span></figcaption></figure>'; }).join('') + '</div></div>' : '',

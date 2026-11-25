@@ -63,13 +63,16 @@ PAGES['availability'] = {
 
     function drawForm() {
       var bad = !(st.to > st.from);
-      form.innerHTML = '<div class="av-dates">' +
+      /* on a phone the period is one tappable line (the free cars show straight below it); tapping opens the fields */
+      var short = function (d0) { return WD[d0.getDay()] + ' ' + d0.getDate() + ' ' + MON[d0.getMonth()] + ' ' + (d0.getHours() % 12 || 12) + (d0.getMinutes() ? ':' + String(d0.getMinutes()).padStart(2, '0') : '') + ' ' + (d0.getHours() < 12 ? 'AM' : 'PM'); };
+      form.parentNode.classList.toggle('open', !!st.open);
+      form.innerHTML = '<button type="button" class="av-sumbtn" data-av="edit" aria-expanded="' + !!st.open + '">' + i('calendar') + '<span class="grow"><b>' + (bad ? 'Pick a period' : short(st.from) + ' to ' + short(st.to)) + '</b><small>' + (bad ? 'The end must be after the start' : avLenText(st.to - st.from)) + ' · ' + (st.open ? 'Done' : 'Change') + '</small></span>' + i(st.open ? 'chevron-up' : 'chevron-down') + '</button><div class="av-fbody"><div class="av-dates">' +
         UI.dateTimeField({ key: 'from', label: 'From', value: st.from, required: true }) +
         UI.dateTimeField({ key: 'to', label: 'To', value: st.to, required: true, chips: false, error: bad ? 'End must be after start' : '' }) + '</div>' +
         '<div class="av-lab">Rental length</div><div class="av-chips" role="group" aria-label="Rental length">' +
         AV_LENS.map(function (l) { return '<button type="button" class="av-chip" data-len="' + l[0] + '" aria-pressed="' + (st.len === l[0]) + '">' + l[1] + '</button>'; }).join('') +
         '<button type="button" class="av-chip" data-av="half" aria-pressed="' + !!st.half + '">' + i('plus') + '12 hours</button></div>' +
-        (bad ? '' : '<div class="av-sum">' + i('calendar') + '<span>' + avWhen(st.from) + ' to ' + avWhen(st.to) + ' (' + avLenText(st.to - st.from) + ')</span></div>');
+        (bad ? '' : '<div class="av-sum">' + i('calendar') + '<span>' + avWhen(st.from) + ' to ' + avWhen(st.to) + ' (' + avLenText(st.to - st.from) + ')</span></div>') + '</div>';
     }
     /* the daily rate and the rent for the picked period, worked out like the booking form (bkCalc), to quote at once */
     var seeAmt = ctx.can('bookings.see_amounts') || ctx.can('bookings.edit_amounts');
@@ -109,7 +112,8 @@ PAGES['availability'] = {
       if (el.getAttribute('data-key') === 'from') { st.from = v; setLen(); } else { st.to = v; matchLen(); }
       save(); all();
     });
-    UI.on(form, 'click', '[data-len]', function (ev, el) { st.len = +el.getAttribute('data-len'); setLen(); save(); all(); });
+    UI.on(form, 'click', '[data-len]', function (ev, el) { st.len = +el.getAttribute('data-len'); st.open = false; setLen(); save(); all(); });
+    UI.on(form, 'click', '[data-av="edit"]', function () { st.open = !st.open; drawForm(); });
     UI.on(form, 'click', '[data-av="half"]', function () {
       st.half = !st.half;
       if (st.len) setLen(); else st.to = new Date(st.to.getTime() + (st.half ? 1 : -1) * DAY / 2);

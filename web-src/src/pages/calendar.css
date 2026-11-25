@@ -108,3 +108,6 @@
 .pg-calendar .cl-ev.clash{box-shadow:0 0 0 2px #dc2626,0 1px 2px rgb(0 0 0 / .15);z-index:3}
 .pg-calendar .cl-ev .cl-cx{font-size:13px;margin-right:4px;vertical-align:-2px;color:#fff;filter:drop-shadow(0 0 1px rgb(0 0 0 / .5))}
 .pg-calendar .cl-ev.yellow .cl-cx{color:#991b1b;filter:none}
+.pg-calendar .cl-lt{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:92px}
+.pg-calendar .cl-lt b{color:var(--text);font-weight:600}
+.pg-calendar .cl-lt .chip{font-size:11.5px}

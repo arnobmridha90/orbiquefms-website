@@ -34,6 +34,19 @@ var Docs = (function () {
   function fromDep(p) { return p.method === 'Deposit adjustment'; }
   function receiptTotal(r) { return paysOfReceipt(r).filter(function (p) { return !p.voided && !fromDep(p); }).reduce(function (s, p) { return s + payTotal(p); }, 0); }
   function receiptFromDeposit(r) { return paysOfReceipt(r).filter(function (p) { return !p.voided && fromDep(p); }).reduce(function (s, p) { return s + payTotal(p); }, 0); }
+  /* a receipt the customer already has, whose payments changed after it was sent (one voided or added): {was, now} or null */
+  function receiptChanged(r) {
+    if (!r || r.voided || !r.sent || !r.sent.at) return null;
+    var at = new Date(r.sent.at).getTime(), was = 0, now = receiptTotal(r), moved = false;
+    paysOfReceipt(r).forEach(function (p) {
+      if (fromDep(p)) return;
+      var added = new Date(p.made || p.at).getTime() > at, gone = p.voided && p.voidedAt && new Date(p.voidedAt).getTime() > at;
+      if (added || gone) moved = true;
+      if ((!p.voided || gone) && !added) was += payTotal(p);
+    });
+    if (r.sent.total != null) was = +r.sent.total;
+    return moved && Math.abs(was - now) >= 0.005 ? { was: was, now: now } : null;
+  }
   function noReceipt(b) { var live = (S.receipts || []).filter(function (r) { return r.booking === b.id && !r.voided; }); return activePays(b).filter(function (p) { return !live.some(function (r) { return (r.lines || []).indexOf(p.id) >= 0; }); }); }
 
   /* receipt bookkeeping, called by payments.js */
@@ -96,7 +109,7 @@ var Docs = (function () {
   function previewInvoice(inv) { pdfDoc('invoice', invoiceData(inv)); }
   function previewReceipt(r) { pdfDoc('receipt', receiptData(r)); }
   function docBy(kind, id) { return byId(kind === 'invoice' ? S.invoices : S.receipts, id); }
-  function markSent(doc, ch) { doc.sent = { ch: ch, at: new Date().toISOString(), by: S.me }; var b = bk(doc.booking); if (b) bLog(b, (doc.no.indexOf(B().invoicePrefix || 'INV') === 0 ? 'Invoice ' : 'Receipt ') + doc.no + ' sent (' + ch + ')'); save(); }
+  function markSent(doc, ch) { doc.sent = { ch: ch, at: new Date().toISOString(), by: S.me }; if ((S.receipts || []).indexOf(doc) >= 0) doc.sent.total = receiptTotal(doc); var b = bk(doc.booking); if (b) bLog(b, (doc.no.indexOf(B().invoicePrefix || 'INV') === 0 ? 'Invoice ' : 'Receipt ') + doc.no + ' sent (' + ch + ')'); save(); }
   function sendWa(kind, id) {
     var doc = docBy(kind, id); if (!doc) return;
     if (doc.voided) { say('This document is void and cannot be sent'); return; }
@@ -147,6 +160,9 @@ var Docs = (function () {
     recs.forEach(function (r) {
       var n = paysOfReceipt(r).filter(function (p) { return !p.voided; }).length;
       h += '<button type="button" class="dc-doc' + (r.voided ? ' void' : '') + '" data-act="view" data-k="receipt" data-id="' + r.id + '">' + I('receipt') + '<span class="grow"><b>' + esc(r.no) + (r.voided ? ' · voided' : '') + '</b><small>' + (r.voided ? esc(r.voidReason || '') : n + ' payment' + (n === 1 ? '' : 's') + ' · made ' + esc(dShort(r.at))) + '</small></span><span class="money">' + rm(receiptTotal(r)) + '</span></button>';
+      var rch = receiptChanged(r);
+      if (rch) h += '<div class="banner amber dc-changed">' + I('warn') + '<div class="grow"><b>Changed since it was sent:</b> <b class="nowrap">' + rm(rch.was) + '</b> to <b class="nowrap">' + rm(rch.now) + '</b>. The customer has the old one.' +
+        (can('billing.send') ? '<button type="button" class="btn sm" data-act="wa" data-k="receipt" data-id="' + r.id + '">' + I('wa') + 'Send the new receipt</button>' : '') + '</div></div>';
       if (!r.voided) h += sendRow('receipt', r) + (can('billing.void') ? '<button type="button" class="btn link red dc-void" data-act="void" data-k="receipt" data-id="' + r.id + '">Void receipt</button>' : '');
     });
     if (missing.length) {
@@ -243,7 +259,7 @@ var Docs = (function () {
       shareText: 'Hi ' + callName(cu.name) + ', here is the deposit statement for ' + b.code + ' from ' + B().name + '.' });
   }
 
-  return { open: open, addToReceipt: addToReceipt, dropPayment: dropPayment, receiptOf: receiptOf, invoiceOf: invoiceOf, receiptTotal: receiptTotal, paysOfReceipt: paysOfReceipt, noReceipt: noReceipt,
+  return { receiptChanged: receiptChanged, open: open, addToReceipt: addToReceipt, dropPayment: dropPayment, receiptOf: receiptOf, invoiceOf: invoiceOf, receiptTotal: receiptTotal, paysOfReceipt: paysOfReceipt, noReceipt: noReceipt,
     invoiceDraft: invoiceDraft, changedSince: changedSince, previewInvoice: previewInvoice, previewReceipt: previewReceipt, sendWa: sendWa, share: shareDoc, download: downloadDoc, generate: generate, voidDoc: voidDoc };
 })();
 
@@ -309,7 +325,7 @@ function ivRows() {
       var b = bk(d.booking); if (!b) return;
       if (!ivMatch(b, q, d.no)) return;
       out.push({ t: new Date(d.updatedAt || d.at).getTime(), html: '<button type="button" class="card2' + (d.voided ? ' muted' : '') + '" data-doc="' + d.id + '"><div class="c2-main"><div class="c2-t1">' + esc(d.no) + ' <span class="muted iv-d">· ' + dShort(d.at) + '</span></div><div class="c2-t2">' + esc(cust(b.cust).name) + ' · ' + esc(b.code) + '</div></div>' +
-        '<div class="c2-end"><span class="money">' + rm(inv ? d.total : Docs.receiptTotal(d)) + '</span><small>' + (d.voided ? chip('Void', 'grey') : inv && Docs.changedSince(d, b) ? chip('Booking changed', 'amber') : d.sent ? chip('Sent', 'green') : chip(inv ? 'Not sent' : 'Ready', inv ? 'grey' : 'blue')) + '</small></div></button>' });
+        '<div class="c2-end"><span class="money">' + rm(inv ? d.total : Docs.receiptTotal(d)) + '</span><small>' + (d.voided ? chip('Void', 'grey') : inv && Docs.changedSince(d, b) ? chip('Booking changed', 'amber') : !inv && Docs.receiptChanged(d) ? chip('Changed since sent', 'amber') : d.sent ? chip('Sent', 'green') : chip(inv ? 'Not sent' : 'Ready', inv ? 'grey' : 'blue')) + '</small></div></button>' });
     });
   } else {
     var liveRc = {}; (S.receipts || []).forEach(function (r) { if (!r.voided) liveRc[r.no] = 1; });

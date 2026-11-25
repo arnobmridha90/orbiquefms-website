@@ -293,7 +293,8 @@ function rptBI(r, o) {
   var keys = ['rental', 'deliv', 'ret', 'dmg', 'other', 'total'], tot = { n: list.length, days: 0 };
   keys.forEach(function (k) { tot[k] = sum(list.map(function (it) { return it[k]; })); });
   tot.days = sum(list.map(function (it) { return it.n; }));
-  tot.dep = sum(list.map(function (it) { return it.x.dep; }));
+  tot.dep = sum(list.map(function (it) { return it.x.dep; }));   /* deposits on the bookings in the period, not what is held now (that is on Deposit refunds) */
+  tot.depBack = list.filter(function (it) { return it.x.dep > 0 && it.x.pay === 'Deposit Refunded'; }).length;
   var byCar = cars.map(function (c) { var l = list.filter(function (it) { return it.x.car === c; }), o2 = { car: c, n: l.length, days: Math.min(r.days, sum(l.map(function (it) { return it.n; }))) }; keys.forEach(function (k) { o2[k] = sum(l.map(function (it) { return it[k]; })); }); o2.util = o2.days / r.days; return o2; });
   tot.util = cars.length ? sum(byCar.map(function (c) { return c.days; })) / (cars.length * r.days) : 0;
   var group = function (f) { var g = {}; list.forEach(function (it) { var k = f(it) || 'Not set'; g[k] = g[k] || { k: k, n: 0, total: 0 }; g[k].n++; g[k].total += it.total; }); return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return b.total - a.total; }); };
@@ -430,7 +431,7 @@ function rptModel(id, st, r) {
     m.kpis = [{ l: 'Total income', raw: t.total, t: 'money', note: r.label, hero: true, split: [['Rental income', t.rental], ['Delivery fee', t.deliv], ['Return fee', t.ret], ['Damage coverage', t.dmg]].concat(other ? [['Other charges', t.other]] : []) },
       { l: 'Bookings', raw: t.n, t: 'int', note: t.n ? (t.days / t.n).toFixed(1) + ' days each on average' : 'None in this period' }, { l: 'Days booked', raw: t.days, t: 'int', note: 'Added up over all cars' },
       { l: 'Utilisation', raw: t.util, t: 'pct', note: plural(R.cars.length, 'car') + ' over ' + r.days + ' days', ring: true }, { l: 'Average income per booking', raw: t.n ? t.total / t.n : 0, t: 'money' },
-      { l: 'Rental income', raw: t.rental, t: 'money', small: true }, { l: 'Delivery fee', raw: t.deliv, t: 'money', small: true }, { l: 'Return fee', raw: t.ret, t: 'money', small: true }, { l: 'Damage coverage', raw: t.dmg, t: 'money', small: true }, { l: 'Deposits held', raw: t.dep, t: 'money', note: 'Not income', small: true }];
+      { l: 'Rental income', raw: t.rental, t: 'money', small: true }, { l: 'Delivery fee', raw: t.deliv, t: 'money', small: true }, { l: 'Return fee', raw: t.ret, t: 'money', small: true }, { l: 'Damage coverage', raw: t.dmg, t: 'money', small: true }, { l: 'Deposits on bookings', raw: t.dep, t: 'money', note: 'Not income' + (t.depBack ? ', ' + t.depBack + ' given back' : ''), small: true }];
     var mc = function (l) { return { l: l, t: 'money', a: 'r', w: 12 }; };
     m.sections.push({ title: 'By car', cols: [{ l: 'Car', w: 24 }, { l: 'Bookings', t: 'int', a: 'r', w: 8 }, { l: 'Days booked', t: 'int', a: 'r', w: 9 }, { l: 'Utilisation', t: 'pct', a: 'r', w: 12, bar: true }, mc('Rental income'), mc('Delivery fee'), mc('Return fee'), mc('Damage coverage')].concat(other ? [mc('Other charges')] : []).concat([{ l: 'Total income', t: 'money', a: 'r', w: 13, strong: true }]),
       rows: R.byCar.map(function (c) { return [car2(c.car), c.n, c.days, c.util, c.rental, c.deliv, c.ret, c.dmg].concat(other ? [c.other] : []).concat([c.total]); }),
@@ -614,7 +615,7 @@ function rptBIBook(m, R, r) {
   var t = R.tot, other = t.other > 0, top = rptTop(m.xlTitle, 12, ['One row per booking, income per car and per day. All amounts in RM.', ['Period', r.label + ' (' + r.days + ' days)'], ['Generated', rptGen()], ['Cars', m.info[0][1]], ['Booking statuses', m.info[1][1]]]);
   var S = top.rows.slice(), merges = top.merges.slice();
   S.push([]); S.push([{ v: 'KEY FIGURES', s: 'sec' }, { v: '', s: 'sec' }]);
-  [['Total income', t.total, 'kvg'], ['Rental income', t.rental, 'kv'], ['Delivery fee', t.deliv, 'kv'], ['Return fee', t.ret, 'kv'], ['Damage coverage', t.dmg, 'kv']].concat(other ? [['Other charges', t.other, 'kv']] : []).concat([['Deposits held (not income)', t.dep, 'kv'], ['Bookings', t.n, 'kvn'], ['Rental days', t.days, 'kvn'], ['Average income per booking', t.n ? t.total / t.n : 0, 'kv'], ['Average rental length (days)', t.n ? t.days / t.n : 0, 'kvd'], ['Utilisation', t.util, 'kvp']]).forEach(function (k) { S.push([{ v: k[0], s: 'kl' }, { v: k[1], s: k[2] }]); });
+  [['Total income', t.total, 'kvg'], ['Rental income', t.rental, 'kv'], ['Delivery fee', t.deliv, 'kv'], ['Return fee', t.ret, 'kv'], ['Damage coverage', t.dmg, 'kv']].concat(other ? [['Other charges', t.other, 'kv']] : []).concat([['Deposits on bookings (not income)', t.dep, 'kv'], ['Bookings', t.n, 'kvn'], ['Rental days', t.days, 'kvn'], ['Average income per booking', t.n ? t.total / t.n : 0, 'kv'], ['Average rental length (days)', t.n ? t.days / t.n : 0, 'kvd'], ['Utilisation', t.util, 'kvp']]).forEach(function (k) { S.push([{ v: k[0], s: 'kl' }, { v: k[1], s: k[2] }]); });
   /* by car */
   S.push([]); S.push([{ v: 'BY CAR', s: 'sec' }].concat(Array.apply(null, Array(11)).map(function () { return { v: '', s: 'sec' }; })));
   var head = ['Car', 'Plate', 'Bookings', 'Days booked', 'Utilisation', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Other charges', 'Total income', 'Income bar'];
@@ -649,7 +650,7 @@ function rptBIBook(m, R, r) {
   sheets.push({ name: 'Daily by car', rows: D2, cols: [13, 13].concat(R.cars.map(function () { return 15; })).concat([15]), merges: t2.merges, freeze: 'C' + (hr + 1) });
   /* bookings */
   var t3 = rptTop('Bookings', 25, [['Period', r.label], ['Generated', rptGen()]]), K = t3.rows.slice();
-  var bh = ['Booking ID', 'Status', 'Customer', 'IC / Passport', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days', 'Daily rate', 'Rent', 'Discount', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Total income', 'Deposit held', 'Total payable', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period'];
+  var bh = ['Booking ID', 'Status', 'Customer', 'IC / Passport', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days', 'Daily rate', 'Rent', 'Discount', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Total income', 'Deposit', 'Total payable', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period'];
   K.push(bh.map(function (h, k) { return { v: h, s: k >= 9 && k <= 19 || k >= 23 ? 'hr' : 'h' }; }));
   var hb = K.length, fb = hb + 1;
   R.list.forEach(function (it, k) {

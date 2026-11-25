@@ -1001,6 +1001,7 @@ function bkCalc(o) {
 /* ---------- booking status rules (reference backend) ----------
    applyStatusRules(before, patch) -> a copy of patch with the automatic changes, and patch.notes = ['...'] saying why.
    before: the booking as it is (null for a new one). patch: what is about to be saved ({status, pay, submitted, dep}).
+   0. Agreement Signed (chosen now) switches submitted on.
    1. Submitted (the customer signed the form): Pending, Confirmed or Agreement Sent become Agreement Signed, and the payment
       status becomes Deposit due unless it is already Deposit Received, Full Payment Received, Refund Pending or Deposit Refunded.
    2. A change to Car Returned sets Refund Pending when a deposit was received (or Deposit Refunded when the booking has no
@@ -1009,6 +1010,11 @@ var EARLY_STATUSES = ['Pending', 'Confirmed', 'Agreement Sent'];
 function applyStatusRules(before, patch) {
   var b = before || {}, out = Object.assign({}, patch), notes = [];
   var status = out.status != null ? out.status : b.status, pay = out.pay != null ? out.pay : b.pay, submitted = out.submitted != null ? out.submitted : b.submitted;
+  /* 0. Agreement Signed means the customer signed the form: choosing it switches Is Submitted on (the booking form, the
+     PDF and the phone card all follow submitted, so the two can never disagree) */
+  if (status === 'Agreement Signed' && b.status !== 'Agreement Signed' && !submitted) {
+    out.submitted = submitted = true; if (!b.submittedAt) out.submittedAt = NOW(); notes.push('Agreement Signed means the customer signed the form, so Is Submitted is now on.');
+  }
   if (submitted && EARLY_STATUSES.indexOf(status) >= 0) {
     out.status = status = 'Agreement Signed'; notes.push('The customer signed the form, so the booking is now Agreement Signed.');
     if (['Deposit Received', 'Full Payment Received', 'Refund Pending', 'Deposit Refunded'].indexOf(pay) < 0) { out.pay = pay = 'Deposit due'; notes.push('Payment status set to Deposit due.'); }
@@ -1120,6 +1126,22 @@ function busy(car, start, end, except, d) {
     if (parts.length) { res.soon = parts.join('; '); res.soon = res.soon.charAt(0).toUpperCase() + res.soon.slice(1); res.gapH = gapH; }
   }
   return res;
+}
+
+/* road tax and insurance a car must have on the road: carPaperIssues(car, start, end) -> [{kind, until, expired, text, short}]
+   for each of the two whose latest paper has run out, or runs out before the rental ends (start/end default to now).
+   Used by the car picker, the booking drawer, Schedules and the handover card, so a car never goes out without a warning. */
+var ROAD_PAPERS = ['Road tax', 'Insurance'];
+function carPaperIssues(car, start, end, d) {
+  d = d || D(); var c = typeof car === 'object' ? car : byId(d.cars, car); if (!c || !d.papers) return [];
+  var now = NOW(), s = start || now, e = end || s, out = [], fmt = function (x) { return x.getDate() + ' ' + MON[x.getMonth()] + (x.getFullYear() !== now.getFullYear() ? ' ' + x.getFullYear() : ''); };
+  ROAD_PAPERS.forEach(function (k) {
+    var l = d.papers.filter(function (p) { return p.car === c.id && p.kind === k; }).sort(function (a, b) { return (b.until ? +b.until : 9e15) - (a.until ? +a.until : 9e15); }), p = l[0];
+    if (!p || !p.until || p.until >= e) return;   /* nothing recorded yet is a job for Maintenance, not a warning on every booking */
+    var gone = p.until < now || p.until <= s;
+    out.push({ kind: k, until: p.until, expired: gone, text: gone ? k + ' expired on ' + fmt(p.until) : k + ' runs out on ' + fmt(p.until) + ', before the return on ' + fmt(e), short: gone ? k + ' expired' : k + ' runs out ' + fmt(p.until) });
+  });
+  return out;
 }
 
 /* ---------- cash a staff member holds (one figure everywhere: Bank in cash, Cash held by staff, Deposit refunds and

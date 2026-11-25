@@ -1051,6 +1051,13 @@ svg{display:block}
   .t3-foot{padding:24px 16px}
 }
 @media (max-width:760px){.sx{position:relative}.d-nav,.pm-side{top:0!important;height:100vh!important;z-index:70!important}.d-shell.open .d-scrim,.pm.open .pm-scrim{inset:0!important;z-index:65!important}}
+/* text beside buttons in a wrapping row (card footers, notes with an action): it keeps a readable width and the buttons
+   wrap below it, instead of the text shrinking to one word per line. Empty spacers keep flex:1. */
+.card-f > .grow:not(:empty),.row.wrap > .grow:not(:empty){flex:1 1 220px}
+@media (max-width:560px){.card-f > .grow:not(:empty){flex-basis:100%}}
+/* a note with an action button: the button drops below the text on a narrow screen instead of squeezing it */
+.alert{flex-wrap:wrap}
+.alert > .grow{flex:1 1 200px;min-width:0}
 
 /* ---- ui.css ---- */
 /* ============================================================
@@ -1537,6 +1544,21 @@ html.ui-locked,html.ui-locked body{overflow:hidden}
 .pg-availability .av-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:8px 0 2px;font-size:14px}
 .pg-availability .av-price b{font-weight:600;color:var(--text)}
 .pg-availability .av-price span{color:var(--text2)}
+/* phones: the period as one line that opens the fields */
+.pg-availability .av-sumbtn{display:none}
+@media (max-width:640px){
+  .pg-availability .av-pick{padding:6px;margin-bottom:12px}
+  .pg-availability .av-sumbtn{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:8px 10px;border:0;border-radius:8px;background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+  .pg-availability .av-sumbtn > i{font-size:20px;color:var(--primary-text);flex:none}
+  .pg-availability .av-sumbtn .grow{min-width:0;display:flex;flex-direction:column}
+  .pg-availability .av-sumbtn b{font-size:14.5px;font-weight:600}
+  .pg-availability .av-sumbtn small{font-size:12.5px;color:var(--text2)}
+  .pg-availability .av-pick:not(.open) .av-fbody{display:none}
+  .pg-availability .av-pick.open .av-fbody{padding:8px 10px 12px}
+  .pg-availability .av-fbody .av-sum{display:none}
+  .pg-availability .av-h{margin:14px 0 10px}
+  .pg-availability .pg-h p{display:none}
+}
 
 /* ---- pages/bookings.css ---- */
 /* ===================================================================
@@ -1802,6 +1824,18 @@ html.ui-locked,html.ui-locked body{overflow:hidden}
   .bkx-jump::-webkit-scrollbar{display:none}
   .bkx-jump .ui-fchip{flex:none;height:40px;padding:0 14px;font-size:14px;background:var(--paper)}
 }
+/* a picked customer: one card, details folded away until "Edit details" */
+.bkx-csum{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface2,var(--hover))}
+.bkx-csum:empty,#bkx-csum:empty{display:none}
+.bkx-csum .grow{min-width:0}
+.bkx-csum b{display:block;font-size:14.5px;overflow-wrap:anywhere}
+.bkx-csum small{display:block;color:var(--text2);font-size:12.5px;overflow-wrap:anywhere}
+.bkx-csum .btn{min-height:40px;flex:none}
+.bkx-cfold .bkx-cdet{display:none}
+#bkx-lic:empty,#bkx-match:empty{display:none}
+#bkx-lic .alert{margin-bottom:10px}
+.bkx-cpb{margin-top:8px}
+.bkx-cpb .btn{min-height:40px}
 
 /* ---- pages/calendar.css ---- */
 /* Calendar (cl-) */
@@ -1914,6 +1948,9 @@ html.ui-locked,html.ui-locked body{overflow:hidden}
 .pg-calendar .cl-ev.clash{box-shadow:0 0 0 2px #dc2626,0 1px 2px rgb(0 0 0 / .15);z-index:3}
 .pg-calendar .cl-ev .cl-cx{font-size:13px;margin-right:4px;vertical-align:-2px;color:#fff;filter:drop-shadow(0 0 1px rgb(0 0 0 / .5))}
 .pg-calendar .cl-ev.yellow .cl-cx{color:#991b1b;filter:none}
+.pg-calendar .cl-lt{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:92px}
+.pg-calendar .cl-lt b{color:var(--text);font-weight:600}
+.pg-calendar .cl-lt .chip{font-size:11.5px}
 
 /* ---- pages/cars.css ---- */
 /* Cars page and the car drawer (cr-) */
@@ -2207,7 +2244,7 @@ html.ui-locked,html.ui-locked body{overflow:hidden}
 .dp-ex b{color:var(--text)}
 .dp-ex.faint{border-style:dashed;background:transparent}
 .dp-card{display:flex;flex-direction:column;gap:10px;min-width:0}
-.dp-card-n{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.dp-card-n{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px 12px}
 .dp-card-n span{display:flex;flex-direction:column;min-width:0}
 .dp-card-n small{font-size:11.5px;color:var(--text3)}
 .dp-card-n b{color:var(--text);font-weight:600;font-size:14px;white-space:nowrap}
@@ -3646,6 +3683,9 @@ button.dsh-legi:hover{background:var(--hover)}
 .sc-smdlg .sc-sm > .card-b{padding:0}
 .pg-schedules .sc-q{width:min(360px,100%)}
 @media (max-width:760px){.pg-schedules .sc-q{width:100%}}
+.pg-schedules .sc-papers:empty{display:none}
+.pg-schedules .sc-papers{padding:12px 16px 0}
+.pg-schedules .sc-papers .alert{margin:0}
 
 /* ---- pages/settings.css ---- */
 /* Settings (builder 5) */
@@ -3786,6 +3826,11 @@ button.dsh-legi:hover{background:var(--hover)}
   .pg-settings .set-rate,.pg-settings .chip:has(.set-x){min-height:40px}
   .pg-settings .set-fee-rates,.pg-settings .set-tg + .row{gap:8px}
 }
+/* Other places: the fee boxes carry their own labels on a phone, where the column headings are hidden */
+@media (min-width:761px){.pg-settings .set-pl > .inp > label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+@media (max-width:760px){.pg-settings .set-pl{align-items:end}.pg-settings .set-pl > .ib{margin-bottom:2px}}
+/* Menu layout on a phone: the page name on its own line, the group and the arrows below it */
+@media (max-width:560px){.pg-settings .set-mi > .grow{flex:1 1 calc(100% - 40px);white-space:normal;overflow:visible}}
 
 /* ---- pages/signatures.css ---- */
 /* Signatures (builder 1). .pg-signatures for the page; .sg-* for the drawer and the draw pad. */
@@ -4271,6 +4316,12 @@ button.dsh-legi:hover{background:var(--hover)}
   .tr-pin .tr-ring{r:22px}
   .tr-scale text,.tr-north text{font-size:26px}
 }
+/* who has the car now */
+.pg-tracking .tr-who{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-size:13px;color:var(--text2);min-width:0}
+.pg-tracking .tr-who > i{font-size:15px;color:var(--text3);flex:none}
+.pg-tracking .tr-who b{color:var(--text);font-weight:600}
+.pg-tracking .tr-who .inv-link{min-height:32px}
+.pg-tracking .tr-mc .tr-who{margin:2px 0}
 
 /* ---- pages/website.css ---- */
 /* Website feeds (builder 5): FAQs, reviews, logos, social buttons and WhatsApp inside every design.
@@ -4826,6 +4877,7 @@ button.dsh-legi:hover{background:var(--hover)}
 .tabler-message-2{--svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M8 9h8m-8 4h6m-5 5H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-3l-3 3z'/%3E%3C/svg%3E");}
 .tabler-plane{--svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M16 10h4a2 2 0 0 1 0 4h-4l-4 7H9l2-7H7l-2 2H2l2-4l-2-4h3l2 2h4L9 3h3z'/%3E%3C/svg%3E");}
 .tabler-plane-off{--svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9.788 5.758L9 3h3l4 7h4a2 2 0 1 1 0 4h-2m-2.718 1.256L12 21H9l2-7H7l-2 2H2l2-4l-2-4h3l2 2h3M3 3l18 18'/%3E%3C/svg%3E");}
+.tabler-user-question{--svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h3.5m5.5 7v.01M19 19a2.003 2.003 0 0 0 .914-3.782a1.98 1.98 0 0 0-2.414.483'/%3E%3C/svg%3E");}
 </style>
 <div id="app"></div>
 <script>
@@ -7046,6 +7098,7 @@ function bkCalc(o) {
 /* ---------- booking status rules (reference backend) ----------
    applyStatusRules(before, patch) -> a copy of patch with the automatic changes, and patch.notes = ['...'] saying why.
    before: the booking as it is (null for a new one). patch: what is about to be saved ({status, pay, submitted, dep}).
+   0. Agreement Signed (chosen now) switches submitted on.
    1. Submitted (the customer signed the form): Pending, Confirmed or Agreement Sent become Agreement Signed, and the payment
       status becomes Deposit due unless it is already Deposit Received, Full Payment Received, Refund Pending or Deposit Refunded.
    2. A change to Car Returned sets Refund Pending when a deposit was received (or Deposit Refunded when the booking has no
@@ -7054,6 +7107,11 @@ var EARLY_STATUSES = ['Pending', 'Confirmed', 'Agreement Sent'];
 function applyStatusRules(before, patch) {
   var b = before || {}, out = Object.assign({}, patch), notes = [];
   var status = out.status != null ? out.status : b.status, pay = out.pay != null ? out.pay : b.pay, submitted = out.submitted != null ? out.submitted : b.submitted;
+  /* 0. Agreement Signed means the customer signed the form: choosing it switches Is Submitted on (the booking form, the
+     PDF and the phone card all follow submitted, so the two can never disagree) */
+  if (status === 'Agreement Signed' && b.status !== 'Agreement Signed' && !submitted) {
+    out.submitted = submitted = true; if (!b.submittedAt) out.submittedAt = NOW(); notes.push('Agreement Signed means the customer signed the form, so Is Submitted is now on.');
+  }
   if (submitted && EARLY_STATUSES.indexOf(status) >= 0) {
     out.status = status = 'Agreement Signed'; notes.push('The customer signed the form, so the booking is now Agreement Signed.');
     if (['Deposit Received', 'Full Payment Received', 'Refund Pending', 'Deposit Refunded'].indexOf(pay) < 0) { out.pay = pay = 'Deposit due'; notes.push('Payment status set to Deposit due.'); }
@@ -7165,6 +7223,22 @@ function busy(car, start, end, except, d) {
     if (parts.length) { res.soon = parts.join('; '); res.soon = res.soon.charAt(0).toUpperCase() + res.soon.slice(1); res.gapH = gapH; }
   }
   return res;
+}
+
+/* road tax and insurance a car must have on the road: carPaperIssues(car, start, end) -> [{kind, until, expired, text, short}]
+   for each of the two whose latest paper has run out, or runs out before the rental ends (start/end default to now).
+   Used by the car picker, the booking drawer, Schedules and the handover card, so a car never goes out without a warning. */
+var ROAD_PAPERS = ['Road tax', 'Insurance'];
+function carPaperIssues(car, start, end, d) {
+  d = d || D(); var c = typeof car === 'object' ? car : byId(d.cars, car); if (!c || !d.papers) return [];
+  var now = NOW(), s = start || now, e = end || s, out = [], fmt = function (x) { return x.getDate() + ' ' + MON[x.getMonth()] + (x.getFullYear() !== now.getFullYear() ? ' ' + x.getFullYear() : ''); };
+  ROAD_PAPERS.forEach(function (k) {
+    var l = d.papers.filter(function (p) { return p.car === c.id && p.kind === k; }).sort(function (a, b) { return (b.until ? +b.until : 9e15) - (a.until ? +a.until : 9e15); }), p = l[0];
+    if (!p || !p.until || p.until >= e) return;   /* nothing recorded yet is a job for Maintenance, not a warning on every booking */
+    var gone = p.until < now || p.until <= s;
+    out.push({ kind: k, until: p.until, expired: gone, text: gone ? k + ' expired on ' + fmt(p.until) : k + ' runs out on ' + fmt(p.until) + ', before the return on ' + fmt(e), short: gone ? k + ' expired' : k + ' runs out ' + fmt(p.until) });
+  });
+  return out;
 }
 
 /* ---------- cash a staff member holds (one figure everywhere: Bank in cash, Cash held by staff, Deposit refunds and
@@ -7358,7 +7432,13 @@ var UI = (function () {
     plural: plural
   };
   /* phone numbers never wrap */
-  U.phone = function (p, o) { if (!p) return '<span class="faint">-</span>'; o = o || {}; return '<span class="ui-phone">' + e(p) + (o.wa ? ' <a class="ui-wa" href="https://wa.me/' + String(p).replace(/\D/g, '') + '" target="_blank" rel="noopener" title="Open WhatsApp chat" data-stop>' + i('brand-whatsapp') + '</a>' : '') + '</span>'; };
+  /* WhatsApp needs the international number: '+44 20 ...' stays, a local '012-345 6789' takes the company's country code
+     from settings ('+60123456789'). UI.waNumber(p) -> '+60123456789' or ''; UI.waLink(p, text) -> 'https://wa.me/60123456789?text=...' or ''. */
+  U.waNumber = function (p) { var s = String(p || '').replace(/[^\d+]/g, ''); if (!s.replace(/\D/g, '')) return ''; if (s.charAt(0) === '+') return '+' + s.replace(/\D/g, ''); if (s.charAt(0) === '0') { var co = (typeof D === 'function' && D() && D().company) || {}; return (co.countryCode || '+60') + s.slice(1); } return '+' + s; };
+  U.waLink = function (p, text) { var n = U.waNumber(p).replace(/\D/g, ''); return n ? 'https://wa.me/' + n + (text ? '?text=' + encodeURIComponent(text) : '') : ''; };
+  /* a phone typed in local form ('012-345 6789') shows with the company's country code, like the rest ('+60 12-345 6789') */
+  U.phoneText = function (p) { var s = String(p || '').trim(); if (/^0/.test(s)) { var co = (typeof D === 'function' && D() && D().company) || {}; return (co.countryCode || '+60') + ' ' + s.slice(1); } return s; };
+  U.phone = function (p, o) { if (!p) return '<span class="faint">-</span>'; o = o || {}; return '<span class="ui-phone">' + e(U.phoneText(p)) + (o.wa ? ' <a class="ui-wa" href="' + U.waLink(p) + '" target="_blank" rel="noopener" title="Open WhatsApp chat" data-stop>' + i('brand-whatsapp') + '</a>' : '') + '</span>'; };
   U.money = function (v, o) { return '<span class="ui-money num">' + U.fmt.money(v, o) + '</span>'; };
 
   /* ---------------- statuses and chips ---------------- */
@@ -7477,10 +7557,12 @@ var UI = (function () {
       var bar = o.selectable && selKeys.length ? '<div class="ui-selbar"><b>' + e(selText) + '</b>' + (other ? '<span class="b2">(' + other + ' on other pages)</span>' : '') + '<button type="button" class="btn t sm" data-ui-clear>Clear</button><span class="grow"></span>' + (o.bulk ? o.bulk(selKeys) : '') + '</div>' : '';
       var cards = o.card ? '<div class="ui-cards">' + (shown.length ? shown.map(function (r, k) { var key = keyOf(r); return '<div class="ui-card' + (o.onRowClick ? ' click' : '') + (st.sel[key] ? ' on' : '') + '" data-k="' + e(key) + '"' + (o.onRowClick ? ' tabindex="0" role="button"' : '') + '>' + (o.selectable ? '<label class="cb ui-card-ck" data-stop><input type="checkbox" data-ui-row="' + e(key) + '" aria-label="Tick"' + (st.sel[key] ? ' checked' : '') + '><span class="box">' + i('check') + '</span></label>' : '') + o.card(r, k) + '</div>'; }).join('') : emptyHtml) + '</div>' : '';
       var pager = '';
-      if (paged && rows.length > Math.min.apply(0, o.pageSizes || [10])) {
+      /* the Rows box always lists the page size in use (a page may ask for 15 when the usual choices are 10, 25, 50, 100) */
+      var sizes = (o.pageSizes || [10, 25, 50, 100]).slice(); [o.pageSize, st.size].forEach(function (n) { if (typeof n === 'number' && n > 0 && sizes.indexOf(n) < 0) sizes.push(n); }); sizes.sort(function (a, b) { return a - b; });
+      if (paged && rows.length > Math.min.apply(0, sizes)) {
         var from = rows.length ? (st.page - 1) * st.size + 1 : 0, to = Math.min(rows.length, st.page * st.size), nums = [];
         for (var p = 1; p <= pages; p++) if (p === 1 || p === pages || Math.abs(p - st.page) <= 1) nums.push(p); else if (nums[nums.length - 1] !== '…') nums.push('…');
-        pager = '<div class="pager ui-pager"><span>Showing ' + from + ' to ' + to + ' of ' + rows.length + '</span><span class="row gap8"><label class="row gap6 b2">Rows<span class="inp"><select data-ui-size aria-label="Rows per page">' + (o.pageSizes || [10, 25, 50, 100]).map(function (n) { return '<option' + (n === st.size ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></span></label>' +
+        pager = '<div class="pager ui-pager"><span>Showing ' + from + ' to ' + to + ' of ' + rows.length + '</span><span class="row gap8"><label class="row gap6 b2">Rows<span class="inp"><select data-ui-size aria-label="Rows per page">' + sizes.map(function (n) { return '<option' + (n === st.size ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></span></label>' +
           '<span class="pgs"><button type="button" data-ui-page="' + (st.page - 1) + '"' + (st.page === 1 ? ' disabled' : '') + ' aria-label="Previous page">' + i('chevron-left') + '</button>' + nums.map(function (n) { return n === '…' ? '<span class="ui-gap">…</span>' : '<button type="button" data-ui-page="' + n + '" aria-current="' + (n === st.page) + '">' + n + '</button>'; }).join('') + '<button type="button" data-ui-page="' + (st.page + 1) + '"' + (st.page === pages ? ' disabled' : '') + ' aria-label="Next page">' + i('chevron-right') + '</button></span></span></div>';
       }
       el.innerHTML = '<div class="ui-tbl' + (o.density === 'compact' ? ' compact' : '') + (o.sticky !== false ? ' sticky' : '') + (o.card ? ' has-cards' : '') + '">' + bar +
@@ -7705,7 +7787,10 @@ var UI = (function () {
       var t = ev.target, x;
       if (t === wrap && ctrl._down && o.dismissable !== false) { ctrl.close(); return; }
       if (t.closest('[data-ui-x]')) { ctrl.close(); return; }
-      if ((x = t.closest('[data-ui-fb]'))) { var b = (o.foot || o.buttons)[+x.getAttribute('data-ui-fb')]; if (!b) return; var r = b.onClick ? b.onClick(ctrl, ev) : null; if (b.close !== false && r !== false && !(r && r.then)) ctrl.close(true); else if (r && r.then) r.then(function (v) { if (v !== false && b.close !== false) ctrl.close(true); }); return; }
+      if ((x = t.closest('[data-ui-fb]'))) { var b = (o.foot || o.buttons)[+x.getAttribute('data-ui-fb')]; if (!b) return; /* a plain Cancel or Close (no onClick, or dismiss: true) goes through the same unsaved-changes check as Esc, X and
+           the backdrop; a button that did its job (onClick returned anything but false) closes without asking */
+        if (!b.onClick || b.dismiss) { if (b.onClick) b.onClick(ctrl, ev); if (b.close !== false) ctrl.close(); return; }
+        var r = b.onClick(ctrl, ev); if (b.close !== false && r !== false && !(r && r.then)) ctrl.close(true); else if (r && r.then) r.then(function (v) { if (v !== false && b.close !== false) ctrl.close(true); }); return; }
     });
     var offData = o.live ? on('data', function () { if (!ctrl.closed) ctrl.refresh(); }) : null;
     layer().appendChild(wrap);
@@ -8198,11 +8283,12 @@ var UI = (function () {
     opts.items = function () {
       var cars = (o.cars || D().cars).filter(function (c) { return !o.hideInactive || c.fleet === 'Active' || c.id === opts.value; });
       var rows = cars.map(function (c) {
-        var b = busy(c, opts.start || null, opts.end || null, opts.exceptId), badge = null, rank = 0;
+        var b = busy(c, opts.start || null, opts.end || null, opts.exceptId), badge = null, rank = 0, pi;
         if (o.badges !== false) {
           if (b.kind === 'fleet') { badge = { text: b.reason, tone: 'grey' }; rank = 3; }
           else if (b.kind === 'workshop') { badge = { text: b.reason, tone: 'warn' }; rank = 2; }
           else if (b.kind === 'booking') { badge = { text: b.reason, tone: 'bad' }; rank = 1; }
+          else if (opts.start && (pi = carPaperIssues(c, opts.start, opts.end || null)).length) { badge = { text: pi[0].short + (pi.length > 1 ? ', ' + pi[1].kind.toLowerCase() + ' too' : ''), tone: 'bad' }; rank = 0.9; }
           else if (opts.start) { badge = { text: b.soon ? 'Check: ' + b.soon.charAt(0).toLowerCase() + b.soon.slice(1) + ' (gap is ' + b.gapH + ' hr' + (b.gapH === 1 ? '' : 's') + ')' : 'Free', tone: b.soon ? 'warn' : 'ok' }; if (b.soon) rank = 0.5; }
         }
         return { value: c.id, label: c.plate, sub: carName(c) + ' · ' + c.color, badge: badge, kw: normPlate(c.plate) + ' ' + c.make + ' ' + c.model + ' ' + c.color + ' ' + c.type + ' #' + c.serial, rank: rank, car: c, busy: b,
@@ -9451,13 +9537,16 @@ PAGES['availability'] = {
 
     function drawForm() {
       var bad = !(st.to > st.from);
-      form.innerHTML = '<div class="av-dates">' +
+      /* on a phone the period is one tappable line (the free cars show straight below it); tapping opens the fields */
+      var short = function (d0) { return WD[d0.getDay()] + ' ' + d0.getDate() + ' ' + MON[d0.getMonth()] + ' ' + (d0.getHours() % 12 || 12) + (d0.getMinutes() ? ':' + String(d0.getMinutes()).padStart(2, '0') : '') + ' ' + (d0.getHours() < 12 ? 'AM' : 'PM'); };
+      form.parentNode.classList.toggle('open', !!st.open);
+      form.innerHTML = '<button type="button" class="av-sumbtn" data-av="edit" aria-expanded="' + !!st.open + '">' + i('calendar') + '<span class="grow"><b>' + (bad ? 'Pick a period' : short(st.from) + ' to ' + short(st.to)) + '</b><small>' + (bad ? 'The end must be after the start' : avLenText(st.to - st.from)) + ' · ' + (st.open ? 'Done' : 'Change') + '</small></span>' + i(st.open ? 'chevron-up' : 'chevron-down') + '</button><div class="av-fbody"><div class="av-dates">' +
         UI.dateTimeField({ key: 'from', label: 'From', value: st.from, required: true }) +
         UI.dateTimeField({ key: 'to', label: 'To', value: st.to, required: true, chips: false, error: bad ? 'End must be after start' : '' }) + '</div>' +
         '<div class="av-lab">Rental length</div><div class="av-chips" role="group" aria-label="Rental length">' +
         AV_LENS.map(function (l) { return '<button type="button" class="av-chip" data-len="' + l[0] + '" aria-pressed="' + (st.len === l[0]) + '">' + l[1] + '</button>'; }).join('') +
         '<button type="button" class="av-chip" data-av="half" aria-pressed="' + !!st.half + '">' + i('plus') + '12 hours</button></div>' +
-        (bad ? '' : '<div class="av-sum">' + i('calendar') + '<span>' + avWhen(st.from) + ' to ' + avWhen(st.to) + ' (' + avLenText(st.to - st.from) + ')</span></div>');
+        (bad ? '' : '<div class="av-sum">' + i('calendar') + '<span>' + avWhen(st.from) + ' to ' + avWhen(st.to) + ' (' + avLenText(st.to - st.from) + ')</span></div>') + '</div>';
     }
     /* the daily rate and the rent for the picked period, worked out like the booking form (bkCalc), to quote at once */
     var seeAmt = ctx.can('bookings.see_amounts') || ctx.can('bookings.edit_amounts');
@@ -9497,7 +9586,8 @@ PAGES['availability'] = {
       if (el.getAttribute('data-key') === 'from') { st.from = v; setLen(); } else { st.to = v; matchLen(); }
       save(); all();
     });
-    UI.on(form, 'click', '[data-len]', function (ev, el) { st.len = +el.getAttribute('data-len'); setLen(); save(); all(); });
+    UI.on(form, 'click', '[data-len]', function (ev, el) { st.len = +el.getAttribute('data-len'); st.open = false; setLen(); save(); all(); });
+    UI.on(form, 'click', '[data-av="edit"]', function () { st.open = !st.open; drawForm(); });
     UI.on(form, 'click', '[data-av="half"]', function () {
       st.half = !st.half;
       if (st.len) setLen(); else st.to = new Date(st.to.getTime() + (st.half ? 1 : -1) * DAY / 2);
@@ -9818,7 +9908,7 @@ function bkStatusDialog(x, kind) {
     },
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Update', onClick: function (d) {
       var v = UI.form(d.body).st, patch = {}; if ((pay ? x.pay || '' : x.status) === v) return;
-      patch[pay ? 'pay' : 'status'] = v; if (!pay && v === 'Agreement Signed' && !x.submitted) { patch.submitted = true; patch.submittedAt = NOW(); }
+      patch[pay ? 'pay' : 'status'] = v; /* Agreement Signed also switches Is Submitted on (applyStatusRules) */
       var label = pay ? 'the payment status' : 'the booking status';
       /* the car may have been given to someone else while this booking was cancelled or completed */
       var bad = !pay ? bkReviveProblem(x, patch) : '';
@@ -9958,7 +10048,7 @@ function bkExport(from, to, f) {
   var byCar = cars.map(function (c) { var r = rows.filter(function (z) { return z.x.car === c; }), days = sum(r.map(function (z) { return z.n; })); return [carLbl(c), c.plate, r.length, days, nDays ? Math.round(days / nDays * 1000) / 10 + '%' : '0%', sum(r.map(function (z) { return (z.x.rent - z.x.disc) * z.n / z.x.days; })), sum(r.map(function (z) { return z.x.deliv * z.n / z.x.days; })), sum(r.map(function (z) { return z.x.ret * z.n / z.x.days; })), sum(r.map(function (z) { return z.x.dmg * z.n / z.x.days; })), sum(r.map(function (z) { return z.incIn; }))].map(function (v) { return typeof v === 'number' ? Math.round(v * 100) / 100 : v; }); });
   var gen = UI.fmt.dateTime(NOW()) + ' by ' + DB.actor(), title = b.name + ' booking and income report';
   var summary = [[title], ['Bookings, income per car and per day. All amounts in Malaysian Ringgit (RM).'], [], ['Period', UI.fmt.date(from) + ' to ' + UI.fmt.date(to) + ' (' + nDays + ' days)'], ['Generated', gen], ['Cars', car ? bkCarLabel(car) : 'All cars'], ['Booking statuses', f.status || 'Confirmed, Agreement Sent, Agreement Signed, Car Delivered, Car Returned, Completed'], [],
-    ['Key figures'], ['Total income', tot(function (z) { return z.incIn; })], ['Rental income', tot(function (z) { return (z.x.rent - z.x.disc) * z.n / z.x.days; })], ['Delivery fee', tot(function (z) { return z.x.deliv * z.n / z.x.days; })], ['Return fee', tot(function (z) { return z.x.ret * z.n / z.x.days; })], ['Damage coverage', tot(function (z) { return z.x.dmg * z.n / z.x.days; })], ['Deposits held (not income)', tot(function (z) { return z.x.dep; })], ['Bookings', rows.length], ['Rental days', tot(function (z) { return z.n; })], ['Average income per booking', rows.length ? Math.round(tot(function (z) { return z.incIn; }) / rows.length * 100) / 100 : 0], ['Average rental length (days)', rows.length ? Math.round(sum(rows.map(function (z) { return z.x.days; })) / rows.length * 10) / 10 : 0], [],
+    ['Key figures'], ['Total income', tot(function (z) { return z.incIn; })], ['Rental income', tot(function (z) { return (z.x.rent - z.x.disc) * z.n / z.x.days; })], ['Delivery fee', tot(function (z) { return z.x.deliv * z.n / z.x.days; })], ['Return fee', tot(function (z) { return z.x.ret * z.n / z.x.days; })], ['Damage coverage', tot(function (z) { return z.x.dmg * z.n / z.x.days; })], ['Deposits on bookings (not income)', tot(function (z) { return z.x.dep; })], ['Bookings', rows.length], ['Rental days', tot(function (z) { return z.n; })], ['Average income per booking', rows.length ? Math.round(tot(function (z) { return z.incIn; }) / rows.length * 100) / 100 : 0], ['Average rental length (days)', rows.length ? Math.round(sum(rows.map(function (z) { return z.x.days; })) / rows.length * 10) / 10 : 0], [],
     ['By car'], ['Car', 'Plate', 'Bookings', 'Days booked', 'Utilisation', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Total income']].concat(byCar).concat([['Total', '', rows.length, tot(function (z) { return z.n; }), '', sum(byCar.map(function (r) { return r[5]; })), sum(byCar.map(function (r) { return r[6]; })), sum(byCar.map(function (r) { return r[7]; })), sum(byCar.map(function (r) { return r[8]; })), sum(byCar.map(function (r) { return r[9]; }))], []]);
   var group = function (key, label) { var m = {}; rows.forEach(function (z) { var k = z.x[key] || 'None'; m[k] = m[k] || [0, 0]; m[k][0]++; m[k][1] += z.incIn; }); summary.push([label, 'Bookings', 'Total income']); Object.keys(m).forEach(function (k) { summary.push([k, m[k][0], Math.round(m[k][1] * 100) / 100]); }); summary.push([]); };
   group('method', 'By payment method'); group('pay', 'By payment status');
@@ -9969,7 +10059,7 @@ function bkExport(from, to, f) {
     daily.push([ds, de].concat(vals).concat([Math.round(sum(vals.map(function (v) { return v || 0; })) * 100) / 100]));
   }
   daily.push(['Total', ''].concat(cars.map(function (c, j) { return Math.round(sum(daily.slice(3).map(function (r) { return r[2 + j] || 0; })) * 100) / 100; })).concat([Math.round(sum(daily.slice(3).map(function (r) { return r[r.length - 1]; })) * 100) / 100]));
-  var bk = [['Booking ID', 'Status', 'Customer', 'IC / Passport (middle hidden)', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days\n(whole booking)', 'Daily rate', 'Rent\n(whole booking)', 'Discount\n(whole booking)', 'Rental income\n(whole booking)', 'Delivery fee\n(whole booking)', 'Return fee\n(whole booking)', 'Damage coverage\n(whole booking)', 'Total income\n(whole booking)', 'Deposit held\n(whole booking)', 'Total payable\n(whole booking)', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period']].concat(rows.map(function (z) {
+  var bk = [['Booking ID', 'Status', 'Customer', 'IC / Passport (middle hidden)', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days\n(whole booking)', 'Daily rate', 'Rent\n(whole booking)', 'Discount\n(whole booking)', 'Rental income\n(whole booking)', 'Delivery fee\n(whole booking)', 'Return fee\n(whole booking)', 'Damage coverage\n(whole booking)', 'Total income\n(whole booking)', 'Deposit\n(whole booking)', 'Total payable\n(whole booking)', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period']].concat(rows.map(function (z) {
     var x = z.x; return [x.code, x.status, x.cust.name, UI.fmt.ic(x.cust.ic), x.cust.phone, carLbl(x.car), x.car.plate, x.start, x.end, x.days, x.rate, x.rent, x.disc, x.rent - x.disc, x.deliv, x.ret, x.dmg, z.inc, x.dep, x.payable, x.method, x.pay || 'None', x.created, z.n, z.incIn];
   }));
   DB.log('Exported', 'Booking', '', DB.actor() + ' downloaded the bookings report for ' + UI.fmt.date(from) + ' to ' + UI.fmt.date(to));
@@ -10044,13 +10134,13 @@ function bkOpenBooking(code, prefill) {
   var custOf = function (c0) { c0 = c0 || {}; var em = c0.emergency || {}; return { name: c0.name || '', phone: c0.phone || '', email: c0.email || '', address: c0.address || '', nat: c0.nat || 'Malaysian', ic: c0.ic || '', licenceNo: c0.licenceNo || '', licenceExp: c0.licenceExp || null, emName: em.name || '', emPhone: em.phone || '', emRel: em.rel || '' }; };
   var cust = custOf(p);
   if (!x && !p) { if (prefill.name) cust.name = String(prefill.name); if (prefill.phone) cust.phone = bkTidyPhone(String(prefill.phone)); }
-  var check = { files: [], read: null, results: null, valid: null, filled: '', why: '', fill: false, error: '' }, dirty = false, saved = false, offData = null, carCtl = null, custCtl = null, avail = { key: '', res: { free: true } }, prevEnd = v.end;
+  var notMatch = null, carNote = null, check = { files: [], read: null, results: null, valid: null, filled: '', why: '', fill: false, error: '' }, dirty = false, saved = false, offData = null, carCtl = null, custCtl = null, avail = { key: '', res: { free: true } }, prevEnd = v.end;
   var onPage = S.page === 'bookings' && CUR && CUR.ctx;
   var refLocked = function () { var f = dr && dr.body ? form() : {}; var e = f.end ? UI.parseDate(f.end) : v.end; return !canPickRefunded({ end: e, pay: x ? x.pay : '' }); };
 
   /* ---- field builders ---- */
   var money = function (k, label, req, o) { o = o || {}; return UI.input({ key: k, label: label, type: 'number', value: v[k], required: req, readonly: !amt, step: '0.01', min: 0, placeholder: o.ph, prefix: 'RM' }); };
-  var sect = function (title, icon, inner, o) { o = o || {}; return '<section class="bkx-sec' + (o.coll ? ' coll' : '') + (o.shut ? ' shut' : '') + '"' + (o.id ? ' id="' + o.id + '"' : '') + '><div class="bkx-sec-h"' + (o.coll ? ' role="button" tabindex="0" data-bkx-tog' : '') + '>' + i(icon) + '<span class="grow">' + title + '</span>' + (o.act || '') + (o.coll ? i('chevron-down', 'bkx-chev') : '') + '</div><div class="bkx-sec-b">' + inner + '</div></section>'; };
+  var sect = function (title, icon, inner, o) { o = o || {}; return '<section class="bkx-sec' + (o.coll ? ' coll' : '') + (o.shut ? ' shut' : '') + (o.cls ? ' ' + o.cls : '') + '"' + (o.id ? ' id="' + o.id + '"' : '') + '><div class="bkx-sec-h"' + (o.coll ? ' role="button" tabindex="0" data-bkx-tog' : '') + '>' + i(icon) + '<span class="grow">' + title + '</span>' + (o.act || '') + (o.coll ? i('chevron-down', 'bkx-chev') : '') + '</div><div class="bkx-sec-b">' + inner + '</div></section>'; };
   var pkgOpts = [['', 'No damage cover']].concat(d.damagePackages.map(function (pk) { return [pk.id, bkPkgLabel(pk)]; })).concat([['manual', 'Set by hand']]);
 
   function checkerHtml() {
@@ -10058,21 +10148,48 @@ function bkOpenBooking(code, prefill) {
       return '<label class="btn ' + b2[3] + ' sm">' + i(b2[2]) + b2[1] + '<input type="file" accept="' + (/^(ic|passport|dl)$/.test(b2[0]) ? 'image/*' : 'image/*,.pdf') + '" hidden data-bkx-chk="' + b2[0] + '"></label>';
     }).join('') + '</div><p class="b2">Reading a card fills in the customer and checks our blacklist. Everything uploaded is saved with the booking.</p><div id="bkx-chk-out"></div></div>';
   }
+  /* the picked customer in one card: name, phone, IC and licence, with Edit details */
+  function csumHtml() {
+    if (!p) return '';
+    var c = custOf(p), le = c.licenceExp ? new Date(c.licenceExp) : null, bits = [esc(c.phone || 'No phone')];
+    if (c.ic) bits.push('IC ' + esc(cuSeeIc() ? c.ic : UI.fmt.ic(c.ic)));
+    bits.push(le ? 'Licence until ' + UI.fmt.date(le) : 'No licence expiry on file');
+    return '<div class="bkx-csum">' + UI.avatar(c.name) + '<div class="grow"><b>' + esc(c.name) + '</b><small>' + bits.join(' · ') + '</small></div>' + UI.btn('Edit details', { kind: 't', size: 'sm', icon: 'pencil', attrs: { 'data-bkx-cdet': 1, 'aria-expanded': 'false' } }) + '</div>';
+  }
+  function setFold(on) {
+    var sec = dr.body.querySelector('#bkx-s-cust'); if (!sec) return; sec.classList.toggle('bkx-cfold', !!on);
+    var bt = sec.querySelector('[data-bkx-cdet]'); if (bt) { bt.setAttribute('aria-expanded', on ? 'false' : 'true'); bt.lastChild.textContent = on ? 'Edit details' : 'Hide details'; }
+  }
+  /* an existing customer with the phone or IC typed for a new one (not picked from the list) */
+  function custMatch(f) {
+    if (p || ro) return null;
+    var ph = normPhone(f.phone || ''), icn = String(f.ic || '').replace(/[\s-]/g, '').toUpperCase();
+    return d.people.filter(function (q) { return q.id !== notMatch && ((ph.length > 6 && normPhone(q.phone) === ph) || (icn.length > 5 && String(q.ic || '').replace(/[\s-]/g, '').toUpperCase() === icn)); })[0] || null;
+  }
+  function custBookings(q) { return d.bookings.filter(function (z) { return z.cust === q; }).length; }
+  /* the licence runs out before the rental ends: '' or the warning */
+  function licenceIssue(f, e) {
+    var le = f.licenceExp ? UI.parseDate(f.licenceExp) : null; if (!le || isNaN(le) || !e) return '';
+    var end = new Date(le); end.setHours(23, 59, 59, 0); if (end >= e) return '';
+    return end < NOW() ? 'Licence expired on ' + UI.fmt.date(le) + '.' : 'Licence runs out on ' + UI.fmt.date(le) + ', before the return on ' + UI.fmt.date(e) + '.';
+  }
   function formHtml() {
     var h = '<div class="bkx-form">';
     var hChk = isNew && can('customers.check_ic') ? sect('Read IC or licence', 'shield-search', checkerHtml(), { id: 'bkx-s-chk', coll: true, shut: bkIsPhone() }) : '';
     /* 1. customer */
-    var hCust = sect('Customer', 'user', (isNew && !ro ? '<div class="bkx-cpick" id="bkx-cpick"></div>' : '') + '<div class="bkx-g">' +
-      UI.input({ key: 'name', label: 'Full Name', value: cust.name, required: true, style: 'grid-column:span 2', attrs: { autocomplete: 'off' } }) + UI.input({ key: 'phone', label: 'Phone', type: 'tel', value: cust.phone, required: true, placeholder: '+60 12 345 6789' }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: cust.email }) +
+    /* a customer picked on a new booking shows as one short card (their details are already on file); "Edit details"
+       opens the full fields. A new customer gets the fields straight away. */
+    var hCust = sect('Customer', 'user', (isNew && !ro ? '<div class="bkx-cpick" id="bkx-cpick"></div>' : '') + (isNew ? '<div id="bkx-csum">' + csumHtml() + '</div>' : '') + '<div id="bkx-lic"></div><div class="bkx-cdet"><div class="bkx-g">' +
+      UI.input({ key: 'name', label: 'Full Name', value: cust.name, required: true, style: 'grid-column:span 2', attrs: { autocomplete: 'off' } }) + UI.input({ key: 'phone', label: 'Phone', type: 'tel', value: cust.phone, required: true, placeholder: '+60 12 345 6789' }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: cust.email }) + '<div class="full" id="bkx-match"></div>' +
       UI.input({ key: 'ic', label: 'IC / Passport no.', value: cuSeeIc() || isNew ? cust.ic : UI.fmt.ic(cust.ic), readonly: !cuSeeIc() && !isNew, help: !cuSeeIc() && !isNew ? 'Middle hidden for you' : '' }) + UI.input({ key: 'nat', label: 'Nationality', value: cust.nat, placeholder: 'Type to search', attrs: { list: 'bkx-nats' } }) +
       UI.input({ key: 'licenceNo', label: 'Licence no.', value: cust.licenceNo }) + UI.dateField({ key: 'licenceExp', label: 'Licence expiry', value: cust.licenceExp, chips: false }) +
       UI.input({ key: 'address', label: 'Residential Address', value: cust.address, style: 'grid-column:1 / -1' }) +
       '<datalist id="bkx-nats">' + LISTS.nationalities.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>' +
-      '<div class="bkx-subh">' + i('phone-call') + 'Emergency contact</div><div class="bkx-g3">' + UI.input({ key: 'emName', label: 'Name', value: cust.emName }) + UI.input({ key: 'emPhone', label: 'Phone', type: 'tel', value: cust.emPhone }) + UI.input({ key: 'emRel', label: 'Relationship', value: cust.emRel, attrs: { list: 'bkx-rels' }, placeholder: 'Relative, Sibling, Colleague' }) + '<datalist id="bkx-rels">' + LISTS.relationships.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>', { id: 'bkx-s-cust' });
+      '<div class="bkx-subh">' + i('phone-call') + 'Emergency contact</div><div class="bkx-g3">' + UI.input({ key: 'emName', label: 'Name', value: cust.emName }) + UI.input({ key: 'emPhone', label: 'Phone', type: 'tel', value: cust.emPhone }) + UI.input({ key: 'emRel', label: 'Relationship', value: cust.emRel, attrs: { list: 'bkx-rels' }, placeholder: 'Relative, Sibling, Colleague' }) + '<datalist id="bkx-rels">' + LISTS.relationships.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div></div>', { id: 'bkx-s-cust', cls: isNew && p ? 'bkx-cfold' : '' });
     if (p && can('customer_notes.view')) hCust += '<section class="bkx-sec" id="bkx-notes"></section>';
     if (x && can('customers.check_ic')) hCust += sect('Check IC', 'id-badge-2', '<div id="bkx-ic"></div>', { coll: true, shut: true });
     /* 2. car and dates */
-    var hCar = sect('Car and dates', 'car', '<div class="bkx-g"><div class="full" id="bkx-carpick"></div>' +
+    var hCar = sect('Car and dates', 'car', '<div class="bkx-g"><div class="full" id="bkx-carpick"></div><div class="full" id="bkx-carnote" hidden></div>' +
       UI.dateTimeField({ key: 'start', label: 'Rental start', value: v.start, required: true, style: 'grid-column:span 2', disabled: ro }) +
       UI.dateTimeField({ key: 'end', label: 'Rental end', value: v.end, required: true, style: 'grid-column:span 2', chips: false, disabled: ro }) +
       (ro ? '' : '<div class="full bkx-lens" role="group" aria-label="Rental length"><span class="b2">Length</span>' + BK_LENS.map(function (l) { return '<button type="button" class="ui-fchip" data-bkx-len="' + l[0] + '">' + l[1] + '</button>'; }).join('') + '<span class="bkx-durtx" id="bkx-durtx"></span></div>') +
@@ -10159,7 +10276,7 @@ function bkOpenBooking(code, prefill) {
       var fe = el.querySelector('#bkx-fees'); if (fe) fe.innerHTML = feesHtml();
       carCtl = UI.carPicker(el.querySelector('#bkx-carpick'), { key: 'car', label: 'Car', required: true, value: v.car, start: v.start, end: v.end, exceptId: x ? x.code : undefined, disabled: ro,
         cars: d.cars.filter(function (c) { return c.fleet !== 'Sold' || (x && x.car === c); }), placeholder: 'Find the car by its plate',
-        onChange: function (id, car) { dirty = true; clearErr('car'); if (car) fillCarPrices(car); recalc(); } });
+        onChange: function (id, car) { dirty = true; clearErr('car'); if (car) carPrices(car); recalc(); } });
       var cp = el.querySelector('#bkx-cpick');
       if (cp) custCtl = UI.combo(cp, { key: 'custPick', label: 'Find a customer', placeholder: pre ? pre.name : 'Search by name, phone or IC', title: 'Find a customer', searchPlaceholder: 'Name, phone or IC', value: pre ? pre.id : '', recentKey: 'bk-cust-' + B().id,
         help: 'Leave it empty for a new customer and type the details below.', emptyText: 'No customers yet.', noMatchHelp: 'No match. Type the details below to add a new customer.',
@@ -10190,6 +10307,21 @@ function bkOpenBooking(code, prefill) {
     cuDocsMount(dc, docs, { readonly: ro, person: p, fromCustomer: fromCustomer || null, onChange: function () { dirty = true; },
       extra: x && can('deposits.view') ? '<div class="cu-doc" id="bkx-slip"><div class="cu-doc-h">Deposit refund slip</div>' + (x.refundSlip ? '<div class="cu-doc-f"><button type="button" class="cu-link ellip" data-bs="slipopen">' + esc(x.refundSlip.name) + '</button></div>' : x.pay === 'Refund Pending' ? '<label class="btn o sm cu-up">' + i('upload') + 'Upload refund slip<input type="file" accept="image/*,.pdf" hidden data-bs-slip></label>' : '<div class="cu-none">The deposit is not waiting to be returned yet. It can be recorded once the booking is Refund Pending.</div>') + '</div>' : '' });
   }
+  /* a new booking takes the car's prices. An existing one keeps the prices agreed with the customer (a car swapped after a
+     breakdown usually keeps them) and offers the new car's prices under the field. */
+  function carPrices(c) {
+    var box = dr.body.querySelector('#bkx-carnote'); carNote = null; if (box) { box.hidden = true; box.innerHTML = ''; }
+    if (isNew) { fillCarPrices(c); return; }
+    if (!amt) return;
+    var r = calcNow(), cur = { rate: r.num('rate'), hourly: r.num('hourly'), dep: r.num('dep') };
+    if (!(cur.rate > 0)) { fillCarPrices(c); return; }
+    if (cur.rate === +c.rate && cur.hourly === +c.hourly && cur.dep === +c.deposit) return;
+    carNote = c;
+    var hr = cur.hourly !== +c.hourly ? ', ' + UI.fmt.money(c.hourly) + '/hour' : '';
+    box.innerHTML = UI.alert('<b>' + esc(c.plate) + ' has other prices:</b> ' + UI.fmt.money(c.rate) + '/day' + hr + ', deposit ' + UI.fmt.money(c.deposit) + '. This booking keeps ' + UI.fmt.money(cur.rate) + '/day and deposit ' + UI.fmt.money(cur.dep) + ' unless you change them.' +
+      '<div class="row wrap gap6 bkx-cpb">' + UI.btn('Use new prices', { kind: 'tonal', size: 'sm', attrs: { 'data-bkx-cp': 'use' } }) + UI.btn('Keep ' + UI.fmt.money(cur.rate) + '/day', { kind: 'o', size: 'sm', attrs: { 'data-bkx-cp': 'keep' } }) + '</div>', 'pri', { html: true, icon: 'tag' });
+    box.hidden = false;
+  }
   function fillCarPrices(c) {
     if (amt) { setVal('rate', c.rate); setVal('hourly', c.hourly); setVal('dep', c.deposit); }
     else { v.rate = c.rate; v.hourly = c.hourly; v.dep = c.deposit; ['rate', 'hourly', 'dep'].forEach(function (f2) { setVal(f2, v[f2]); }); }
@@ -10202,6 +10334,7 @@ function bkOpenBooking(code, prefill) {
     var le = field('licenceExp'); if (le) UI.setDateField(le, c.licenceExp ? new Date(c.licenceExp) : null, true);
     CU_DOCS.forEach(function (dc) { var k = dc[0]; if (q && q.docs && q.docs[k] && !docs[k]) docs[k] = Object.assign({}, q.docs[k]); if (!q && docs[k] && docs[k].fromCust) docs[k] = null; });
     if (q) CU_DOCS.forEach(function (dc) { if (docs[dc[0]] && q.docs && q.docs[dc[0]] && docs[dc[0]].name === q.docs[dc[0]].name) docs[dc[0]].fromCust = true; });
+    var cs = dr.body.querySelector('#bkx-csum'); if (cs) cs.innerHTML = csumHtml(); if (isNew) setFold(!!q);
     mountDocs(q ? q.docs : null); drawBanner(); recalc();
     if (q) UI.toast('Filled in ' + q.name + '\'s details' + (CU_DOCS.some(function (dc) { return q.docs && q.docs[dc[0]]; }) ? ' and documents' : '') + '.', { ms: 2500 });
   }
@@ -10243,11 +10376,19 @@ function bkOpenBooking(code, prefill) {
       else if (!ro && b.soon) al.push(UI.alert('Inside the ' + plural(b.gapH, 'hour') + ' gap between rentals. ' + b.soon + '. Check the car can be cleaned in time.', 'warn'));
       else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + 'The car is free for these dates.</div>');
     } else if (r.s && r.e && carCtl) { var k3 = '|' + +r.s + '|' + +r.e; if (avail.key !== k3) { avail.key = k3; carCtl.setDates(r.s, r.e, x ? x.code : undefined); } } }
+    /* road tax and insurance must cover the rental */
+    var stA = f.status || (x ? x.status : 'Pending'), live = stA !== 'Completed' && stA !== 'Cancelled';
+    var pp = live && f.car && r.s && r.e && r.e > r.s ? carPaperIssues(f.car, r.s, r.e) : [];
+    if (pp.length) { var pc = carById(f.car); al.unshift(UI.alert('<b>Papers to renew before ' + esc(pc ? pc.plate : 'the car') + ' goes out:</b> ' + pp.map(function (z) { return esc(z.text); }).join('. ') + '. Renew ' + (pp.length > 1 ? 'them' : 'it') + ' on Maintenance before the handover.', 'bad', { html: true, icon: 'file-alert' })); }
     if (isNew && !ro && r.s && r.s < NOW() - 6e4) al.unshift(UI.alert('The pick-up is in the past (' + UI.fmt.dt(r.s) + '). Is this a late entry? You will be asked to confirm on Create.', 'warn'));
     var nm = (f.name || '').trim().toLowerCase(), icn = (f.ic || '').replace(/[\s-]/g, ''), ph = normPhone(f.phone || '');
     var bl = d.people.filter(function (q) { return q.blacklist && q !== (x && x.cust) && ((nm && q.name.toLowerCase() === nm) || (icn.length > 5 && String(q.ic).replace(/[\s-]/g, '') === icn) || (ph.length > 6 && normPhone(q.phone) === ph)); })[0];
     if (bl || (p && p.blacklist && isNew)) al.push(UI.alert('Warning: This customer matches a blacklisted customer record. Please verify before proceeding.', 'bad', { icon: 'ban' }));
     var ab = body.querySelector('#bkx-alerts'); if (ab) ab.innerHTML = al.join('');
+    var li = body.querySelector('#bkx-lic'), lw = live ? licenceIssue(f, r.e) : ''; if (li) li.innerHTML = lw ? UI.alert(lw + ' Ask for the renewed licence before the car goes out.', 'bad', { icon: 'license' }) : '';
+    var mb = body.querySelector('#bkx-match'), mt = custMatch(f);
+    if (mb) mb.innerHTML = mt ? UI.alert('<b>This ' + (normPhone(f.phone || '').length > 6 && normPhone(mt.phone) === normPhone(f.phone || '') ? 'phone number' : 'IC number') + ' belongs to ' + esc(mt.name) + '</b> (' + esc(mt.phone) + ', ' + plural(custBookings(mt), 'booking') + ').' +
+      '<div class="row wrap gap6 bkx-cpb">' + UI.btn('Use ' + mt.name, { kind: 'tonal', size: 'sm', attrs: { 'data-bkx-mt': mt.id } }) + UI.btn('This is someone else', { kind: 'o', size: 'sm', attrs: { 'data-bkx-mt': '' } }) + '</div>', 'warn', { html: true, icon: 'user-question' }) : '';
     var sg = body.querySelector('.bkx-sigimg'), sig = byId(d.signatures, f.signature); if (sg) sg.innerHTML = sig ? '<img src="' + sig.img + '" alt="' + esc(sig.name) + '">' : '';
     /* Deposit Refunded follows the end date (lock date rule) */
     var ps = field('pay'); if (ps) { var o2 = ps.querySelector('option[value="Deposit Refunded"]'), lk = refLocked(); if (o2 && ps.value !== 'Deposit Refunded') { o2.disabled = lk; o2.textContent = lk ? BK_REF_OFF : 'Deposit Refunded'; } }
@@ -10258,7 +10399,7 @@ function bkOpenBooking(code, prefill) {
   function liveRules(trigger) {
     if (!chSt) return; var f = form(), rl = dr.body.querySelector('#bkx-rule'); if (!rl) return;
     var r = applyStatusRules(x || { status: 'Pending', pay: '' }, { status: f.status, pay: f.pay, submitted: f.submitted, dep: calcNow().num('dep') });
-    if (trigger && (trigger === 'status' || trigger === 'submitted')) { if (r.status && r.status !== f.status) setVal('status', r.status); if (r.pay != null && r.pay !== f.pay) setVal('pay', r.pay); }
+    if (trigger && (trigger === 'status' || trigger === 'submitted')) { if (r.status && r.status !== f.status) setVal('status', r.status); if (r.pay != null && r.pay !== f.pay) setVal('pay', r.pay); var sw = field('submitted'); if (sw && r.submitted && !sw.checked) sw.checked = true; }
     rl.textContent = (r.notes || []).join(' ');
   }
 
@@ -10288,11 +10429,13 @@ function bkOpenBooking(code, prefill) {
     miss.forEach(function (m) { setErr(m[0], m[1]); });
     var first = miss[0], w = wrapOf(first[0]); if (!w) return;
     var sec = w.closest('.bkx-sec'); if (sec) sec.classList.remove('shut');
+    if (w.closest('.bkx-cdet')) setFold(false);
     try { w.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) { w.scrollIntoView(); }
     var fo = first[0] === 'car' ? w.querySelector('.ui-cbx-btn') : w.querySelector('input:not([type="hidden"]),select');
     if (fo) setTimeout(function () { try { fo.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 300);
   }
-  function save(sure) {
+  function save(sure, how) {
+    how = how || {};
     var r = calcNow(), f = r.f;
     var miss = validate(r);
     if (miss.length) {
@@ -10307,22 +10450,62 @@ function bkOpenBooking(code, prefill) {
     if (stW.block) { UI.toast(stW.block, { tone: 'warn', ms: 6000 }); showErrors([['status', 'Not yet: the pick-up is still to come']]); return false; }
     var payNew = !x ? 0 : amt ? r.c.payable : bkCalc({ start: r.s, end: r.e, rate: x.rate, hourly: x.hourly, dep: x.dep, disc: x.disc, deliv: x.deliv, ret: x.ret, others: x.others, covDaily: r.pk ? r.pk.daily : 0 }).payable;
     var overNew = x ? bookingOverpaid(x, payNew) : 0, overGrew = overNew > bookingOverpaid(x || '') + 0.004;
+    var again = function (extra) { return function (ch) { return ch ? save(sure, Object.assign({}, how, extra(ch))) : false; }; };
+    /* who the booking is for. Typed details that match a customer on file (phone or IC), without picking them, ask first:
+       their record is never overwritten by a new name. A picked customer is renamed only when staff say so. */
+    var typedName = f.name.trim().replace(/\s+/g, ' ');
+    var match = !p && !how.who ? custMatch(f) : null;
+    if (match) return bkAsk({ title: 'Is this ' + match.name + '?', text: 'The ' + (normPhone(match.phone) === normPhone(f.phone) ? 'phone number ' + match.phone : 'IC number') + ' belongs to ' + match.name + ', who has ' + plural(custBookings(match), 'booking') + '. Book for ' + match.name + ', or add ' + typedName + ' as a new customer?',
+      buttons: [{ label: 'Go back', value: false, kind: 'g' }, { label: 'New customer', value: 'new', kind: 'o' }, { label: 'Use ' + match.name, value: 'use', kind: 'c' }] }).then(again(function (ch) { return { who: ch, match: match }; }));
+    var person = how.who === 'new' ? null : p || (how.who === 'use' ? how.match : null);
+    if (person && how.who !== 'use' && !how.rename && typedName.toLowerCase() !== String(person.name || '').trim().replace(/\s+/g, ' ').toLowerCase()) {
+      var nb0 = custBookings(person);
+      return bkAsk({ title: 'Rename ' + person.name + '?', text: 'This changes the name on ' + person.name + '\'s customer record' + (nb0 ? ' and on all ' + plural(nb0, 'booking') : '') + ' to ' + typedName + '. Booking for someone else, such as a family member? Add them as a new customer instead.',
+        buttons: [{ label: 'Go back', value: false, kind: 'g' }, { label: 'New customer', value: 'new', kind: 'o' }, { label: 'Rename', value: 'rename', kind: 'c' }] }).then(again(function (ch) { return ch === 'new' ? { who: 'new' } : { rename: true }; }));
+    }
+    var payTo = chSt ? f.pay || '' : '', payTot = x && !amt ? payNew : r.c.payable, got = x ? bkRecv(x) : 0;
+    var payNeed = payTo === 'Full Payment Received' ? payTot : payTo === 'Deposit Received' ? r.num('dep') : 0;
+    var payAsk = !how.payOk && payNeed > 0.004 && got < payNeed - 0.004 && (!x || payTo !== (x.pay || ''));
     if (!sure) {
       var asks = [];
+      var stA = f.status || (x ? x.status : 'Pending'), live = stA !== 'Completed' && stA !== 'Cancelled';
+      var lw = live ? licenceIssue(f, r.e) : '', le0 = person && person.licenceExp ? +new Date(person.licenceExp) : 0, le1 = f.licenceExp ? +UI.parseDate(f.licenceExp) : 0;
+      if (lw && (isNew || +r.e !== +x.end || le0 !== le1)) asks.push(lw + ' Ask for the renewed licence before the car goes out.');
+      var pp = live ? carPaperIssues(f.car, r.s, r.e) : [], carCh = isNew || f.car !== x.car.id || +r.s !== +x.start || +r.e !== +x.end;
+      if (pp.length && carCh) asks.push((carById(f.car) || {}).plate + ': ' + pp.map(function (z) { return z.text; }).join('. ') + '. Renew ' + (pp.length > 1 ? 'them' : 'it') + ' before the car goes out.');
       if (isNew && r.s < NOW() - 6e4) asks.push('The pick-up (' + UI.fmt.dt(r.s) + ') is in the past. Is this a late entry for a rental that already started?');
       if (stW.ask) asks.push(stW.ask);
       if (overGrew) asks.push('The customer has paid ' + UI.fmt.money(overNew) + ' more than the new total of ' + UI.fmt.money(payNew) + '. After saving, the booking shows ' + UI.fmt.money(overNew) + ' to give back.');
-      if (asks.length) return UI.confirm({ title: isNew ? 'Create this booking?' : 'Save the changes to ' + x.code + '?', text: asks.join(' '), ok: isNew ? 'Create anyway' : 'Save anyway', cancel: 'Go back' }).then(function (y) { return y ? save(true) : false; });
+      /* a payment status that says money came in, with no payment recorded: record it, or save as typed */
+      if (payAsk) asks.push('The payment status says ' + payTo + ', but ' + (got > 0.004 ? 'only ' + UI.fmt.money(got) + ' is recorded' : 'no payment is recorded') + '. Record ' + UI.fmt.money(payNeed - got) + ' now so it shows in the books?');
+      if (asks.length) {
+        var okL = isNew ? 'Create anyway' : 'Save anyway', recOk = payAsk && can('billing.record_payment');
+        return bkAsk({ title: isNew ? 'Create this booking?' : 'Save the changes to ' + x.code + '?', html: asks.map(function (a) { return '<p class="ui-ctext">' + esc(a) + '</p>'; }).join(''),
+          buttons: [{ label: 'Go back', value: false, kind: 'g' }].concat(recOk ? [{ label: okL, value: 'ok', kind: 'o' }, { label: 'Record payment', value: 'rec', kind: 'c' }] : [{ label: okL, value: 'ok', kind: 'c' }]) })
+          .then(function (ch) { return ch ? save(true, Object.assign({}, how, { payOk: true, recordPay: ch === 'rec' })) : false; });
+      }
     }
     var car = carById(f.car), c = r.c, pk = r.pk, so = (f.startOpt || 'Not chosen').split('|'), eo = (f.endOpt || 'Not chosen').split('|');
     var sOpt = handoverOptions('start').filter(function (o) { return o.value === f.startOpt; })[0], eOpt = handoverOptions('end').filter(function (o) { return o.value === f.endOpt; })[0];
     var phone = f.phone.trim();
-    /* the customer: the one picked, else the same person when the IC or phone matches */
-    var icIn = !cuSeeIc() && !isNew ? (p ? p.ic : '') : (f.ic || '').trim();
-    var person = p || d.people.filter(function (q) { return (icIn && String(q.ic).replace(/[\s-]/g, '') === icIn.replace(/[\s-]/g, '')) || normPhone(q.phone) === normPhone(phone); })[0];
-    var pPatch = { name: f.name.trim(), phone: phone, email: f.email, address: f.address, nat: f.nat || 'Malaysian', ic: icIn || (person ? person.ic : ''), licenceNo: f.licenceNo, licenceExp: f.licenceExp ? UI.parseDate(f.licenceExp) : null, emergency: { name: f.emName, phone: f.emPhone, rel: f.emRel } };
+    /* the customer (decided above): a new record, or the one on file. An existing record only takes the fields that were
+       filled in, so a field left empty never blanks it, and the name changes only after "Rename". "Use" (a match by phone
+       or IC) only fills the gaps in their record. */
+    var icIn = !cuSeeIc() && !isNew ? (p ? p.ic : '') : (f.ic || '').trim(), tx = function (k) { return String(f[k] || '').trim(); };
+    var pPatch = { name: typedName, phone: phone, email: tx('email'), address: tx('address'), nat: tx('nat') || 'Malaysian', ic: icIn, licenceNo: tx('licenceNo'), licenceExp: f.licenceExp ? UI.parseDate(f.licenceExp) : null, emergency: { name: tx('emName'), phone: tx('emPhone'), rel: tx('emRel') } };
+    if (person) {
+      var gapsOnly = how.who === 'use', up = {}, em = Object.assign({}, person.emergency || {}), emCh = false;
+      var put = function (k, val) { if (val == null || val === '' || (val instanceof Date && isNaN(val))) return; if (gapsOnly && person[k]) return; if (String(person[k] == null ? '' : person[k]) !== String(val)) up[k] = val; };
+      if (how.rename) up.name = typedName;
+      ['phone', 'email', 'address', 'ic', 'licenceNo'].forEach(function (k) { put(k, pPatch[k]); });
+      if (tx('nat')) put('nat', tx('nat'));
+      if (pPatch.licenceExp && !(gapsOnly && person.licenceExp) && +new Date(person.licenceExp || 0) !== +pPatch.licenceExp) up.licenceExp = pPatch.licenceExp;
+      ['name', 'phone', 'rel'].forEach(function (k) { var val = pPatch.emergency[k]; if (val && !(gapsOnly && em[k]) && em[k] !== val) { em[k] = val; emCh = true; } });
+      if (emCh) up.emergency = em;
+      if (Object.keys(up).length) DB.update('people', person, up, { silent: !up.name, text: up.name ? DB.actor() + ' renamed customer ' + person.name + ' to ' + up.name : undefined, where: 'Customer' });
+    }
+    if (how.who === 'new' && p) Object.keys(docs).forEach(function (k) { if (docs[k] && docs[k].fromCust) docs[k] = null; });
     if (!person) person = DB.add('people', Object.assign({ id: 'cus-' + (d.people.length + 1) + '-' + Date.now().toString(36), i: d.people.length, since: NOW(), flag: '', docs: {}, blacklist: null, notes: [], icCheck: check.results ? { at: NOW(), by: DB.actor(), valid: !!check.valid, results: check.results, cardName: check.read ? check.read.name : '' } : null }, pPatch), { where: 'Customer', text: DB.actor() + ' added customer ' + pPatch.name });
-    else DB.update('people', person, pPatch, { silent: true });
     if (isNew) { CU_DOCS.forEach(function (dc) { if (!docs[dc[0]] && person.docs && person.docs[dc[0]]) docs[dc[0]] = Object.assign({}, person.docs[dc[0]]); else if (docs[dc[0]] && person.docs && !person.docs[dc[0]]) person.docs[dc[0]] = docs[dc[0]]; }); }
     Object.keys(docs).forEach(function (k) { if (docs[k]) delete docs[k].fromCust; });
     var rec = { car: car, start: r.s, end: r.e, days: c.days, rate: r.num('rate'), hourly: r.num('hourly'), dep: r.num('dep'), disc: r.num('disc'), deliv: r.num('deliv'), ret: r.num('ret'), others: r.num('others'), rent: c.rent, dmg: c.cover, payable: c.payable,
@@ -10332,13 +10515,16 @@ function bkOpenBooking(code, prefill) {
     if (!amt) { if (x) ['rate', 'hourly', 'dep', 'disc', 'deliv', 'ret', 'others'].forEach(function (k) { rec[k] = x[k]; }); var c2 = bkCalc({ start: r.s, end: r.e, rate: rec.rate, hourly: rec.hourly, dep: rec.dep, disc: rec.disc, deliv: rec.deliv, ret: rec.ret, others: rec.others, covDaily: pk ? pk.daily : 0 }); rec.rent = c2.rent; rec.payable = c2.payable; rec.dmg = c2.cover; rec.days = c2.days; }
     rec.status = chSt ? f.status : (x ? x.status : 'Pending'); rec.pay = chSt ? f.pay : (x ? x.pay : '');
     if (chSt && rec.pay === 'Deposit Refunded' && !(x && x.pay === 'Deposit Refunded') && !canPickRefunded({ end: r.e, pay: x ? x.pay : '' })) rec.pay = x ? x.pay : '';
-    var rules = applyStatusRules(x, rec), notes = rules.notes || []; rec.status = rules.status; rec.pay = rules.pay;
+    var rules = applyStatusRules(x, rec), notes = rules.notes || []; rec.status = rules.status; rec.pay = rules.pay; rec.submitted = !!rules.submitted;
     /* paid more than the new total: the whole booking is paid, and the extra waits to go back (To give back) */
     if (overGrew) { if (['', 'Deposit due', 'Deposit Received'].indexOf(rec.pay || '') >= 0) { rec.pay = 'Full Payment Received'; notes.push('Payment status set to Full Payment Received.'); } notes.push(UI.fmt.money(overNew) + ' to give back to the customer.'); }
     if (rec.submitted && !(x && x.submittedAt)) rec.submittedAt = NOW();
+    /* "Record payment": the payment, once recorded, moves the payment status itself */
+    if (how.recordPay) { rec.pay = x ? x.pay || '' : ''; notes = notes.filter(function (nt) { return !/^Payment status set/.test(nt); }); }
     saved = true;
+    var recAfter = function (code) { if (how.recordPay) setTimeout(function () { API.recordPayment(code); }, 250); };
     var tail2 = notes.length ? ' ' + notes.join(' ') : '';
-    if (x) { DB.update('bookings', x, rec, { text: DB.actor() + ' changed booking ' + x.code }); UI.toast('Booking ' + x.code + ' updated.' + tail2, { ms: notes.length ? 6000 : 3500 }); return true; }
+    if (x) { DB.update('bookings', x, rec, { text: DB.actor() + ' changed booking ' + x.code }); UI.toast('Booking ' + x.code + ' updated.' + tail2, { ms: notes.length ? 6000 : 3500 }); recAfter(x.code); return true; }
     var n = Math.max.apply(0, d.bookings.map(function (z) { return z.n; }).concat([B().startNo || 0])) + 1, code2 = B().code + '-' + String(n).padStart(5, '0'), hx = function () { return Math.random().toString(16).slice(2, 10); };
     var nb = Object.assign({ n: n, code: code2, id: code2, received: 0, agent: '', created: NOW(), inspected: false, formId: B().id.slice(0, 3) + '-' + hx(), agentToken: 'agt-' + hx(), submittedAt: rec.submitted ? NOW() : null, ip: '', agentIds: [] }, rec);
     if (nb.submitted) nb.custSig = { typed: person.name };
@@ -10348,6 +10534,7 @@ function bkOpenBooking(code, prefill) {
     var ld = leadId && D().leads ? byId(D().leads, leadId) : null;
     if (ld) DB.update('leads', ld, { status: 'closed', booking: code2, heldUntil: null, reason: 'Booked', closedAt: NOW() }, { where: 'Lead', text: DB.actor() + ' booked the lead of ' + (ld.name || ld.phone) + ' as ' + code2 });
     UI.toast('Booking ' + code2 + ' created.' + tail2 + ' Send the booking form to ' + person.name + '.', { ms: 6000, action: { label: 'Send form', run: function () { bkSendForm(nb); } } });
+    recAfter(code2);
     return true;
   }
 
@@ -10393,6 +10580,9 @@ function bkOpenBooking(code, prefill) {
   dr.el.addEventListener('click', function (ev) {
     var t = ev.target, b2;
     if ((b2 = t.closest('[data-bkx-tog]'))) { b2.parentNode.classList.toggle('shut'); return; }
+    if ((b2 = t.closest('[data-bkx-cdet]'))) { var cs0 = dr.body.querySelector('#bkx-s-cust'); setFold(!(cs0 && cs0.classList.contains('bkx-cfold'))); return; }
+    if ((b2 = t.closest('[data-bkx-cp]'))) { var cn = carNote, nb2 = dr.body.querySelector('#bkx-carnote'); carNote = null; if (nb2) { nb2.hidden = true; nb2.innerHTML = ''; } if (cn && b2.getAttribute('data-bkx-cp') === 'use') { fillCarPrices(cn); dirty = true; recalc(); UI.toast('Prices set to ' + cn.plate + '\'s: ' + UI.fmt.money(cn.rate) + '/day, deposit ' + UI.fmt.money(cn.deposit) + '.', { ms: 3000 }); } return; }
+    if ((b2 = t.closest('[data-bkx-mt]'))) { var mid = b2.getAttribute('data-bkx-mt'); if (mid && custCtl) custCtl.set(mid); else { var m0 = custMatch(form()); notMatch = m0 ? m0.id : null; recalc(); } return; }
     if ((b2 = t.closest('[data-bkx-sum]'))) { API.openSummons(b2.getAttribute('data-bkx-sum')); return; }
     if ((b2 = t.closest('[data-bkx-len]'))) {
       var s = UI.dateFieldValue(field('start')), e = UI.dateFieldValue(field('end')), L = b2.getAttribute('data-bkx-len'); if (!s) { UI.toast('Pick the rental start first.', { tone: 'warn' }); return; }
@@ -10490,6 +10680,16 @@ function bkOpenBooking(code, prefill) {
     out.innerHTML = h ? '<div class="bkx-chk-res">' + h + '</div>' : '';
   }
   return dr;
+}
+
+/* a question with its own buttons: bkAsk({title, text | html, buttons: [{label, value, kind}]}) -> promise of the value
+   (false when closed) */
+function bkAsk(o) {
+  return new Promise(function (res) {
+    var done = false, fin = function (val) { if (!done) { done = true; res(val); } };
+    UI.dialog({ title: o.title, width: 'sm', alert: true, body: o.html || '<p class="ui-ctext">' + esc(o.text) + '</p>', onClose: function () { fin(false); },
+      buttons: o.buttons.map(function (b) { return { label: b.label, kind: b.kind, onClick: function () { fin(b.value); } }; }) });
+  });
 }
 
 /* ---------------- send the booking form (WhatsApp message, made-up send) ---------------- */
@@ -10818,7 +11018,11 @@ PAGES['calendar'] = {
         (cars.length ? '' : st.q ? UI.empty({ icon: 'car-off', title: 'No car matches "' + st.q + '"', text: 'Try the numbers of the plate, or clear the box.' }) : UI.empty({ icon: 'car-off', title: 'No cars yet', text: 'Add a car on the Cars page to see it here.' }));
     }
     function listHtml(r, ev) {
-      var items = ev.bks.map(function (x) { return { at: x.start, b: x }; }).concat(ev.shop.map(function (w) { return { at: w.from, w: w }; })).sort(function (a, b) { return a.at - b.at; });
+      /* an agenda: each booking shows on its pick-up day and on its return day (a booking that only passes through the
+         range shows once at the top as Continues) */
+      var inR = function (t) { return t >= r.from && t < r.to; }, bi = [];
+      ev.bks.forEach(function (x) { var a = inR(x.start), z = inR(x.end); if (a) bi.push({ at: x.start, b: x, kind: 'out' }); if (z) bi.push({ at: x.end, b: x, kind: 'back' }); if (!a && !z) bi.push({ at: x.start, b: x, kind: 'on' }); });
+      var items = bi.concat(ev.shop.map(function (w) { return { at: w.from, w: w }; })).sort(function (a, b) { return a.at - b.at; });
       if (!items.length) return UI.empty({ icon: 'calendar-off', title: 'No events to display', text: 'No bookings or workshop time in ' + r.label + '.' });
       var groups = {}, order = [];
       items.forEach(function (it) { var k = UI.isoDate(it.at < r.from ? r.from : it.at); if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(it); });
@@ -10829,8 +11033,9 @@ PAGES['calendar'] = {
         return '<div class="cl-lday' + (+dt === +today ? ' td' : '') + '"><span>' + (+dt === +today ? 'Today, ' : '') + WDL[dt.getDay()] + '</span><b>' + UI.fmt.date(dt) + '</b></div>' + groups[k].map(function (it) {
           if (it.w) { var c = carById(it.w.car); return '<button type="button" class="cl-li" data-shop="' + it.w.id + '"><span class="cl-lt">' + (it.at < r.from ? 'Continues' : tm(it.w.from)) + '</span><i class="cl-sw shop"></i><span class="cl-lx"><b>Workshop · ' + esc(it.w.reason) + '</b><span>' + (c ? esc(c.plate) + ' · ' + esc(carName(c)) : '') + ' · until ' + (it.w.to ? UI.fmt.dateTime(it.w.to) : 'no date set') + '</span></span></button>'; }
           var x = it.b;
-          return '<button type="button" class="cl-li" data-bk="' + x.code + '"><span class="cl-lt">' + (it.at < r.from ? 'Continues' : tm(x.start)) + '</span><i class="cl-sw ' + clTone(x) + '"></i><span class="cl-lx"><b>' + esc(x.cust.name) + ' · ' + esc(x.car.plate) + '</b><span>' + x.code + ' · ' + clDays(x) + ', until ' + UI.fmt.dateTime(x.end) + '</span></span><span class="cl-lc">' + UI.status('booking', x.status) + UI.status('payment', x.pay) + '</span></button>';
-        }).join('') + (groups[k].length ? '' : '<div class="cl-lnone">No bookings or workshop time start today.</div>');
+          var back = it.kind === 'back';
+          return '<button type="button" class="cl-li" data-bk="' + x.code + '"><span class="cl-lt">' + (it.kind === 'on' ? 'Continues' : '<b>' + tm(it.at) + '</b>' + UI.chip(back ? 'Return' : 'Pick-up', back ? 'grey' : 'info', { icon: back ? 'arrow-back-up' : 'key' })) + '</span><i class="cl-sw ' + clTone(x) + '"></i><span class="cl-lx"><b>' + esc(x.cust.name) + ' · ' + esc(x.car.plate) + '</b><span>' + x.code + ' · ' + clDays(x) + (back ? ', out since ' + UI.fmt.dateTime(x.start) : ', until ' + UI.fmt.dateTime(x.end)) + '</span></span><span class="cl-lc">' + UI.status('booking', x.status) + UI.status('payment', x.pay) + '</span></button>';
+        }).join('') + (groups[k].length ? '' : '<div class="cl-lnone">No pick-ups, returns or workshop time today.</div>');
       }).join('') + '</div>';
     }
     function pointAnchor(ev, el) {
@@ -11863,14 +12068,14 @@ function dpOpen(id) {
   function example() {
     var dl = +v.daily || 0, mx = +v.max || 0;
     if (!dl && !mx) return '<div class="dp-ex faint">' + i('calculator') + '<span>Type the rates to see what a customer pays.</span></div>';
-    return '<div class="dp-ex">' + i('calculator') + '<div><b>For a 3 day rental</b><span>The customer pays <b class="num">' + UI.money(dl * 3) + '</b> for cover (' + UI.money(dl) + ' x 3 days). If the car is damaged, the most they pay is <b class="num">' + UI.money(mx) + '</b>.</span></div></div>';
+    return '<div class="dp-ex">' + i('calculator') + '<div><b>For a 3 day rental</b><span>The customer pays <b class="num">' + UI.money(dl * 3) + '</b> for cover (' + UI.money(dl) + ' x 3 days). If the car is damaged, this cover pays up to <b class="num">' + UI.money(mx) + '</b>.</span></div></div>';
   }
   function body(el) {
     var uses = pk ? dpUses(pk) : [], live = uses.filter(function (x) { return x.status !== 'Cancelled' && x.status !== 'Returned'; });
     el.innerHTML = '<div class="dp-form">' + (edit
       ? UI.input({ key: 'name', label: 'Name', required: true, value: v.name, placeholder: 'e.g. Standard cover', error: errs.name ? 'Name is required' : '' }) +
         '<div class="dp-g2">' + UI.input({ key: 'daily', label: 'Daily Rate', type: 'number', min: 0, step: '0.01', required: true, prefix: 'RM', value: v.daily, placeholder: 'e.g. 25.00', error: errs.daily || '' }) +
-        UI.input({ key: 'max', label: 'Maximum Coverage', type: 'number', min: 0, step: '0.01', required: true, prefix: 'RM', value: v.max, placeholder: 'e.g. 5000.00', error: errs.max || '' }) + '</div>'
+        UI.input({ key: 'max', label: 'Maximum Coverage', type: 'number', min: 0, step: '0.01', required: true, prefix: 'RM', value: v.max, placeholder: 'e.g. 5000.00', help: 'The most this cover pays for damage.', error: errs.max || '' }) + '</div>'
       : '<div class="dp-kv">' + UI.kv('Name', esc(pk.name)) + UI.kv('Daily Rate', UI.money(pk.daily)) + UI.kv('Maximum Coverage', UI.money(pk.max)) + '</div>') +
       '<div id="dp-ex">' + example() + '</div>' +
       (pk ? '<div class="dp-uses">' + i('calendar-event') + '<div><b>' + (uses.length ? 'Chosen on ' + plural(uses.length, 'booking') + (live.length ? ', ' + live.length + ' still open' : '') : 'Not chosen on any booking yet') + '</b><span class="b2">' + (uses.length ? 'Latest: ' + uses.slice().sort(function (a, b) { return b.n - a.n; }).slice(0, 3).map(function (x) { return '<a href="#" data-dp-bk="' + x.code + '">' + x.code + '</a>'; }).join(', ') + '. Changing the rates only changes new bookings and bookings you save again.' : 'Staff pick a package under Rental info when they make a booking.') + '</span></div></div>' : '') +
@@ -11921,7 +12126,7 @@ PAGES['damage-packages'] = {
   render: function (root, ctx) {
     var d = ctx.data, st = ctx.state; st.f = st.f || {};
     var canEdit = ctx.can('damage_packages.edit'), canDel = ctx.can('damage_packages.delete');
-    root.innerHTML = '<div class="pg-h"><div><h1>Damage Packages</h1><p>Cover customers can add to a booking: what it costs per day and the most they pay if the car is damaged.</p></div><div class="acts">' +
+    root.innerHTML = '<div class="pg-h"><div><h1>Damage Packages</h1><p>Cover customers can add to a booking: what it costs per day and the most it pays if the car is damaged.</p></div><div class="acts">' +
       (ctx.can('damage_packages.create') ? UI.btn('New Package', { icon: 'plus', attrs: { 'data-dp-new': 1 } }) : '') + '</div></div>' +
       '<div class="card"><div id="dp-f"></div><div id="dp-t"></div></div>';
     var rowsFor = function () { var q = (st.f.q || '').toLowerCase().trim(); return d.damagePackages.filter(function (p) { return !q || (p.name + ' ' + p.daily + ' ' + p.max).toLowerCase().indexOf(q) >= 0; }); };
@@ -12173,10 +12378,11 @@ PAGES['dashboard'] = {
       var html = '<div class="vd dsh">' +
         '<div class="col gap16"><div class="vd-head"><div><h1 class="h4">' + greet + ', ' + esc((u ? u.name : b.owner).split(' ')[0]) + '</h1><div class="muted">' + UI.fmt.long(NOW()) + '</div></div>' +
         '<div class="row wrap gap8 dsh-quick"><span class="cap">Updated ' + tm(st.updated) + ' · refreshes every minute</span>' +
+        (can0('bookings.create') ? UI.btn('New booking', { kind: 'c', size: 'sm', icon: 'plus', attrs: { 'data-act': 'newbooking' } }) : '') +
         (can0('billing.record_payment') ? UI.btn('Upload payment slip', { kind: 'tonal', size: 'sm', icon: 'receipt', attrs: { 'data-act': 'slip' } }) : '') +
         (can0('expenses.view') && typeof ctx.api.bankIn === 'function' ? UI.btn('Bank in cash', { kind: 'tonal', size: 'sm', icon: 'building-bank', attrs: { 'data-act': 'bankin' } }) : '') +
         (can0('expenses.add') || can0('expenses.add_business') ? UI.btn('Add expense', { kind: 'tonal', size: 'sm', icon: 'receipt-2', attrs: { 'data-act': 'expense' } }) : '') +
-        UI.btn('Refresh', { kind: 'o', size: 'sm', icon: 'refresh', attrs: { 'data-act': 'refresh' } }) + '</div></div>' +
+        UI.iconBtn('refresh', 'Refresh now', { size: 'sm', attrs: { 'data-act': 'refresh' } }) + '</div></div>' +
         (st.busy ? '<div class="dsh-busy" role="progressbar" aria-label="Refreshing"><i></i></div>' : '') +
         (st.failed ? UI.alert('Could not refresh just now. Showing the last numbers we had.', 'warn', { action: UI.btn('Try again', { kind: 't', size: 'sm', attrs: { 'data-act': 'refresh' } }) }) : '') +
         '<nav class="vd-navs" data-srow aria-label="Parts of the page">' + shown.filter(function (id) { return chips[id]; }).map(function (id) { return '<button type="button" class="vd-navchip" data-jump="dsh-' + id + '">' + chips[id] + '</button>'; }).join('') + '</nav></div>' +
@@ -12291,7 +12497,7 @@ PAGES['dashboard'] = {
         'Fleet utilisation': 'The share of the car days in the period that were rented.', 'Average booking value': 'What a booking that starts in the period brings in, without the deposit.',
         'Rental days': 'Days rented in the period. Each rental is cut into 24-hour blocks from its pick-up time.', 'Average rental length': 'How many days a rental that starts in the period lasts.',
         'Rental income': 'Daily rent less discounts.', 'Delivery fee': 'Delivery charges.', 'Return fee': 'Return charges.', 'Damage coverage': 'Damage cover sold with the rentals.', 'Other charges': 'Other charges added to bookings.',
-        'Deposits taken': 'Security deposits taken for bookings that start in the period, including ones already given back. They are not income.'
+        'Deposits on bookings': 'Security deposits on the bookings that start in the period, counted by booking, including ones already given back. They are not income. For the money that came in, see Deposits received under Cash.'
       };
       var k1 = [], k2 = [];
       if (V.prof) {
@@ -12303,7 +12509,7 @@ PAGES['dashboard'] = {
       if (V.rev) k1.push(['Average booking value', money(A.avgValue), dshChange(A.avgValue, C.avgValue, true, cl), sp('income'), 'revenue']);
       k2.push(['Rental days', n0(A.days), dshChange(A.days, C.days, true, cl)]);
       k2.push(['Average rental length', A.avgLen.toFixed(1) + ' days', dshChange(A.avgLen, C.avgLen, true, cl)]);
-      if (V.rev) [['Rental income', 'rent'], ['Delivery fee', 'deliv'], ['Return fee', 'ret'], ['Damage coverage', 'dmg'], ['Other charges', 'other'], ['Deposits taken', 'deposits']].forEach(function (q) { k2.push([q[0], money(A[q[1]]), A[q[1]] || C[q[1]] ? dshChange(A[q[1]], C[q[1]], true, cl) : '']); });
+      if (V.rev) [['Rental income', 'rent'], ['Delivery fee', 'deliv'], ['Return fee', 'ret'], ['Damage coverage', 'dmg'], ['Other charges', 'other'], ['Deposits on bookings', 'deposits']].forEach(function (q) { k2.push([q[0], money(A[q[1]]), A[q[1]] || C[q[1]] ? dshChange(A[q[1]], C[q[1]], true, cl) : '']); });
       var kpi = function (k, j, small) { return '<div class="vd-kpi vd-rise vd-h-' + (k[4] || 'revenue') + (small ? ' dsh-kpi-sm' : '') + '" style="--i:' + j + '"><span class="lab">' + esc(k[0]) + ' <button type="button" class="dsh-info" data-act="info" data-v="' + esc(defs[k[0]] || '') + '" aria-label="What is ' + esc(k[0]) + '?" title="' + esc(defs[k[0]] || '') + '">' + i('info-circle') + '</button></span><span class="vd-kpi-value num">' + k[1] + '</span>' + (k[2] || '') + (k[3] || '') + '</div>'; };
       var warn = M.cars.filter(function (c) { return !c.rate; }).length ? UI.alert(plural(M.cars.filter(function (c) { return !c.rate; }).length, 'car') + ' have no daily rate, so their days count but their income does not.', 'warn') : '';
       if (part === 'now') return '<section class="col gap24 dsh-sec" id="dsh-now">' + nowCard + '</section>';
@@ -12533,7 +12739,7 @@ PAGES['dashboard'] = {
       var box = function (title, since, from) {
         var main = 0, side = 0, dep = 0;
         pays.forEach(function (p) { if (p.at < from || p.at > now || p.method === 'Deposit adjustment') return; var x = findBooking(p.booking); if (p.kind === 'Security deposit') dep += p.amount; else if (x && (x.status === 'Pending' || x.status === 'Cancelled')) side += p.amount; else main += p.amount; });
-        return '<div class="card dsh-cash"><div><b>' + title + '</b><span class="b2">' + since + '</span></div><b class="dsh-cashv num">' + UI.fmt.money(main) + '</b><p class="b2">Rental and other payments received. Cash, not revenue.</p><div class="dsh-cashside"><span>On pending or cancelled bookings (not revenue)</span><b class="num">' + UI.fmt.money(side) + '</b><span>Deposits taken (not income)</span><b class="num">' + UI.fmt.money(dep) + '</b></div></div>';
+        return '<div class="card dsh-cash"><div><b>' + title + '</b><span class="b2">' + since + '</span></div><b class="dsh-cashv num">' + UI.fmt.money(main) + '</b><p class="b2">Rental and other payments received. Cash, not revenue.</p><div class="dsh-cashside"><span>On pending or cancelled bookings (not revenue)</span><b class="num">' + UI.fmt.money(side) + '</b><span>Deposits received (not income)</span><b class="num">' + UI.fmt.money(dep) + '</b></div></div>';
       };
       var wait = depLists().wait.map(function (z) { var x = findBooking(z.booking); return x ? { x: x, amt: depDue(z) } : null; }).filter(Boolean);   /* the same list as Deposit refunds */
       var dep = '<div class="card dsh-cash"><div><b>Deposits to give back</b><span class="b2">Car back, what is left after deductions</span></div><div class="row gap8 wrap"><b class="dsh-cashv num">' + UI.fmt.money(sum(wait.map(function (w) { return w.amt; }))) + '</b>' + UI.chip(plural(wait.length, 'booking'), 'grey') + '</div><div class="dsh-deplist">' + wait.map(function (w) { return '<button type="button" data-go="deposits" data-p="' + esc(JSON.stringify({ booking: w.x.code })) + '"><span class="ellip">' + esc(w.x.cust.name) + ' ' + w.x.code + '</span><b class="num">' + UI.fmt.money(w.amt) + '</b></button>'; }).join('') + '</div></div>';
@@ -12586,6 +12792,7 @@ PAGES['dashboard'] = {
       else if (a === 'more') { st.more[v] = !st.more[v]; draw(); }
       else if (a === 'refresh') doRefresh();
       else if (a === 'slip') ctx.api.uploadSlips();
+      else if (a === 'newbooking') ctx.api.newBooking();
       else if (a === 'expense') ctx.api.addExpense();
       else if (a === 'bankin') ctx.api.bankIn();
       else if (a === 'unfold') { st.open[v] = true; draw(); jump('dsh-' + v); }
@@ -12669,8 +12876,9 @@ function depChip(z) {
   if (s === 'used') return UI.chip('Used for payments', 'info', { title: 'Payments from the deposit took all of it, so nothing goes back' });
   if (s === 'none') return UI.chip('No deposit taken', 'grey', { title: 'The booking had no deposit, so nothing goes back' });
   if (s === 'hand') return UI.chip('Marked by hand', 'grey', { title: 'The payment status was set to Deposit Refunded without recording a refund' });
-  var n = depWaitDays(z);
-  return UI.chip(n ? 'Waiting ' + plural(n, 'day') : 'Waiting since today', n >= 7 ? 'bad' : 'warn');
+  /* amber within the company's refund time (Settings, refundHours), red once it is past it */
+  var n = depWaitDays(z), x = findBooking(z.booking), lim = +(B().refundHours || 24), late = x && (NOW() - x.end) / 36e5 > lim;
+  return UI.chip(n ? 'Waiting ' + plural(n, 'day') : 'Waiting since today', late ? 'bad' : 'warn', { title: late ? 'Past the ' + lim + '-hour refund time' : 'Within the ' + lim + '-hour refund time' });
 }
 function depHow(r) { if (!r) return ''; return r.method === 'None' ? 'Nothing returned: the deductions took all of it' : r.method === 'Cash' ? 'Cash, refunded by ' + r.by : r.method === 'Stripe' ? 'Refunded to the card through Stripe' : 'Online transfer from the bank'; }
 function depLists() {
@@ -12941,7 +13149,7 @@ PAGES['deposits'] = {
   title: 'Deposit refunds',
   search: [{ label: 'Deposits waiting to be returned', icon: 'cash-banknote', run: function () { go('deposits', { tab: 'refund' }); } }, { label: 'Refund a deposit for any booking', icon: 'cash-banknote', run: function () { depPickBooking(); } }],
   render: function (root, ctx) {
-    var P = ctx.params, tab = P.tab === 'refunded' ? 'refunded' : 'refund', L = depLists(), q = P.q || '', state = (tab === 'refund' ? ['long'] : ['returned', 'used', 'hand', 'none']).indexOf(P.state) >= 0 ? P.state : '', sort = P.sort || '';
+    var P = ctx.params, tab = P.tab === 'refunded' ? 'refunded' : 'refund', L = depLists(), q = P.q || '', state = (tab === 'refund' ? ['long'] : ['returned', 'used', 'hand', 'none']).indexOf(P.state) >= 0 ? P.state : '', sort = P.sort || (tab === 'refund' ? 'status' : 'new');   /* To refund opens with the longest wait on top */
     var m0 = new Date(NOW().getFullYear(), NOW().getMonth(), 1), thisMonth = L.done.filter(function (z) { return z.refund && z.refund.at >= m0 && z.refund.method !== 'None'; });
     var heldWait = sum(L.wait.map(function (z) { return depBasis(z); })), dueWait = sum(L.wait.map(function (z) { return depDue(z); }));
     /* adjustments this month: taken off deposits refunded this month, and payments paid from deposits this month */
@@ -12954,7 +13162,7 @@ PAGES['deposits'] = {
       '<div class="card stat ui-stat dep-adj" style="--c:var(--info-rgb)"><div class="grow"><div class="l">Adjustments this month</div><div class="dep-adj-r"><span>Taken off deposits</span><b class="num">' + UI.money(takenOff) + '</b></div><div class="dep-adj-r"><span>Used for payments</span><b class="num">' + UI.money(usedM) + '</b></div></div><span class="ic">' + i('receipt-2') + '</span></div></div>' +
       '<div class="card"><div class="dep-tabs" id="dep-tabs"></div><div class="dep-q"><div class="inp srch">' + i('search') + '<input type="search" id="dep-q" data-key="depq" placeholder="Booking ID, customer, plate..." aria-label="Search deposits" value="' + esc(q) + '"></div>' +
       UI.select({ key: 'state', aria: 'Status', value: state, options: [['', tab === 'refund' ? 'All waiting' : 'All refunded']].concat(tab === 'refund' ? [['long', 'Waiting 7 days or more']] : [['returned', 'Returned'], ['used', 'Used for payments'], ['hand', 'Marked by hand'], ['none', 'No deposit taken']]), id: 'dep-state' }) +
-      UI.select({ key: 'sort', aria: 'Order', value: sort, options: [['', 'Newest booking first'], ['status', tab === 'refunded' ? 'Status, earliest first' : 'Longest waiting first'], ['-status', tab === 'refunded' ? 'Status, latest first' : 'Shortest waiting first']], id: 'dep-sort' }) +
+      UI.select({ key: 'sort', aria: 'Order', value: sort, options: [['new', 'Newest booking first'], ['status', tab === 'refunded' ? 'Status, earliest first' : 'Longest waiting first'], ['-status', tab === 'refunded' ? 'Status, latest first' : 'Shortest waiting first']], id: 'dep-sort' }) +
       (q || state ? UI.btn('Clear', { kind: 't', size: 'sm', icon: 'x', attrs: { 'data-clearq': '1' } }) : '') + '</div><div id="dep-t"></div></div>';
     UI.tabs(root.querySelector('#dep-tabs'), { value: tab, items: [{ id: 'refund', label: 'To refund', icon: 'hourglass', count: L.wait.length, tone: 'warn' }, { id: 'refunded', label: 'Refunded', icon: 'circle-check', count: L.done.length, tone: 'grey' }], onChange: function (id) { ctx.setParams({ tab: id === 'refund' ? null : id, page: null, state: null, sort: null }); ctx.refresh(); } });
     var list = tab === 'refund' ? L.wait : L.done;
@@ -14041,7 +14249,7 @@ function invPayOf(r) { return byId(D().payments, r.payment); }
 function invStaff() { return D().users.filter(function (u) { return u.active; }).map(function (u) { return u.name; }); }
 function invToken(no) { var h = 0; String(no + B().id).split('').forEach(function (c) { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return h.toString(36) + no.slice(-3).toLowerCase(); }
 function invLink(no) { return 'https://' + B().slug + '.orbiquefms.com/d/' + invToken(no) + '.pdf'; }
-function invWaNumber(p) { var s = String(p || '').replace(/[^\d+]/g, ''); if (!s) return ''; if (s[0] === '+') return s; if (s[0] === '0') return (invCo().countryCode || '+60') + s.slice(1); return '+' + s; }
+function invWaNumber(p) { return UI.waNumber(p); }
 function invPhoneOk(p) { var s = invWaNumber(p).replace(/\D/g, ''); return s.length >= 9 && s.length <= 15; }
 function invNextNo(kind) {
   var co = invCo(), nb = co.numbering || {}, pre = (kind === 'inv' ? nb.invPrefix || 'INV-' : nb.rcpPrefix || 'RCP-') + (nb.resetYearly !== false ? NOW().getFullYear() + '-' : ''), list = kind === 'inv' ? D().invoices : D().receipts, max = 0;
@@ -15617,7 +15825,7 @@ function ldDrawer(id) {
         (mg && l.status !== 'closed' ? UI.btn('Close lead', { kind: 't', icon: 'circle-x', attrs: { 'data-ld': 'close' } }) : '') + '</div>' +
         (!mg ? '<p class="b2">' + i('lock') + ' Taking, closing or letting go of a car needs "Handle leads".</p>' : '') +
         '<div class="ld-h">Chat</div><div class="ld-chat">' + (l.msgs.length ? l.msgs.map(function (m) { return '<div class="ld-msg ' + m.dir + '"><div class="ld-bub">' + esc(m.text) + '</div><small>' + (m.dir === 'bot' ? 'Assistant' : m.dir === 'staff' ? 'Staff' : 'Customer') + ' · ' + tm(m.at) + ', ' + m.at.getDate() + ' ' + MON[m.at.getMonth()] + '</small></div>'; }).join('') : '<p class="b2 faint">No messages.</p>') + '</div>' +
-        '<a class="btn o sm ld-wa" href="https://wa.me/' + String(l.phone).replace(/\D/g, '') + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Reply on WhatsApp</a></div>';
+        '<a class="btn o sm ld-wa" href="' + UI.waLink(l.phone) + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Reply on WhatsApp</a></div>';
       var ch = el.querySelector('.ld-chat'); if (ch) ch.scrollTop = ch.scrollHeight;
     } });
   dr.el.addEventListener('click', function (ev) {
@@ -16263,7 +16471,7 @@ function mtTabVendors(el, ctx) {
   var t;
   UI.filters(el.querySelector('#mt-vf'), { values: f, fields: [{ type: 'search', key: 'q', placeholder: 'Search workshops' }, { type: 'toggle', key: 'old', label: 'Show workshops no longer in use' }], onChange: function () { t.setRows(rows()); },
     extra: ctx.can('maintenance.manage_vendors') ? '<span class="grow"></span>' + UI.btn('Add a workshop', { size: 'sm', icon: 'plus', attrs: { 'data-vact': 'add' } }) : '' });
-  var contact = function (v) { return '<span class="row gap4">' + (v.phone ? '<a class="ib sm" href="tel:' + esc(v.phone.replace(/\s/g, '')) + '" title="Call ' + esc(v.phone) + '" aria-label="Call" data-stop>' + i('phone') + '</a>' : '') + (v.wa || v.phone ? '<a class="ib sm" href="https://wa.me/' + String(v.wa || v.phone).replace(/\D/g, '') + '" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp" data-stop>' + i('brand-whatsapp') + '</a>' : '') + (v.email ? '<a class="ib sm" href="mailto:' + esc(v.email) + '" title="' + esc(v.email) + '" aria-label="Email" data-stop>' + i('mail') + '</a>' : '') + '</span>'; };
+  var contact = function (v) { return '<span class="row gap4">' + (v.phone ? '<a class="ib sm" href="tel:' + esc(v.phone.replace(/\s/g, '')) + '" title="Call ' + esc(v.phone) + '" aria-label="Call" data-stop>' + i('phone') + '</a>' : '') + (v.wa || v.phone ? '<a class="ib sm" href="' + UI.waLink(v.wa || v.phone) + '" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp" data-stop>' + i('brand-whatsapp') + '</a>' : '') + (v.email ? '<a class="ib sm" href="mailto:' + esc(v.email) + '" title="' + esc(v.email) + '" aria-label="Email" data-stop>' + i('mail') + '</a>' : '') + '</span>'; };
   t = UI.table(el.querySelector('#mt-vt'), {
     columns: [{ key: 'name', label: 'Workshop', sort: true, render: function (r) { return '<b class="fw5">' + esc(r.name) + '</b>' + (r.v.active ? '' : ' ' + UI.chip('Not in use', 'grey')) + '<div class="b2">' + UI.phone(r.v.phone) + '</div>'; } },
       { key: 'kind', label: 'Kind', render: function (r) { return esc(r.v.kind); } },
@@ -16648,7 +16856,7 @@ function mtPaperForm(o) {
   var start = JSON.stringify(f);
   var title = edit ? 'Edit paper' : old ? 'Renew ' + kind.toLowerCase().replace('puspakom', 'PUSPAKOM') : 'Add a paper';
   function html() {
-    return '<div class="mt-form">' + UI.select({ key: 'car', label: 'Car', required: true, options: mtCarOpts(true), value: f.car, placeholder: 'Choose a car', full: true }) +
+    return '<div class="mt-form"><div class="full mt-pcar"></div>' +
       UI.choice({ key: 'kind', label: 'Type', value: f.kind, options: LISTS.paperTypes, full: true }) + (f.kind === 'Other' ? UI.input({ key: 'name', label: 'What is it?', required: true, value: f.name, full: true, placeholder: 'For example Permit to enter a port' }) : '') +
       UI.dateField({ key: 'until', label: 'Valid until', chips: false, required: f.kind !== 'Car grant', value: f.until, help: f.kind === 'Car grant' ? 'A grant does not expire. Leave empty.' : '' }) + UI.dateField({ key: 'issued', label: 'Issued on (optional)', chips: false, value: f.issued }) +
       UI.input({ key: 'provider', label: f.kind === 'Insurance' ? 'Insurer (optional)' : 'Issued by (optional)', value: f.provider }) + (mtCostsOk() ? UI.input({ key: 'cost', label: 'What it cost', type: 'number', prefix: 'RM', min: 0, step: '0.01', value: f.cost }) : '') +
@@ -16660,9 +16868,11 @@ function mtPaperForm(o) {
   var box = dr.body.querySelector('.mt-pf');
   function paint() {
     box.innerHTML = html();
+    /* the same searchable car picker as the other fleet forms: type '3326' or 'VMA3326'; sold cars only when already chosen */
+    mtCarPick(box.querySelector('.mt-pcar'), { value: f.car, badges: false, onChange: function (id) { f.car = id || ''; } });
     var z = box.querySelector('.mt-pdz'); if (z) UI.dropzone(z, { accept: 'image/*,.pdf', camera: true, label: 'Add the photo or PDF', onFiles: function (fs) { mtReadFile(fs[0]).then(function (r) { f.file = r; paint(); }, function (e) { UI.toast(e.message, { tone: 'warn' }); }); } });
   }
-  mtBind(box, f, function (k, ev) { if (ev.type === 'change' && (k === 'kind' || k === 'car')) paint(); });
+  mtBind(box, f, function (k, ev) { if (ev.type === 'change' && k === 'kind') paint(); });
   box.addEventListener('click', function (ev) { if (ev.target.closest('[data-pf="rmfile"]')) { f.file = null; paint(); } });
   function save() {
     if (!f.car) { UI.toast('Choose the car', { tone: 'warn' }); return false; }
@@ -17005,7 +17215,8 @@ function rptBI(r, o) {
   var keys = ['rental', 'deliv', 'ret', 'dmg', 'other', 'total'], tot = { n: list.length, days: 0 };
   keys.forEach(function (k) { tot[k] = sum(list.map(function (it) { return it[k]; })); });
   tot.days = sum(list.map(function (it) { return it.n; }));
-  tot.dep = sum(list.map(function (it) { return it.x.dep; }));
+  tot.dep = sum(list.map(function (it) { return it.x.dep; }));   /* deposits on the bookings in the period, not what is held now (that is on Deposit refunds) */
+  tot.depBack = list.filter(function (it) { return it.x.dep > 0 && it.x.pay === 'Deposit Refunded'; }).length;
   var byCar = cars.map(function (c) { var l = list.filter(function (it) { return it.x.car === c; }), o2 = { car: c, n: l.length, days: Math.min(r.days, sum(l.map(function (it) { return it.n; }))) }; keys.forEach(function (k) { o2[k] = sum(l.map(function (it) { return it[k]; })); }); o2.util = o2.days / r.days; return o2; });
   tot.util = cars.length ? sum(byCar.map(function (c) { return c.days; })) / (cars.length * r.days) : 0;
   var group = function (f) { var g = {}; list.forEach(function (it) { var k = f(it) || 'Not set'; g[k] = g[k] || { k: k, n: 0, total: 0 }; g[k].n++; g[k].total += it.total; }); return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return b.total - a.total; }); };
@@ -17142,7 +17353,7 @@ function rptModel(id, st, r) {
     m.kpis = [{ l: 'Total income', raw: t.total, t: 'money', note: r.label, hero: true, split: [['Rental income', t.rental], ['Delivery fee', t.deliv], ['Return fee', t.ret], ['Damage coverage', t.dmg]].concat(other ? [['Other charges', t.other]] : []) },
       { l: 'Bookings', raw: t.n, t: 'int', note: t.n ? (t.days / t.n).toFixed(1) + ' days each on average' : 'None in this period' }, { l: 'Days booked', raw: t.days, t: 'int', note: 'Added up over all cars' },
       { l: 'Utilisation', raw: t.util, t: 'pct', note: plural(R.cars.length, 'car') + ' over ' + r.days + ' days', ring: true }, { l: 'Average income per booking', raw: t.n ? t.total / t.n : 0, t: 'money' },
-      { l: 'Rental income', raw: t.rental, t: 'money', small: true }, { l: 'Delivery fee', raw: t.deliv, t: 'money', small: true }, { l: 'Return fee', raw: t.ret, t: 'money', small: true }, { l: 'Damage coverage', raw: t.dmg, t: 'money', small: true }, { l: 'Deposits held', raw: t.dep, t: 'money', note: 'Not income', small: true }];
+      { l: 'Rental income', raw: t.rental, t: 'money', small: true }, { l: 'Delivery fee', raw: t.deliv, t: 'money', small: true }, { l: 'Return fee', raw: t.ret, t: 'money', small: true }, { l: 'Damage coverage', raw: t.dmg, t: 'money', small: true }, { l: 'Deposits on bookings', raw: t.dep, t: 'money', note: 'Not income' + (t.depBack ? ', ' + t.depBack + ' given back' : ''), small: true }];
     var mc = function (l) { return { l: l, t: 'money', a: 'r', w: 12 }; };
     m.sections.push({ title: 'By car', cols: [{ l: 'Car', w: 24 }, { l: 'Bookings', t: 'int', a: 'r', w: 8 }, { l: 'Days booked', t: 'int', a: 'r', w: 9 }, { l: 'Utilisation', t: 'pct', a: 'r', w: 12, bar: true }, mc('Rental income'), mc('Delivery fee'), mc('Return fee'), mc('Damage coverage')].concat(other ? [mc('Other charges')] : []).concat([{ l: 'Total income', t: 'money', a: 'r', w: 13, strong: true }]),
       rows: R.byCar.map(function (c) { return [car2(c.car), c.n, c.days, c.util, c.rental, c.deliv, c.ret, c.dmg].concat(other ? [c.other] : []).concat([c.total]); }),
@@ -17326,7 +17537,7 @@ function rptBIBook(m, R, r) {
   var t = R.tot, other = t.other > 0, top = rptTop(m.xlTitle, 12, ['One row per booking, income per car and per day. All amounts in RM.', ['Period', r.label + ' (' + r.days + ' days)'], ['Generated', rptGen()], ['Cars', m.info[0][1]], ['Booking statuses', m.info[1][1]]]);
   var S = top.rows.slice(), merges = top.merges.slice();
   S.push([]); S.push([{ v: 'KEY FIGURES', s: 'sec' }, { v: '', s: 'sec' }]);
-  [['Total income', t.total, 'kvg'], ['Rental income', t.rental, 'kv'], ['Delivery fee', t.deliv, 'kv'], ['Return fee', t.ret, 'kv'], ['Damage coverage', t.dmg, 'kv']].concat(other ? [['Other charges', t.other, 'kv']] : []).concat([['Deposits held (not income)', t.dep, 'kv'], ['Bookings', t.n, 'kvn'], ['Rental days', t.days, 'kvn'], ['Average income per booking', t.n ? t.total / t.n : 0, 'kv'], ['Average rental length (days)', t.n ? t.days / t.n : 0, 'kvd'], ['Utilisation', t.util, 'kvp']]).forEach(function (k) { S.push([{ v: k[0], s: 'kl' }, { v: k[1], s: k[2] }]); });
+  [['Total income', t.total, 'kvg'], ['Rental income', t.rental, 'kv'], ['Delivery fee', t.deliv, 'kv'], ['Return fee', t.ret, 'kv'], ['Damage coverage', t.dmg, 'kv']].concat(other ? [['Other charges', t.other, 'kv']] : []).concat([['Deposits on bookings (not income)', t.dep, 'kv'], ['Bookings', t.n, 'kvn'], ['Rental days', t.days, 'kvn'], ['Average income per booking', t.n ? t.total / t.n : 0, 'kv'], ['Average rental length (days)', t.n ? t.days / t.n : 0, 'kvd'], ['Utilisation', t.util, 'kvp']]).forEach(function (k) { S.push([{ v: k[0], s: 'kl' }, { v: k[1], s: k[2] }]); });
   /* by car */
   S.push([]); S.push([{ v: 'BY CAR', s: 'sec' }].concat(Array.apply(null, Array(11)).map(function () { return { v: '', s: 'sec' }; })));
   var head = ['Car', 'Plate', 'Bookings', 'Days booked', 'Utilisation', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Other charges', 'Total income', 'Income bar'];
@@ -17361,7 +17572,7 @@ function rptBIBook(m, R, r) {
   sheets.push({ name: 'Daily by car', rows: D2, cols: [13, 13].concat(R.cars.map(function () { return 15; })).concat([15]), merges: t2.merges, freeze: 'C' + (hr + 1) });
   /* bookings */
   var t3 = rptTop('Bookings', 25, [['Period', r.label], ['Generated', rptGen()]]), K = t3.rows.slice();
-  var bh = ['Booking ID', 'Status', 'Customer', 'IC / Passport', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days', 'Daily rate', 'Rent', 'Discount', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Total income', 'Deposit held', 'Total payable', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period'];
+  var bh = ['Booking ID', 'Status', 'Customer', 'IC / Passport', 'Phone', 'Car', 'Plate', 'Pickup', 'Return', 'Days', 'Daily rate', 'Rent', 'Discount', 'Rental income', 'Delivery fee', 'Return fee', 'Damage coverage', 'Total income', 'Deposit', 'Total payable', 'Payment method', 'Payment status', 'Created', 'Days in period', 'Income in period'];
   K.push(bh.map(function (h, k) { return { v: h, s: k >= 9 && k <= 19 || k >= 23 ? 'hr' : 'h' }; }));
   var hb = K.length, fb = hb + 1;
   R.list.forEach(function (it, k) {
@@ -17690,13 +17901,16 @@ function scSamplePhoto(label, k) {
 }
 
 /* ---------------- the details dialog ---------------- */
+/* a car going out with road tax or insurance that has run out (or runs out before the return): the warning on the card */
+function scPapers(h, x) { return h.kind === 'Delivery' && x.status !== 'Cancelled' && x.status !== 'Completed' ? carPaperIssues(x.car, x.start, x.end) : []; }
+function scPaperAlert(h, x) { var pp = scPapers(h, x); return pp.length ? UI.alert('<b>Do not hand over yet:</b> ' + pp.map(function (z) { return esc(z.text); }).join('. ') + '. Renew ' + (pp.length > 1 ? 'them' : 'it') + ' on Maintenance first.', 'bad', { html: true, icon: 'file-alert' }) : ''; }
 function scDetails(h, ctx) {
   var x = findBooking(h.booking); if (!x) return null;
   var money = can('bookings.see_amounts') || can('calendar.see_amounts'), staff = scStaff(x), c = x.car;
   var sec = function (t, b) { return '<section class="sc-dsec"><h3>' + t + '</h3>' + b + '</section>'; };
   var row = function (l, v, cls) { return '<div class="sc-mrow' + (cls ? ' ' + cls : '') + '"><span>' + l + '</span><b>' + v + '</b></div>'; };
-  var body = sec('Customer information', '<div class="sc-who">' + UI.avatar(x.cust.name) + '<div><b>' + esc(x.cust.name) + '</b><span>' + esc(x.cust.email || '') + '</span>' + UI.phone(x.cust.phone, { wa: true }) + '</div></div>' +
-      '<a class="btn o sm sc-wa" href="https://wa.me/' + String(x.cust.phone || '').replace(/\D/g, '') + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Open WhatsApp Chat</a>') +
+  var body = scPaperAlert(h, x) + sec('Customer information', '<div class="sc-who">' + UI.avatar(x.cust.name) + '<div><b>' + esc(x.cust.name) + '</b><span>' + esc(x.cust.email || '') + '</span>' + UI.phone(x.cust.phone, { wa: true }) + '</div></div>' +
+      '<a class="btn o sm sc-wa" href="' + UI.waLink(x.cust.phone) + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Open WhatsApp Chat</a>') +
     sec('Assigned vehicle', '<div class="sc-car">' + carsThumb(c, 'sc-ph') + '<div><b>' + esc(carName(c)) + '</b><span class="sc-plate">' + esc(c.plate) + '</span><span>' + esc(c.color) + '</span></div></div>') +
     sec('Schedule and note details', '<div class="sc-kv">' + UI.kv(h.kind === 'Delivery' ? 'Starting date and time' : 'Ending date and time', UI.fmt.dateTime(h.at)) + UI.kv('Handover', esc(scLabel(h))) +
       UI.kv('Assigned staff', staff.length ? staff.map(function (e2) { return esc(e2.name); }).join(', ') : 'No staff assigned') + UI.kv(h.kind === 'Delivery' ? 'Delivery / pickup note' : 'Return / drop-off note', esc(h.note || '-')) + '</div>') +
@@ -17753,7 +17967,7 @@ function scFlow(kind, code, onClose) {
       return stepper() + '<div class="sc-scr"><div class="sc-logo">' + carSVG(x.car.color, x.car.shape, { label: carName(x.car) }) + '</div><h2>Vehicle Condition Check</h2><p>Please complete the inspection when you receive the vehicle.</p>' +
         '<label class="sc-fl">Booking ID</label><div class="sc-ro"><span>' + x.code + '</span>' + i('circle-check') + '</div>' +
         '<div class="sc-warn">' + i('clock') + 'You must complete this inspection within 15 minutes of vehicle handover.</div>' + pbtn('Start Inspection', 'start') +
-        '<p class="sc-help">Need help? <a href="https://wa.me/' + String(B().phone || '').replace(/\D/g, '') + '" target="_blank" rel="noopener">Contact WhatsApp</a></p></div>';
+        '<p class="sc-help">Need help? <a href="' + UI.waLink(B().phone) + '" target="_blank" rel="noopener">Contact WhatsApp</a></p></div>';
     }
     if (kind === 'agent' && f.step === 'capture') {
       var n = agentDone(), tot = SC_AGENT_SLOTS.length + 1, w = kmWarn(), lo = lastOdo();
@@ -17900,7 +18114,7 @@ function scSendLink(x, kind) {
   var to = kind === 'agent' ? (e ? e.wa : '') : x.cust.phone, name = kind === 'agent' ? (e ? e.name.split(' ')[0] : '') : x.cust.name.split(' ')[0];
   var txt = kind === 'agent' ? 'Hi' + (name ? ' ' + name : '') + ', here is the handover check for ' + x.code + ' (' + x.car.plate + ', ' + x.cust.name + ', ' + UI.fmt.dateTime(x.start) + '). Take the 4 photos and type the odometer reading: ' + siteLink(x, 'agent')
     : 'Hi ' + name + ', thank you for renting with ' + B().name + '. Please take a few photos of the car (' + x.car.plate + ') within 15 minutes of the handover: ' + siteLink(x, 'customer');
-  var url = 'https://wa.me/' + String(to || '').replace(/\D/g, '') + '?text=' + encodeURIComponent(txt);
+  var url = UI.waLink(to, txt) || 'https://wa.me/?text=' + encodeURIComponent(txt);
   UI.dialog({ title: 'Send on WhatsApp', width: 'sm', body: '<div class="tsk-wa"><div class="tsk-wa-to">' + i('brand-whatsapp') + '<span>To ' + (to ? esc(kind === 'agent' ? e.name : x.cust.name) + ' ' + UI.phone(to) : (kind === 'agent' ? 'no staff with a WhatsApp number is assigned yet: choose the chat in WhatsApp' : 'the customer')) + '</span></div><div class="tsk-bubble">' + esc(txt) + '</div></div>',
     buttons: [{ label: 'Copy message', kind: 'o', onClick: function () { UI.copy(txt, { label: 'Message copied' }); return false; } }, { label: 'Open WhatsApp', icon: 'brand-whatsapp', onClick: function () { window.open(url, '_blank', 'noopener'); DB.log('Sent', 'Booking', x.code, DB.actor() + ' sent the ' + (kind === 'agent' ? 'agent handover' : 'customer photo check') + ' link of ' + x.code + ' on WhatsApp'); } }] });
 }
@@ -17910,13 +18124,13 @@ DATA_INIT.push(function (d, b) {
   if (d.staffMsgLog) return;
   d.company.staffMsg = d.company.staffMsg || { nightlyOn: true, nightly: '23:30', remindOn: true, remindMin: 30 };
   var R = rng(5150 + b.id.length * 7), base = typeof TODAY !== 'undefined' ? TODAY : new Date(2026, 9, 19, 14, 32), out = [];
-  var emps = d.employees || [];
+  var emps = (d.employees || []).filter(function (e) { return e.active !== false; });
   for (var day = 3; day >= 0; day--) {
     emps.forEach(function (e, k) {
       if (day === 0 && k > 1) return;
       var at = new Date(base.getFullYear(), base.getMonth(), base.getDate() - day - 1, 23, 30, Math.floor(R() * 50));
       var ok = !!e.wa && e.active !== false && !(k === emps.length - 1 && day % 2 === 0);
-      out.push({ id: 'smg-' + out.length, at: at, to: e.id, kind: 'Nightly schedule', text: 'Tomorrow: ' + (1 + Math.floor(R() * 4)) + ' handovers', ok: ok, error: ok ? '' : e.active === false ? 'The agent is switched off' : 'Not on WhatsApp' });
+      out.push({ id: 'smg-' + out.length, at: at, to: e.id, kind: 'Nightly schedule', text: 'Tomorrow: ' + plural(1 + Math.floor(R() * 4), 'handover'), ok: ok, error: ok ? '' : 'Not on WhatsApp' });
     });
   }
   (d.tasks || []).filter(function (t) { return t.at < base && t.at > new Date(base.getTime() - 3 * DAY); }).slice(0, 8).forEach(function (t) {
@@ -17935,7 +18149,7 @@ function scStaffMsgCard(el, redraw) {
     UI.switch({ key: 'remindOn', label: 'Remind staff before a job', checked: sm.remindOn, disabled: !canEdit }) + UI.input({ key: 'remindMin', label: 'Minutes before the job', type: 'number', min: 5, max: 240, value: sm.remindMin, disabled: !canEdit }) + '</div>' +
     '<div class="row wrap gap8 mt8">' + (canEdit ? UI.btn('Save', { icon: 'device-floppy', size: 'sm', attrs: { 'data-sm': 'save' } }) + UI.btn("Send tonight's schedule now", { kind: 'o', size: 'sm', icon: 'send', attrs: { 'data-sm': 'now' } }) : UI.alert('Changing these needs "Edit tasks".', 'warn', { icon: 'lock' })) + '</div>' +
     '<div class="row wrap gap8 sc-smh"><b class="grow">Sent messages</b><label class="row gap6 b2"><span class="sw"><input type="checkbox" data-sm="only"' + (st.only ? ' checked' : '') + '><span></span></span>Only failed (' + (d.staffMsgLog || []).filter(function (x) { return !x.ok; }).length + ')</label></div>' +
-    (log.length ? '<div class="sc-smlog">' + log.slice(0, st.n).map(function (x) { return '<div class="sc-sml">' + UI.chip(x.ok ? 'Sent' : 'Failed', x.ok ? 'ok' : 'bad') + '<div class="grow"><b>' + esc(who(x.to)) + '</b> <span class="b2">' + esc(x.kind) + ': ' + esc(x.text) + '</span>' + (x.error ? '<div class="b2 sc-bad">' + esc(x.error) + '</div>' : '') + '</div><span class="b2 nw">' + UI.fmt.dateTime(x.at) + '</span>' + (!x.ok && canEdit ? UI.btn('Try again', { kind: 't', size: 'sm', attrs: { 'data-sm': 'retry', 'data-v': x.id } }) : '') + '</div>'; }).join('') + '</div>' + (log.length > st.n ? '<div class="mt8">' + UI.btn('Show more', { kind: 't', size: 'sm', icon: 'chevron-down', attrs: { 'data-sm': 'more' } }) + '</div>' : '') : '<p class="b2 faint">Nothing here.</p>') + '</div></div>';
+    (log.length ? '<div class="sc-smlog">' + log.slice(0, st.n).map(function (x) { return '<div class="sc-sml">' + UI.chip(x.ok ? 'Sent' : 'Failed', x.ok ? 'ok' : 'bad') + '<div class="grow"><b>' + esc(who(x.to)) + '</b> <span class="b2">' + esc(x.kind) + ': ' + esc(x.text) + '</span>' + (x.error ? '<div class="b2 sc-bad">' + esc(x.error) + '</div>' : '') + '</div><span class="b2 nw">' + UI.fmt.dateTime(x.at) + '</span>' + (!x.ok && canEdit && x.error !== 'The agent is switched off' ? UI.btn('Try again', { kind: 't', size: 'sm', attrs: { 'data-sm': 'retry', 'data-v': x.id } }) : '') + '</div>'; }).join('') + '</div>' + (log.length > st.n ? '<div class="mt8">' + UI.btn('Show more', { kind: 't', size: 'sm', icon: 'chevron-down', attrs: { 'data-sm': 'more' } }) + '</div>' : '') : '<p class="b2 faint">Nothing here.</p>') + '</div></div>';
   var again = function () { (redraw || function () { scStaffMsgCard(el); })(); };
   var send = function (e, kind, text) { var ok = !!e.wa && e.active !== false; var rec = { id: 'smg-' + Date.now().toString(36) + e.id, at: NOW(), to: e.id, kind: kind, text: text, ok: ok, error: ok ? '' : e.active === false ? 'The agent is switched off' : 'No WhatsApp number' }; d.staffMsgLog.unshift(rec); return rec; };
   el.onclick = function (ev) {
@@ -17950,7 +18164,8 @@ function scStaffMsgCard(el, redraw) {
     } else if (a === 'now') {
       var tmr = new Date(NOW()); tmr.setHours(0, 0, 0, 0); tmr = new Date(tmr.getTime() + DAY);
       var res = { ok: 0, bad: 0 };
-      d.employees.forEach(function (e) {
+      /* switched-off agents get nothing (not a failure anyone can fix here) */
+      d.employees.filter(function (e) { return e.active !== false; }).forEach(function (e) {
         var n = handovers(d).filter(function (h) { return h.at >= tmr && h.at < new Date(tmr.getTime() + DAY) && scStaff(findBooking(h.booking) || { agentIds: [], code: '' }).some(function (z) { return z.id === e.id; }); }).length;
         var r = send(e, 'Nightly schedule', n ? 'Tomorrow: ' + plural(n, 'handover') : 'Tomorrow: no handovers'); if (r.ok) res.ok++; else res.bad++;
       });
@@ -18023,6 +18238,7 @@ PAGES['schedules'] = {
       var fb = function (icon, label, attrs, dis) { return '<button type="button" class="sc-fb"' + attrs + (dis ? ' disabled title="' + dis + '"' : '') + '>' + i(icon) + '<span>' + label + '</span></button>'; };
       return '<article class="card sc-card' + (u && u.tone === 'bad' ? ' bad' : u ? ' warn' : '') + '" data-ho="' + h.id + '">' +
         '<header class="sc-ch"><span class="sc-kind ' + (del ? 'del' : 'ret') + '">' + esc(scKind(h, x)) + '</span><span class="sc-id">' + x.code + '</span>' + (u ? UI.chip(u.text, u.tone) : '') + '<span class="grow"></span>' + UI.status('booking', x.status) + UI.chip('Payment: ' + (x.pay || 'None'), PAY_COLORS[x.pay] || 'grey') + '</header>' +
+        (del ? '<div class="sc-papers">' + scPaperAlert(h, x) + '</div>' : '') +
         '<div class="sc-cb"><div class="sc-cust"><div class="sc-who">' + UI.avatar(x.cust.name) + '<div><b>' + esc(x.cust.name) + '</b><span>' + esc(x.cust.email || '') + '</span>' + UI.phone(x.cust.phone, { wa: true }) + '</div></div>' +
         '<div class="sc-cap">Assigned staff</div><div class="sc-staff">' + i('user') + (staff.length ? staff.map(function (e2) { return esc(e2.name); }).join(', ') : '<span class="faint">No staff assigned</span>') + '</div>' + (del ? '<div class="sc-checks">' + scChecks(h, x) + '</div>' : '') + '</div>' +
         '<div class="sc-car">' + carsThumb(c, 'sc-ph') + '<div><b>' + esc(carName(c)) + '</b><span class="sc-plate">' + esc(c.plate) + '</span><span>' + esc(c.color) + '</span></div></div>' +
@@ -18040,7 +18256,7 @@ PAGES['schedules'] = {
       var u = scUrgency(h, x), del = h.kind === 'Delivery', staff = scStaff(x);
       return '<div class="sc-line' + (u && u.tone === 'bad' ? ' bad' : u ? ' warn' : '') + '" data-ho="' + h.id + '" role="button" tabindex="0" data-act="details"><span class="sc-lt"><b>' + tm(h.at) + '</b><small>' + h.at.getDate() + ' ' + MON[h.at.getMonth()] + '</small></span><span class="sc-kind sm ' + (del ? 'del' : 'ret') + '">' + esc(scKind(h, x)) + '</span>' +
         '<span class="sc-lm"><b>' + esc(x.cust.name) + '</b><span class="b2">' + x.code + ' · ' + esc(x.car.plate) + ' · ' + esc(carModel(x.car)) + (staff.length ? ' · ' + esc(staff.map(function (z) { return z.name.split(' ')[0]; }).join(', ')) : '') + '</span></span>' +
-        '<span class="sc-lc">' + (u ? UI.chip(u.text, u.tone) : '') + (del ? scChecks(h, x, true) : '') + UI.status('booking', x.status) + '</span></div>';
+        '<span class="sc-lc">' + (scPapers(h, x).length ? UI.chip(scPapers(h, x)[0].short, 'bad', { icon: 'file-alert' }) : '') + (u ? UI.chip(u.text, u.tone) : '') + (del ? scChecks(h, x, true) : '') + UI.status('booking', x.status) + '</span></div>';
     }
     function draw() {
       var all = base(), kind = st.kind;
@@ -18472,7 +18688,7 @@ SET_DRAW.places = function (el, ctx, redraw) {
     title: 'Other places', desc: 'Places that are not your own office, such as the airport, a train station or a ferry terminal. Each one becomes a pick-up and return choice in the booking form, with its own delivery and return fee, and its own handover fee kind and task type.',
     body: function (dr) {
       return (dr.length ? '<div class="set-places"><div class="set-pl set-pl-h b2"><span>Name</span><span>Delivery fee</span><span>Return fee</span><span></span></div>' + dr.map(function (p, k) {
-        return '<div class="set-pl">' + UI.input({ key: 'pn' + k, label: '', value: p.name, placeholder: 'e.g. Airport', attrs: { 'aria-label': 'Name of place ' + (k + 1) } }) + UI.input({ key: 'pd' + k, label: '', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: p.deliveryFee, attrs: { 'aria-label': 'Delivery fee', 'data-money': '1' } }) + UI.input({ key: 'pr' + k, label: '', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: p.returnFee, attrs: { 'aria-label': 'Return fee', 'data-money': '1' } }) + UI.iconBtn('trash', 'Remove ' + (p.name || 'this place'), { attrs: { 'data-pl-del': k } }) + '</div>';
+        return '<div class="set-pl">' + UI.input({ key: 'pn' + k, label: '', value: p.name, placeholder: 'e.g. Airport', attrs: { 'aria-label': 'Name of place ' + (k + 1) } }) + UI.input({ key: 'pd' + k, label: 'Delivery fee', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: p.deliveryFee, attrs: { 'aria-label': 'Delivery fee', 'data-money': '1' } }) + UI.input({ key: 'pr' + k, label: 'Return fee', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: p.returnFee, attrs: { 'aria-label': 'Return fee', 'data-money': '1' } }) + UI.iconBtn('trash', 'Remove ' + (p.name || 'this place'), { attrs: { 'data-pl-del': k } }) + '</div>';
       }).join('') + '</div>' : UI.empty({ icon: 'plane-off', title: 'No other places yet', text: 'Add the airport or a station if you deliver there.' })) +
         '<div class="mt8">' + UI.btn('Add a place', { kind: 'o', icon: 'plus', size: 'sm', attrs: { 'data-pl-add': '1' } }) + '</div>';
     },
@@ -19096,7 +19312,7 @@ function smsMessage(s) {
     '\nFine: ' + UI.fmt.money(s.fine) + (s.fee ? ', our admin fee: ' + UI.fmt.money(s.fee) : '') + '\nAmount to pay us: ' + UI.fmt.money(s.asked || s.fine + (s.fee || 0)) + '\n\n' +
     (acct.length ? 'Please transfer to: ' + acct.join(', ') + '.' : 'Please tell us how you would like to pay.') + '\nUse ' + (s.booking || s.notice || 'the notice number') + ' as the payment reference and send us the slip. Thank you.';
 }
-function smsWaLink(phone, text) { var digits = String(phone || '').replace(/\D/g, ''); return digits.length >= 9 ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent(text) : ''; }
+function smsWaLink(phone, text) { return UI.waNumber(phone).replace(/\D/g, '').length >= 9 ? UI.waLink(phone, text) : ''; }
 
 /* ---------------- the form (Add a summons and the Details block) ---------------- */
 function smsFormHtml(v, o) {
@@ -19635,7 +19851,11 @@ PAGES['summons'] = {
 
 /* ---------------- small helpers ---------------- */
 function tskBooking(t) { return t && t.booking ? findBooking(t.booking) : null; }
-function tskWhen(dt) { if (!dt) return '-'; var h = dt.getHours(), m = dt.getMinutes(); return UI.fmt.date(dt) + ' / ' + String(h % 12 || 12).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'am' : 'pm'); }
+function tskWhen(dt) { if (!dt) return '-'; return UI.fmt.date(dt) + ' / ' + tm(dt); }   /* the same '10:00 AM' as Schedules and Settings */
+/* the order the list opens in: open jobs that are late, then today's, then the coming ones (soonest first), then done or
+   cancelled ones (latest first) */
+function tskRank(t, t0) { var open = t.status !== 'Completed' && t.status !== 'Cancelled'; if (!open) return 3; return t.at < t0 ? 0 : t.at < t0 + DAY ? 1 : 2; }
+function tskOrder(a, b) { var t0 = new Date(NOW()).setHours(0, 0, 0, 0), ra = tskRank(a, t0), rb = tskRank(b, t0); return ra - rb || (ra === 3 ? b.at - a.at : a.at - b.at); }
 function tskEmp(id) { return employeeById(id) || byId(D().employees, id); }
 function tskFirst(name) { return String(name || '').split(' ')[0]; }
 
@@ -20079,7 +20299,7 @@ PAGES['tasks'] = {
         if (sf && t.at < sf) return false; if (stt && t.at >= stt) return false;
         if (q) { var hay = [t.name, t.note, t.type, t.status, t.booking, x ? x.cust.name + ' ' + x.car.plate + ' ' + normPlate(x.car.plate) + ' ' + carName(x.car) : ''].concat(t.agents.map(function (a) { var e = tskEmp(a); return e ? e.name : ''; })).concat((t.photos || []).map(function (ph) { return ph.caption || ''; })).join(' ').toLowerCase(); if (!UI.wordsMatch(hay, q) && !(t.booking && matchBookingCode(q, t.booking))) return false; }
         return true;
-      }).sort(function (a, b) { return b.at - a.at; });
+      }).sort(tskOrder);
     }
     var canEdit = ctx.can('tasks.edit'), canDel = ctx.can('tasks.delete');
     var waChips = function (t) { return t.agents.length ? '<div class="tsk-wachips">' + t.agents.map(function (a) { var e = tskEmp(a), s = (t.wa || {})[a] || 'Not Sent'; return UI.status('wa', s, null, { sm: true, attrs: { title: (e ? e.name : a) + ': ' + s } }); }).join('') + '</div>' : '<span class="faint">-</span>'; };
@@ -20202,9 +20422,8 @@ function teamWirePw(el, getUser, who) {
   var wa = el.querySelector('[data-tm-wa]'); if (wa) wa.addEventListener('click', function () {
     var w = (who && who()) || {}, un = getUser() || '';
     var msg = 'Hi' + (w.name ? ' ' + w.name.split(' ')[0] : '') + ', here is your sign-in for the ' + B().name + ' dashboard.\nUsername: ' + un + '\nPassword: ' + f.value + '\nPlease keep it to yourself.';
-    var num = String(w.phone || '').replace(/\D/g, '');
-    window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
-    if (!num) UI.toast('No WhatsApp number saved for them, so choose the chat in WhatsApp.', { tone: 'info' });
+    window.open(UI.waLink(w.phone, msg) || 'https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+    if (!UI.waNumber(w.phone)) UI.toast('No WhatsApp number saved for them, so choose the chat in WhatsApp.', { tone: 'info' });
   });
   up();
 }
@@ -20825,6 +21044,18 @@ function trPos(lat, lng) { return '<span class="tr-pos"><span class="num">' + la
 function trKm(a, b) { var R = 6371, r = Math.PI / 180, dLa = (b.lat - a.lat) * r, dLo = (b.lng - a.lng) * r, h = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLo / 2) * Math.sin(dLo / 2); return 2 * R * Math.asin(Math.sqrt(h)); }
 function trSeed(s) { var h = 2166136261; for (var k = 0; k < s.length; k++) { h ^= s.charCodeAt(k); h = Math.imul(h, 16777619); } return function () { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; }; }
 function trStateChip(t) { return UI.status('tracker', t.state) + (t.speed > trOver() ? ' ' + UI.chip('Over-speed', 'bad') : ''); }
+/* who has the car now: the booking it is out on (Car Delivered, or its rental time is now), so staff can tell a rented
+   car on the move from one that should be parked */
+function trLive(c) {
+  if (!c) return null; var now = NOW();
+  return D().bookings.filter(function (x) { return x.car === c && x.status !== 'Cancelled' && x.status !== 'Completed' && x.status !== 'Car Returned' && (x.status === 'Car Delivered' || (x.start <= now && x.end >= now)); })
+    .sort(function (a, b) { return (b.status === 'Car Delivered') - (a.status === 'Car Delivered') || a.start - b.start; })[0] || null;
+}
+function trWho(c, t) {
+  var x = trLive(c), now = NOW();
+  if (!x) return '<div class="tr-who">' + i('parking') + '<span>No booking now</span>' + (t && t.state === 'Moving' ? UI.chip('Moving, no booking', 'bad', { icon: 'alert-triangle' }) : '') + '</div>';
+  return '<div class="tr-who">' + i('user') + '<span>With <b>' + esc(x.cust.name) + '</b> · <button type="button" class="inv-link" data-tr-bk="' + x.code + '" data-stop>' + x.code + '</button> · ' + (x.end < now ? 'was due back ' : 'back ') + x.end.getDate() + ' ' + MON[x.end.getMonth()] + ', ' + tm(x.end) + '</span>' + (x.end < now ? UI.chip('Late', 'bad') : '') + '</div>';
+}
 function trAccChip(a) { return UI.chip(a.status, { Working: 'ok', Problem: 'bad', 'Switched off': 'grey', 'Not read yet': 'warn' }[a.status] || 'grey'); }
 
 /* trip points for one car between two days (made up but the same on every load) */
@@ -20927,6 +21158,7 @@ PAGES['tracking'] = {
       var tbl = UI.table(el.querySelector('#tr-t'), {
         columns: [
           { key: 'car', label: 'Car', sort: function (r) { return r.c.plate; }, render: function (r) { return mtCarCell(r.c); } },
+          { key: 'who', label: 'Booking', render: function (r) { return trWho(r.c, r.t); } },
           { key: 'name', label: 'Tracker', sort: function (r) { return r.t ? r.t.name : 'zz'; }, render: function (r) { return r.t ? esc(r.t.name) : '<span class="faint">None</span>'; } },
           { key: 'state', label: 'State', sort: function (r) { return r.state; }, render: function (r) { return r.t ? trStateChip(r.t) : noTr(r); } },
           { key: 'speed', label: 'Speed', align: 'right', sort: function (r) { return r.t ? r.t.speed : -1; }, render: function (r) { var t = r.t; return !t || t.state === 'Offline' ? '-' : '<span class="num' + (t.speed > trOver() ? ' tr-fast' : '') + '">' + t.speed + ' km/h</span>'; } },
@@ -20934,15 +21166,16 @@ PAGES['tracking'] = {
           { key: 'at', label: 'Last update', sort: function (r) { return r.t && r.t.at ? +r.t.at : 0; }, render: function (r) { return r.t && r.t.at ? UI.fmt.ago(r.t.at) : '<span class="faint">' + (r.t ? 'No report yet' : '-') + '</span>'; } },
           { key: 'pos', label: 'Position', render: function (r) { return r.t ? trPos(r.t.lat, r.t.lng) : '<span class="faint">Not tracked</span>'; } }
         ],
-        rows: rows(), density: 'compact', pageSize: false, minWidth: 880, rowClass: function (r) { return st.sel === r.id ? 'tr-selrow' : ''; },
+        rows: rows(), density: 'compact', pageSize: false, minWidth: 1040, rowClass: function (r) { return st.sel === r.id ? 'tr-selrow' : ''; },
         onRowClick: function (r) { if (!r.t) return; st.sel = st.sel === r.id ? null : r.id; drawMap(); tbl.setRows(rows()); },
-        card: function (r) { var t = r.t, c = r.c; if (!t) return '<div class="tr-mc"><div class="row between"><b>' + esc(c.plate) + '</b></div><div class="b2">' + esc(carName(c)) + '</div><div class="b2">' + noTr(r) + '</div></div>'; return '<div class="tr-mc"><div class="row between">' + (c ? '<b>' + esc(c.plate) + '</b>' : '<span class="faint">Not linked to a car</span>') + '<span>' + trStateChip(t) + '</span></div><div class="b2">' + esc(t.name) + (c ? ' · ' + esc(carName(c)) : '') + '</div><div class="b2">' + (t.state === 'Offline' ? '' : t.speed + ' km/h · ') + 'Ignition ' + (t.ign ? 'On' : 'Off') + ' · ' + (t.at ? UI.fmt.ago(t.at) : 'No report yet') + '</div>' + trPos(t.lat, t.lng) + '</div>'; },
+        card: function (r) { var t = r.t, c = r.c; if (!t) return '<div class="tr-mc"><div class="row between"><b>' + esc(c.plate) + '</b></div><div class="b2">' + esc(carName(c)) + '</div><div class="b2">' + noTr(r) + '</div>' + trWho(c, null) + '</div>'; return '<div class="tr-mc"><div class="row between">' + (c ? '<b>' + esc(c.plate) + '</b>' : '<span class="faint">Not linked to a car</span>') + '<span>' + trStateChip(t) + '</span></div>' + (c ? trWho(c, t) : '') + '<div class="b2">' + esc(t.name) + (c ? ' · ' + esc(carName(c)) : '') + '</div><div class="b2">' + (t.state === 'Offline' ? '' : t.speed + ' km/h · ') + 'Ignition ' + (t.ign ? 'On' : 'Off') + ' · ' + (t.at ? UI.fmt.ago(t.at) : 'No report yet') + '</div>' + trPos(t.lat, t.lng) + '</div>'; },
         empty: { icon: 'map-pin-off', title: items().length ? 'No car matches.' : 'No cars to show', text: items().length ? 'Clear the search or pick another state.' : 'Add cars on the Cars page.' }
       });
       var sp = spares();
       if (sp.length) el.querySelector('.tr-note').insertAdjacentHTML('beforeend', ' ' + plural(sp.length, 'spare tracker') + ' (' + sp.map(function (t) { return esc(t.name); }).join(', ') + ') ' + (sp.length === 1 ? 'is' : 'are') + ' on no car, so ' + (sp.length === 1 ? 'it is' : 'they are') + ' not on the map.');
       UI.on(el, 'click', '[data-tr-link]', function () { st.tab = 'accounts'; ctx.setParams({ tab: 'accounts' }); ctx.refresh(); });
       UI.on(el, 'click', '[data-tr-car]', function (ev, b) { ctx.api.editCar(b.getAttribute('data-tr-car')); });
+      UI.on(el, 'click', '[data-tr-bk]', function (ev, b) { ev.stopPropagation(); ctx.api.openBooking(b.getAttribute('data-tr-bk')); });
       var filt = function () {
         var c = counts();
         UI.filters(el.querySelector('#tr-f'), { values: st.f, fields: [{ type: 'chips', key: 'state', options: [['all', 'All cars', c.all], ['Moving', 'Moving', c.Moving, 'ok'], ['Parked', 'Parked', c.Parked, 'info'], ['Offline', 'Offline', c.Offline, 'grey']].concat(c.None ? [['None', 'No tracker', c.None, 'grey']] : []) }, { type: 'search', key: 'q', placeholder: 'Search plate, car or tracker' }],
@@ -21034,7 +21267,7 @@ PAGES['tracking'] = {
         card: function (x) { var c = carById(x.car); return '<div class="tr-mc"><div class="row between"><b>' + (c ? esc(c.plate) : '') + '</b>' + UI.chip(x.type, /SOS|Power|speed/.test(x.type) ? 'bad' : 'warn') + '</div><div class="b2">' + UI.fmt.dateTime(x.at) + '</div>' + trPos(x.lat, x.lng) + '</div>'; },
         empty: { icon: 'bell-off', title: 'No alarms in this time.', text: 'Pick other dates or another car.' } });
       UI.filters(el.querySelector('#tr-af'), { values: st.af, fields: [
-        { type: 'select', key: 'car', label: 'Car', options: mtCarOpts(true), all: 'All cars' },
+        UI.carFilter({ key: 'car', label: 'Car', all: 'All cars' }),
         { type: 'select', key: 'type', label: 'Alarm', options: LISTS.alarmTypes, all: 'All alarms' },
         { type: 'daterange', from: 'from', to: 'to', label: 'Dates' }], onChange: function () { tbl.setRows(rows()); } });
     }
@@ -21164,7 +21397,7 @@ function wsFeed(b) {
   var revs = d.reviews.slice().sort(function (a, z) { return a.order - z.order; });
   var logos = h.logos.slice().sort(function (a, z) { return a.order - z.order; });
   var socials = h.socials.filter(function (s) { return s.active; }).sort(function (a, z) { return a.order - z.order; });
-  var wa = String(h.formNumber || b.phone || '').replace(/\D/g, '');
+  var wa = UI.waNumber(h.formNumber || b.phone || '').replace(/\D/g, '');
   return {
     faq: faqs.length ? '<div class="ws-faq">' + faqs.slice(0, 8).map(function (f, k) { return '<details' + (k === 0 ? ' open' : '') + '><summary><span>' + esc(f.q) + '</span><b aria-hidden="true">+</b></summary><p>' + esc(f.a) + '</p></details>'; }).join('') + '</div>' : '',
     reviews: revs.length ? '<div class="ws-sec ws-revs"><h2>What renters say</h2><div class="ws-rev-grid">' + revs.slice(0, 6).map(function (r) { return '<figure class="ws-rev">' + wsStars(r.rating) + '<blockquote>' + esc(r.text) + '</blockquote><figcaption>' + (r.photo ? '<img src="' + r.photo + '" alt="">' : '<span class="ws-av">' + esc(initials(r.name)) + '</span>') + '<span><b>' + esc(r.name) + '</b><small>' + UI.fmt.month(r.date) + '</small></span></figcaption></figure>'; }).join('') + '</div></div>' : '',

@@ -41,7 +41,22 @@ var M7 = (function () {
     var dt = curDowntime(c.id);
     if (dt) return { key: 'workshop', text: dt.to ? 'Workshop until ' + dShort(dt.to) : 'In the workshop', tone: 'orange', downtime: dt };
     if (now) return { key: 'rent', text: 'Booked until ' + dShort(now.end), tone: 'blue', booking: now };
-    return { key: 'free', text: 'Free', tone: 'green' };
+    return { key: 'free', text: 'Available', tone: 'green' };
+  }
+  /* the worse of road tax and insurance: the two papers a car cannot go out without */
+  function roadPapers(c) {
+    var worst = null, rank = { overdue: 3, none: 2, soon: 1, ok: 0 };
+    ['Road tax', 'Insurance'].forEach(function (t) { var s = paperState(carPaper(c.id, t)); s.type = t; if (!worst || rank[s.level] > rank[worst.level]) worst = s; });
+    return worst;
+  }
+  /* the car's km rebuilt from what is stored on the car and the trusted readings (an untrusted one no longer counts) */
+  function recalcKm(c) {
+    if (!c) return;
+    var rd = (S.odometer || []).filter(function (o) { return o.car === c.id; });
+    if (c.kmBase == null) c.kmBase = rd.some(function (o) { return +o.km === +c.km; }) ? 0 : (+c.km || 0);
+    var best = +c.kmBase || 0;
+    rd.forEach(function (o) { if (o.trusted !== false && +o.km > best) best = +o.km; });
+    c.km = best || c.km;
   }
   function papersDue(c) { return ['Road tax', 'Insurance', 'PUSPAKOM', 'Permit'].some(function (t) { var s = paperState(carPaper(c.id, t)); return s.level === 'overdue' || s.level === 'soon'; }); }
   function telOf(p) { var n = normPhone(p); return n ? '+' + n : ''; }
@@ -77,7 +92,7 @@ var M7 = (function () {
   }
   function dateVal(s) { return s ? String(s).slice(0, 10) : ''; }
   function addYear(ymdS) { var b = ymdS ? new Date(ymdS + 'T00:00:00') : new Date(); if (b < sod(new Date())) b = sod(new Date()); b.setFullYear(b.getFullYear() + 1); return toLocalInput(b); }
-  return { PAPER_TYPES: PAPER_TYPES, PAPER_LABEL: PAPER_LABEL, km: km, kmNum: kmNum, odo: odo, lastReading: lastReading, paperState: paperState, ymd: ymd, curDowntime: curDowntime,
+  return { roadPapers: roadPapers, recalcKm: recalcKm, PAPER_TYPES: PAPER_TYPES, PAPER_LABEL: PAPER_LABEL, km: km, kmNum: kmNum, odo: odo, lastReading: lastReading, paperState: paperState, ymd: ymd, curDowntime: curDowntime,
     nextBooking: nextBooking, carState: carState, papersDue: papersDue, telOf: telOf, thumb: thumb, photoField: photoField, wirePhoto: wirePhoto, zoom: zoom, dateVal: dateVal, addYear: addYear };
 })();
 
@@ -137,10 +152,10 @@ var CarPage = (function () {
     var a = $('#crall'); if (a) a.onclick = function () { CRS.f = 'all'; draw(); };
   }
   function rowHtml(r) {
-    var c = r.c, st = r.st, rt = M7.paperState(carPaper(c.id, 'Road tax'));
+    var c = r.c, st = r.st, rt = M7.roadPapers(c), rtl = rt.type;
     return '<a class="cr-row" href="#car/' + c.id + '"><span class="cr-pic">' + carSVG(c.color, c.shape) + '</span><span class="cr-mid">' +
       '<span class="cr-plate">' + esc(c.plate) + '</span><span class="cr-sub">' + esc(c.make + ' ' + c.model + ' · ' + c.color) + '</span>' +
-      '<span class="cr-chipline">' + chip(st.text, st.tone) + (c.status !== 'sold' ? chip(rt.level === 'ok' ? 'Road tax valid' : 'Road tax: ' + rt.text.replace(/^Expires/, 'expires').replace(/^Expired/, 'expired').replace(/^Not recorded/, 'not recorded'), rt.tone) : '') +
+      '<span class="cr-chipline">' + chip(st.text, st.tone) + (c.status !== 'sold' ? chip(rt.level === 'ok' ? 'Papers valid' : rt.level === 'overdue' ? rtl + ' expired' : rtl + ': ' + rt.text.replace(/^Expires/, 'expires').replace(/^Not recorded/, 'not recorded'), rt.tone) : '') +
       '<span class="cr-km">' + esc(M7.km(M7.odo(c.id))) + '</span></span></span>' +
       '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5l7 7-7 7"/></svg></a>';
   }
@@ -165,7 +180,10 @@ var CarPage = (function () {
     if (cur) bkCard += bkRow(cur, isLate(cur) ? 'Late' : cur.bookingStatus === 'Car Delivered' ? 'On rent now' : 'Booked now');
     if (nxt) bkCard += bkRow(nxt, 'Next');
     if (!bkCard) bkCard = '<div class="card2"><div class="c2-main"><div class="c2-t1">No booking coming up</div><div class="c2-t2">' + (c.status === 'active' && !dt ? 'This car is free to book' : st.text) + '</div></div></div>';
-    var bookBtn = can('bookings.create') && c.status === 'active' ? '<a class="btn ghost cr-book" href="' + hashWith('new', { car: c.id }) + '">' + I('plus') + 'Book this car</a>' : '';
+    var rp = M7.roadPapers(c), noGo = c.status !== 'sold' && rp.level === 'overdue';
+    var noGoBanner = noGo ? '<div class="banner red cr-banner cr-nogo">' + I('warn') + '<div><b>Do not hand over.</b> ' + esc(rp.type) + ' expired on ' + esc(M7.ymd(carPaper(c.id, rp.type).until)) + '. Renew it before the car goes out.' +
+      (can('maintenance.manage_documents') ? ' <button type="button" class="btn sm" onclick="Maint.renew({car:\'' + c.id + '\',type:\'' + rp.type + '\'})">Renew ' + esc(rp.type.toLowerCase()) + '</button>' : '') + '</div></div>' : '';
+    var bookBtn = can('bookings.create') && c.status === 'active' ? (noGo ? '<button type="button" class="btn ghost cr-book" onclick="CarPage.bookAnyway(\'' + c.id + '\')">' + I('plus') + 'Book this car</button>' : '<a class="btn ghost cr-book" href="' + hashWith('new', { car: c.id }) + '">' + I('plus') + 'Book this car</a>') : '';
     /* quick actions */
     var acts = [];
     if (can('maintenance.create')) acts.push('<button class="act" onclick="Maint.log({car:\'' + c.id + '\'})">' + I('wrench') + 'Log service</button>');
@@ -178,7 +196,7 @@ var CarPage = (function () {
       var p = carPaper(c.id, t), s = M7.paperState(p), canR = can('maintenance.manage_documents');
       if (!p && (t === 'Grant' || t === 'Permit' || t === 'PUSPAKOM') && !canR) return '';
       return '<' + (canR ? 'button type="button" onclick="Maint.renew({car:\'' + c.id + '\',type:\'' + t + '\'})"' : 'div') + ' class="card2 cr-paper"><div class="c2-main"><div class="c2-t1">' + esc(M7.PAPER_LABEL[t]) + '</div><div class="c2-t2">' +
-        (p ? (p.until ? 'Valid until ' + esc(M7.ymd(p.until)) : 'On file') + (p.insurer ? ' · ' + esc(p.insurer) : '') : (canR ? 'Tap to add' : 'Not recorded')) + '</div></div>' + chip(s.text, s.tone) + '</' + (canR ? 'button' : 'div') + '>';
+        (p ? (p.until ? (s.level === 'overdue' ? 'Expired on ' : 'Valid until ') + esc(M7.ymd(p.until)) : 'On file') + (p.insurer ? ' · ' + esc(p.insurer) : '') : (canR ? 'Tap to add' : 'Not recorded')) + '</div></div>' + chip(s.text, s.tone) + '</' + (canR ? 'button' : 'div') + '>';
     }).join('');
     /* service */
     var svc = window.Maint && Maint.serviceInfo ? Maint.serviceInfo(c) : null;
@@ -215,7 +233,7 @@ var CarPage = (function () {
     }
     var sm = (S.summons || []).filter(function (s) { return s.car === c.id; }), smOpen = sm.filter(function (s) { return ['Paid', 'Waived'].indexOf(s.status) < 0; }).length;
     var smHtml = can('summons.view') && sm.length ? '<div class="sec"><h2>Summons</h2></div><a class="card2 list cr-sm" href="' + hashWith('summons', { q: c.plate, f: 'all' }) + '"><div class="c2-main"><div class="c2-t1">' + sm.length + ' summons for this car</div><div class="c2-t2">' + (smOpen ? smOpen + ' still open' : 'All settled') + '</div></div>' + (smOpen ? chip(smOpen + ' open', 'amber') : chip('Settled', 'green')) + '</a>' : '';
-    var html = topbar(c.plate, { back: '#cars', sub: c.make + ' ' + c.model, right: right }) + '<main class="cr-page">' + hero +
+    var html = topbar(c.plate, { back: '#cars', sub: c.make + ' ' + c.model, right: right }) + '<main class="cr-page">' + noGoBanner + hero +
       (dt ? '<div class="banner amber cr-banner">' + I('wrench') + '<div><b>In the workshop</b> since ' + esc(when(dt.from)) + (dt.to ? ', expected back ' + esc(dLong(dt.to)) : ', no return date yet') + '. ' + esc(dt.reason || '') + '</div></div>' : '') +
       (acts.length ? '<div class="actions cr-acts" style="grid-template-columns:repeat(' + Math.min(4, acts.length) + ',1fr)">' + acts.join('') + '</div>' : '') +
       '<div class="sec"><h2>Bookings</h2>' + (can('bookings.view') ? '<a href="' + hashWith('calendar', {}) + '">Calendar</a>' : '') + '</div><div class="list">' + bkCard + '</div>' + bookBtn +
@@ -226,6 +244,12 @@ var CarPage = (function () {
       '<div class="sec"><h2>Car details</h2></div>' + facts + owner + inst + where + smHtml +
       (c.note ? '<div class="sec"><h2>Note</h2></div><div class="card cr-note">' + esc(c.note) + '</div>' : '') + '</main>';
     return { html: html, after: function () { if (window.Track && Track.startAgo && can('tracking.view')) Track.startAgo(); } };
+  }
+  /* a car whose road tax or insurance has expired: booking it asks first */
+  function bookAnyway(id) {
+    var c = car(id), rp = c && M7.roadPapers(c); if (!c) return;
+    confirm({ icon: 'warn', title: rp.type + ' has expired', text: c.plate + ' must not go out until it is renewed. Make the booking anyway, for after the renewal?', ok: 'Book anyway', cancel: 'Not now', primary: 'cancel', danger: true })
+      .then(function (y) { if (y) location.hash = hashWith('new', { car: c.id }); });
   }
   var SRC = { typed: 'Typed in', service: 'Service', handover: 'Hand-over', 'return': 'Return' };
 
@@ -257,8 +281,18 @@ var CarPage = (function () {
       if (ot > t && (!after || +o.km < +after.km)) after = o;
     });
     if (before && kmv < +before.km) return 'Lower than the reading of ' + M7.km(before.km) + ' on ' + dShort(before.at) + '. Odometers only go up.';
+    var c = car(carId), base = c ? +c.km || 0 : 0;
+    if (!after && base && kmv < base && (!before || base > +before.km)) return 'Lower than the reading of ' + M7.km(base) + ' on this car. Odometers only go up.';
     if (after && kmv > +after.km) return 'Higher than the later reading of ' + M7.km(after.km) + ' on ' + dShort(after.at) + '. Check the date.';
     return '';
+  }
+  /* a big jump from the reading before: worth a second look, not refused */
+  function kmJump(carId, kmv, at) {
+    var t = new Date(at).getTime(), before = null, c = car(carId);
+    (S.odometer || []).forEach(function (o) { if (o.car === carId && o.trusted !== false && new Date(o.at).getTime() <= t && (!before || +o.km > +before.km)) before = o; });
+    var base = before ? +before.km : (c ? +c.km || 0 : 0);
+    if (!base || kmv - base <= (window.HO_JUMP_KM || 50000)) return '';
+    return 'That is ' + M7.km(kmv - base) + ' more than the last reading' + (before ? ' on ' + dShort(before.at) : '') + ' (' + M7.km(base) + '). Is it right?';
   }
   function kmSheet(id) {
     var c = car(id); if (!c) return;
@@ -266,7 +300,7 @@ var CarPage = (function () {
     sheet(sheetHead('Update km', c.plate + ' · now ' + M7.km(cur)) +
       '<label class="field"><span>Odometer (km)</span><input class="inp num cr-kmin" id="crkm" inputmode="numeric" autocomplete="off" placeholder="For example ' + esc(cur ? (Math.round(cur / 100) * 100 + 300).toLocaleString('en-US') : '48200') + '"><small class="err" id="crkmerr" hidden></small></label>' +
       '<label class="field"><span>Read on</span><input class="inp" type="date" id="crkmd" max="' + toLocalInput(new Date()) + '" value="' + toLocalInput(new Date()) + '"></label>' +
-      '<p class="hint">Odometers only go up. A lower number is refused.</p>' +
+      '<p class="hint">Odometers only go up. A lower number is refused, a very big jump is asked about.</p>' +
       '<div class="sheet-foot"><button type="button" class="btn" id="crkmok">Save km</button></div>', function (sh) {
         var inp = $('#crkm', sh), err = $('#crkmerr', sh), dIn = $('#crkmd', sh);
         inp.addEventListener('input', function () { var d = inp.value.replace(/[^\d]/g, ''); inp.value = d ? (+d).toLocaleString('en-US') : ''; err.hidden = true; inp.classList.remove('bad'); });
@@ -277,11 +311,16 @@ var CarPage = (function () {
           if (at > new Date()) { err.textContent = 'The date cannot be in the future.'; err.hidden = false; return; }
           var pr = kmProblem(c.id, kmv, at);
           if (pr) { err.textContent = pr; err.hidden = false; inp.classList.add('bad'); return; }
-          S.odometer = S.odometer || [];
-          S.odometer.push({ id: uid(), car: c.id, km: kmv, at: at.toISOString(), source: 'typed', by: S.me, trusted: true, booking: null });
-          var prev = c.km; if (kmv > (+c.km || 0)) c.km = kmv;
-          audit('Odometer of ' + c.plate + ' updated to ' + M7.km(kmv), { car: c.id, link: '#car/' + c.id, changes: { km: [prev, c.km] } });
-          save(); closeSheet(); render(false, true); say('Saved: ' + M7.km(kmv));
+          var go = function () {
+            S.odometer = S.odometer || [];
+            S.odometer.push({ id: uid(), car: c.id, km: kmv, at: at.toISOString(), source: 'typed', by: S.me, trusted: true, booking: null });
+            var prev = c.km; M7.recalcKm(c);
+            audit('Odometer of ' + c.plate + ' updated to ' + M7.km(kmv), { car: c.id, link: '#car/' + c.id, changes: { km: [prev, c.km] } });
+            save(); closeSheet(); render(false, true); say('Saved: ' + M7.km(kmv));
+          };
+          var jw = kmJump(c.id, kmv, at);
+          if (!jw) return go();
+          confirm({ icon: 'warn', title: 'Check the km', text: jw, ok: 'Yes, save it', cancel: 'Fix the number', primary: 'cancel' }).then(function (y) { if (y) go(); else { inp.classList.add('bad'); try { inp.focus(); } catch (e) {} } });
         };
       });
   }
@@ -292,9 +331,27 @@ var CarPage = (function () {
       (rows.length ? '<div class="list cr-odolist">' + rows.map(function (o) {
         var b = o.booking && bk(o.booking);
         return '<div class="card2' + (o.trusted === false ? ' cr-untrusted' : '') + '"><div class="c2-main"><div class="c2-t1">' + esc(M7.km(o.km)) + ' ' + (o.trusted === false ? chip('Not trusted', 'amber') : '') + '</div><div class="c2-t2">' + esc(SRC[o.source] || o.source) + ' · ' + esc(dFull(o.at)) + (o.by ? ' · ' + esc(firstName(who(o.by))) : '') + (b ? ' · ' + esc(b.code) : '') + '</div>' +
-          (o.trusted === false ? '<div class="cr-why">' + esc(o.note || 'Not trusted') + '. It does not count toward the car’s km.</div>' : '') + '</div></div>';
+          (o.trusted === false ? '<div class="cr-why">' + esc(o.note || 'Not trusted') + '. It does not count toward the car’s km.</div>' : '') + '</div>' +
+          (o.trusted !== false && (can('cars.edit') || can('maintenance.edit')) ? '<button type="button" class="btn link sm cr-distrust" data-odo="' + o.id + '">Not trusted</button>' : '') + '</div>';
       }).join('') + '</div>' : '<div class="empty">No readings yet.</div>') +
-      ((can('cars.edit') || can('maintenance.create')) ? '<div class="sheet-foot"><button type="button" class="btn" onclick="CarPage.km(\'' + c.id + '\')">' + I('gauge') + 'Update km</button></div>' : ''), { full: rows.length > 6 });
+      ((can('cars.edit') || can('maintenance.create')) ? '<div class="sheet-foot"><button type="button" class="btn" onclick="CarPage.km(\'' + c.id + '\')">' + I('gauge') + 'Update km</button></div>' : ''), function (sh) {
+        sh.querySelectorAll('[data-odo]').forEach(function (bt) { bt.onclick = function () { distrust(c, bt.dataset.odo); }; });
+      }, { full: rows.length > 6 });
+  }
+  /* a wrong reading (a typing slip): it stops counting and the car's km is worked out again */
+  function distrust(c, oid) {
+    var o = (S.odometer || []).filter(function (x) { return x.id === oid; })[0]; if (!o) return;
+    var sh = sheet(sheetHead('Not trusted?', M7.km(o.km) + ' · ' + dFull(o.at)) +
+      '<p class="lead">This reading stops counting toward the car’s km. It stays in the history.</p>' +
+      '<label class="field"><span>Why?</span><input class="inp" id="crdtw" maxlength="120" placeholder="For example: typed one zero too many"></label>' +
+      '<div class="sheet-foot stack"><button type="button" class="btn" id="crdtok">Mark as not trusted</button><button type="button" class="btn link" onclick="closeSheet()">Keep it</button></div>', null, { stack: true });
+    $('#crdtok', sh).onclick = function () {
+      var why = $('#crdtw', sh).value.trim(), prev = c.km;
+      o.trusted = false; o.note = why || 'Marked as not trusted by ' + myName(); o.distrustedBy = S.me; o.distrustedAt = new Date().toISOString();
+      M7.recalcKm(c);
+      audit('Odometer reading of ' + c.plate + ' (' + M7.km(o.km) + ') marked as not trusted' + (why ? ': ' + why : ''), { car: c.id, link: '#car/' + c.id, changes: { km: [prev, c.km] } });
+      save(); closeSheet(true); setTimeout(function () { closeSheet(true); render(false, true); setTimeout(function () { odoHistory(c.id); say('Not trusted. The car is now at ' + M7.km(M7.odo(c.id))); }, 320); }, 60);
+    };
   }
 
   /* ---------- edit car details ---------- */
@@ -333,5 +390,5 @@ var CarPage = (function () {
 
   VIEWS.cars = listView;
   VIEWS.car = pageView;
-  return { open: function (id) { location.hash = '#car/' + id; }, edit: edit, km: kmSheet, kmProblem: kmProblem, odoHistory: odoHistory, photos: photos, zoomPhoto: zoomPhoto, SRC: SRC };
+  return { open: function (id) { location.hash = '#car/' + id; }, edit: edit, km: kmSheet, kmProblem: kmProblem, kmJump: kmJump, bookAnyway: bookAnyway, odoHistory: odoHistory, photos: photos, zoomPhoto: zoomPhoto, SRC: SRC };
 })();

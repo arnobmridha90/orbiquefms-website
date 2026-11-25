@@ -85,9 +85,13 @@ var Track = (function () {
   }
   function rowHtml(r) {
     var t = r.t, c = r.c, lim = limit(), bkNow = carNow(c.id), overSp = t.state === 'Moving' && t.speed >= lim, look = lookOf(r);
-    return '<div class="tr-row' + (overSp ? ' over' : '') + '"><a class="tr-main" href="#car/' + c.id + '"><span class="tr-plate">' + esc(c.plate) + '</span><span class="tr-sub">' + esc(c.make + ' ' + c.model) + (bkNow ? ' · ' + esc(bkNow.code) + ' ' + esc(firstName(cust(bkNow.cust).name)) : '') + '</span>' +
+    var cu = bkNow ? cust(bkNow.cust) : null, tel = cu && M7.telOf(cu.phone), off = t.state === 'Offline';
+    /* who has the car now, with call and WhatsApp right on the row */
+    var custRow = cu ? '<div class="tr-cust"><a class="tr-cname" href="#booking/' + bkNow.id + '"><b>' + esc(cu.name) + '</b><small>' + esc(bkNow.code) + '</small></a>' +
+      (tel ? '<a class="iconbtn tr-call" href="tel:' + esc(tel) + '" aria-label="Call ' + esc(cu.name) + '">' + I('phone') + '</a><button type="button" class="iconbtn tr-call wa" aria-label="WhatsApp ' + esc(cu.name) + '" onclick="Share.wa(\'' + esc(cu.phone) + '\',\'\')">' + I('wa') + '</button>' : '') + '</div>' : '';
+    return '<div class="tr-row' + (overSp ? ' over' : '') + '"><div class="tr-col"><a class="tr-main" href="#car/' + c.id + '"><span class="tr-plate">' + esc(c.plate) + '</span><span class="tr-sub">' + esc(c.make + ' ' + c.model) + '</span>' +
       '<span class="tr-line">' + chip(t.state, TONE[t.state]) + (t.state === 'Moving' ? '<b class="tr-speed">' + Math.round(t.speed) + ' km/h</b>' : '') + (overSp ? chip('Over ' + lim + ' km/h', 'red') : '') + (look === 'late' ? chip('Late return', 'red') : '') + (look === 'offline' || (look === 'late' && t.state === 'Offline') ? chip('Offline while on rent', 'amber') : '') +
-      '<span class="tr-ign">Ignition ' + (t.ignition ? 'on' : 'off') + '</span></span><span class="tr-ago">' + I('clock') + '<span data-ago="' + esc(t.at) + '">' + esc(agoText(t.at)) + '</span></span></a>' +
+      (off ? '' : '<span class="tr-ign">Ignition ' + (t.ignition ? 'on' : 'off') + '</span>') + '</span><span class="tr-ago">' + I('clock') + (off ? 'Last seen&nbsp;' : '') + '<span data-ago="' + esc(t.at) + '">' + esc(agoText(t.at)) + '</span>' + (off ? ', ignition was ' + (t.ignition ? 'on' : 'off') : '') + '</span></a>' + custRow + '</div>' +
       '<a class="tr-maps" target="_blank" rel="noopener" href="' + maps(t) + '" aria-label="Open ' + esc(c.plate) + ' in Maps">' + I('map') + '<span>Maps</span></a></div>';
   }
   function drawAlarms() {

@@ -186,7 +186,7 @@ function ldDrawer(id) {
         (mg && l.status !== 'closed' ? UI.btn('Close lead', { kind: 't', icon: 'circle-x', attrs: { 'data-ld': 'close' } }) : '') + '</div>' +
         (!mg ? '<p class="b2">' + i('lock') + ' Taking, closing or letting go of a car needs "Handle leads".</p>' : '') +
         '<div class="ld-h">Chat</div><div class="ld-chat">' + (l.msgs.length ? l.msgs.map(function (m) { return '<div class="ld-msg ' + m.dir + '"><div class="ld-bub">' + esc(m.text) + '</div><small>' + (m.dir === 'bot' ? 'Assistant' : m.dir === 'staff' ? 'Staff' : 'Customer') + ' · ' + tm(m.at) + ', ' + m.at.getDate() + ' ' + MON[m.at.getMonth()] + '</small></div>'; }).join('') : '<p class="b2 faint">No messages.</p>') + '</div>' +
-        '<a class="btn o sm ld-wa" href="https://wa.me/' + String(l.phone).replace(/\D/g, '') + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Reply on WhatsApp</a></div>';
+        '<a class="btn o sm ld-wa" href="' + UI.waLink(l.phone) + '" target="_blank" rel="noopener">' + i('brand-whatsapp') + 'Reply on WhatsApp</a></div>';
       var ch = el.querySelector('.ld-chat'); if (ch) ch.scrollTop = ch.scrollHeight;
     } });
   dr.el.addEventListener('click', function (ev) {

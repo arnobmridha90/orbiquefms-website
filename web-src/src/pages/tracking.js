@@ -16,6 +16,18 @@ function trPos(lat, lng) { return '<span class="tr-pos"><span class="num">' + la
 function trKm(a, b) { var R = 6371, r = Math.PI / 180, dLa = (b.lat - a.lat) * r, dLo = (b.lng - a.lng) * r, h = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLo / 2) * Math.sin(dLo / 2); return 2 * R * Math.asin(Math.sqrt(h)); }
 function trSeed(s) { var h = 2166136261; for (var k = 0; k < s.length; k++) { h ^= s.charCodeAt(k); h = Math.imul(h, 16777619); } return function () { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; }; }
 function trStateChip(t) { return UI.status('tracker', t.state) + (t.speed > trOver() ? ' ' + UI.chip('Over-speed', 'bad') : ''); }
+/* who has the car now: the booking it is out on (Car Delivered, or its rental time is now), so staff can tell a rented
+   car on the move from one that should be parked */
+function trLive(c) {
+  if (!c) return null; var now = NOW();
+  return D().bookings.filter(function (x) { return x.car === c && x.status !== 'Cancelled' && x.status !== 'Completed' && x.status !== 'Car Returned' && (x.status === 'Car Delivered' || (x.start <= now && x.end >= now)); })
+    .sort(function (a, b) { return (b.status === 'Car Delivered') - (a.status === 'Car Delivered') || a.start - b.start; })[0] || null;
+}
+function trWho(c, t) {
+  var x = trLive(c), now = NOW();
+  if (!x) return '<div class="tr-who">' + i('parking') + '<span>No booking now</span>' + (t && t.state === 'Moving' ? UI.chip('Moving, no booking', 'bad', { icon: 'alert-triangle' }) : '') + '</div>';
+  return '<div class="tr-who">' + i('user') + '<span>With <b>' + esc(x.cust.name) + '</b> · <button type="button" class="inv-link" data-tr-bk="' + x.code + '" data-stop>' + x.code + '</button> · ' + (x.end < now ? 'was due back ' : 'back ') + x.end.getDate() + ' ' + MON[x.end.getMonth()] + ', ' + tm(x.end) + '</span>' + (x.end < now ? UI.chip('Late', 'bad') : '') + '</div>';
+}
 function trAccChip(a) { return UI.chip(a.status, { Working: 'ok', Problem: 'bad', 'Switched off': 'grey', 'Not read yet': 'warn' }[a.status] || 'grey'); }
 
 /* trip points for one car between two days (made up but the same on every load) */
@@ -118,6 +130,7 @@ PAGES['tracking'] = {
       var tbl = UI.table(el.querySelector('#tr-t'), {
         columns: [
           { key: 'car', label: 'Car', sort: function (r) { return r.c.plate; }, render: function (r) { return mtCarCell(r.c); } },
+          { key: 'who', label: 'Booking', render: function (r) { return trWho(r.c, r.t); } },
           { key: 'name', label: 'Tracker', sort: function (r) { return r.t ? r.t.name : 'zz'; }, render: function (r) { return r.t ? esc(r.t.name) : '<span class="faint">None</span>'; } },
           { key: 'state', label: 'State', sort: function (r) { return r.state; }, render: function (r) { return r.t ? trStateChip(r.t) : noTr(r); } },
           { key: 'speed', label: 'Speed', align: 'right', sort: function (r) { return r.t ? r.t.speed : -1; }, render: function (r) { var t = r.t; return !t || t.state === 'Offline' ? '-' : '<span class="num' + (t.speed > trOver() ? ' tr-fast' : '') + '">' + t.speed + ' km/h</span>'; } },
@@ -125,15 +138,16 @@ PAGES['tracking'] = {
           { key: 'at', label: 'Last update', sort: function (r) { return r.t && r.t.at ? +r.t.at : 0; }, render: function (r) { return r.t && r.t.at ? UI.fmt.ago(r.t.at) : '<span class="faint">' + (r.t ? 'No report yet' : '-') + '</span>'; } },
           { key: 'pos', label: 'Position', render: function (r) { return r.t ? trPos(r.t.lat, r.t.lng) : '<span class="faint">Not tracked</span>'; } }
         ],
-        rows: rows(), density: 'compact', pageSize: false, minWidth: 880, rowClass: function (r) { return st.sel === r.id ? 'tr-selrow' : ''; },
+        rows: rows(), density: 'compact', pageSize: false, minWidth: 1040, rowClass: function (r) { return st.sel === r.id ? 'tr-selrow' : ''; },
         onRowClick: function (r) { if (!r.t) return; st.sel = st.sel === r.id ? null : r.id; drawMap(); tbl.setRows(rows()); },
-        card: function (r) { var t = r.t, c = r.c; if (!t) return '<div class="tr-mc"><div class="row between"><b>' + esc(c.plate) + '</b></div><div class="b2">' + esc(carName(c)) + '</div><div class="b2">' + noTr(r) + '</div></div>'; return '<div class="tr-mc"><div class="row between">' + (c ? '<b>' + esc(c.plate) + '</b>' : '<span class="faint">Not linked to a car</span>') + '<span>' + trStateChip(t) + '</span></div><div class="b2">' + esc(t.name) + (c ? ' · ' + esc(carName(c)) : '') + '</div><div class="b2">' + (t.state === 'Offline' ? '' : t.speed + ' km/h · ') + 'Ignition ' + (t.ign ? 'On' : 'Off') + ' · ' + (t.at ? UI.fmt.ago(t.at) : 'No report yet') + '</div>' + trPos(t.lat, t.lng) + '</div>'; },
+        card: function (r) { var t = r.t, c = r.c; if (!t) return '<div class="tr-mc"><div class="row between"><b>' + esc(c.plate) + '</b></div><div class="b2">' + esc(carName(c)) + '</div><div class="b2">' + noTr(r) + '</div>' + trWho(c, null) + '</div>'; return '<div class="tr-mc"><div class="row between">' + (c ? '<b>' + esc(c.plate) + '</b>' : '<span class="faint">Not linked to a car</span>') + '<span>' + trStateChip(t) + '</span></div>' + (c ? trWho(c, t) : '') + '<div class="b2">' + esc(t.name) + (c ? ' · ' + esc(carName(c)) : '') + '</div><div class="b2">' + (t.state === 'Offline' ? '' : t.speed + ' km/h · ') + 'Ignition ' + (t.ign ? 'On' : 'Off') + ' · ' + (t.at ? UI.fmt.ago(t.at) : 'No report yet') + '</div>' + trPos(t.lat, t.lng) + '</div>'; },
         empty: { icon: 'map-pin-off', title: items().length ? 'No car matches.' : 'No cars to show', text: items().length ? 'Clear the search or pick another state.' : 'Add cars on the Cars page.' }
       });
       var sp = spares();
       if (sp.length) el.querySelector('.tr-note').insertAdjacentHTML('beforeend', ' ' + plural(sp.length, 'spare tracker') + ' (' + sp.map(function (t) { return esc(t.name); }).join(', ') + ') ' + (sp.length === 1 ? 'is' : 'are') + ' on no car, so ' + (sp.length === 1 ? 'it is' : 'they are') + ' not on the map.');
       UI.on(el, 'click', '[data-tr-link]', function () { st.tab = 'accounts'; ctx.setParams({ tab: 'accounts' }); ctx.refresh(); });
       UI.on(el, 'click', '[data-tr-car]', function (ev, b) { ctx.api.editCar(b.getAttribute('data-tr-car')); });
+      UI.on(el, 'click', '[data-tr-bk]', function (ev, b) { ev.stopPropagation(); ctx.api.openBooking(b.getAttribute('data-tr-bk')); });
       var filt = function () {
         var c = counts();
         UI.filters(el.querySelector('#tr-f'), { values: st.f, fields: [{ type: 'chips', key: 'state', options: [['all', 'All cars', c.all], ['Moving', 'Moving', c.Moving, 'ok'], ['Parked', 'Parked', c.Parked, 'info'], ['Offline', 'Offline', c.Offline, 'grey']].concat(c.None ? [['None', 'No tracker', c.None, 'grey']] : []) }, { type: 'search', key: 'q', placeholder: 'Search plate, car or tracker' }],
@@ -225,7 +239,7 @@ PAGES['tracking'] = {
         card: function (x) { var c = carById(x.car); return '<div class="tr-mc"><div class="row between"><b>' + (c ? esc(c.plate) : '') + '</b>' + UI.chip(x.type, /SOS|Power|speed/.test(x.type) ? 'bad' : 'warn') + '</div><div class="b2">' + UI.fmt.dateTime(x.at) + '</div>' + trPos(x.lat, x.lng) + '</div>'; },
         empty: { icon: 'bell-off', title: 'No alarms in this time.', text: 'Pick other dates or another car.' } });
       UI.filters(el.querySelector('#tr-af'), { values: st.af, fields: [
-        { type: 'select', key: 'car', label: 'Car', options: mtCarOpts(true), all: 'All cars' },
+        UI.carFilter({ key: 'car', label: 'Car', all: 'All cars' }),
         { type: 'select', key: 'type', label: 'Alarm', options: LISTS.alarmTypes, all: 'All alarms' },
         { type: 'daterange', from: 'from', to: 'to', label: 'Dates' }], onChange: function () { tbl.setRows(rows()); } });
     }

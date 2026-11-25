@@ -12,6 +12,8 @@ function normRef(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g,
 function payDepositLeft(b) {
   /* a cancelled booking holds all the money paid on it (kept as credit or waiting to be refunded): the same figure as Deposits */
   if (b.bookingStatus === 'Cancelled' && typeof Deposit !== 'undefined') { var x = Deposit.info(b); return x.refund ? 0 : x.net; }
+  /* a deposit that was returned (and not opened again) has nothing left to pay with */
+  if (typeof Deposit !== 'undefined' && Deposit.refundsOf && Deposit.refundsOf(b.id).length && Deposit.info(b).refund) return 0;
   var got = activePays(b).reduce(function (s, p) { return s + (p.items || []).reduce(function (t, i) { return t + (i.kind === 'Security deposit' ? (i.after != null ? +i.after || 0 : +i.amt || 0) : 0); }, 0); }, 0);
   var kept = (S.deductions || []).filter(function (d) { return d.booking === b.id; }).reduce(function (s, d) { return s + (+d.amt || 0); }, 0);
   var back = (S.refunds || []).filter(function (r) { return r.booking === b.id && !r.voided; }).reduce(function (s, r) { return s + (+r.amt || 0); }, 0);
@@ -68,6 +70,8 @@ function payFindDup(hash, ref, exceptPayId) {
   return hit;
 }
 function payDupText(d) { return 'This slip was already recorded on ' + d.b.code + ' on ' + dFull(d.p.made || d.p.at) + ' (' + cust(d.b.cust).name + ', ' + rm(payTotal(d.p)) + (d.p.ref ? ', reference ' + d.p.ref : '') + ')'; }
+/* the car has not come back yet: its own deposit is still the security for the rental */
+function payDepHeld(b) { return ['Car Returned', 'Completed', 'Cancelled'].indexOf(b.bookingStatus) < 0; }
 function payRerender() { var n = route().name; if (n === 'booking' || n === 'invoices' || n === 'deposit' || n === 'deposits' || n === 'home' || n === 'money') render(false, true); }
 
 var Pay = (function () {
@@ -108,12 +112,12 @@ var Pay = (function () {
     if (p.voided) return [];
     var said = [];
     p.voided = true; p.voidReason = reason; p.voidedAt = new Date().toISOString(); p.voidedBy = S.me;
-    var r = Docs.dropPayment(b, p); if (r) said.push(r.voided ? 'Receipt ' + r.receipt.no + ' is voided too (no payments left on it)' : 'It is taken off receipt ' + r.receipt.no);
+    var r = Docs.dropPayment(b, p); if (r) said.push(r.voided ? 'Receipt ' + r.receipt.no + ' is voided too (no payments left on it)' + (r.receipt.sent ? '. It was already sent: tell the customer' : '') : 'It is taken off receipt ' + r.receipt.no + (r.receipt.sent ? ', which was already sent: send the new one' : ''));
     if (p.method === 'Deposit adjustment') {
       var ded = (S.deductions || []).filter(function (d) { return d.paymentId === p.id; });
       S.deductions = (S.deductions || []).filter(function (d) { return d.paymentId !== p.id; });
       if (ded.length) { var src = bk(ded[0].booking) || b; said.push(rm(ded[0].amt) + ' is given back to the deposit of ' + src.code); if (src.id !== b.id) bLog(src, rm(ded[0].amt) + ' given back to the deposit (payment on ' + b.code + ' voided)'); }
-      if (typeof Deposit !== 'undefined' && Deposit.sync) { try { if (Deposit.sync(ded.length ? ded[0].booking : (p.depositOf || b.id))) said.push('The deposit is waiting to be returned again'); } catch (e) { console.error(e); } }
+      if (typeof Deposit !== 'undefined' && Deposit.sync) { try { var sid = ded.length ? ded[0].booking : (p.depositOf || b.id), sb2 = bk(sid); if (Deposit.sync(sid)) { var xi = sb2 ? Deposit.info(sb2) : null; said.push(xi && xi.earlier.length ? rm(xi.net) + ' is now owed to ' + cust(sb2.cust).name + ': return it from Deposits' : 'The deposit is waiting to be returned again'); } } catch (e) { console.error(e); } }
     }
     bLog(b, 'Payment of ' + rm(payTotal(p)) + ' voided: ' + reason);
     var st = statusAfterVoid(b); if (st != null) said.push(st ? 'The booking is back to ' + st : 'The payment status is cleared');
@@ -132,6 +136,7 @@ var Pay = (function () {
     var bm = b.method === 'Online Transfer' || b.method === 'Card' || b.method === 'Cash' ? b.method : 'Online Transfer';
     var st = { items: KIND_ORDER.map(function (k) { return { kind: k, on: preset.indexOf(k) >= 0, amt: '', touched: false }; }), method: bm, cashTo: S.me, after: null, depOf: 'this', other: null,
       atMode: 'now', date: toLocalInput(new Date()), time: toTimeInput(new Date()), ref: '', note: '', receipt: can('billing.issue_receipt'), status: null, checked: false, err: '' };
+    if (opts.method === 'Deposit adjustment') { st.method = 'Deposit adjustment'; st.items[0].on = false; if (!st.items.some(function (i) { return i.on; })) st.items[1].on = true; if (payDepHeld(b)) st.depOf = 'other'; }
     if (opts.amount != null && st.items.filter(function (i) { return i.on; })[0]) { var f = st.items.filter(function (i) { return i.on; })[0]; f.amt = money2(opts.amount); f.touched = true; }
     var sh = sheet(sheetHead('Record payment', b.code + ' · ' + cust(b.cust).name) + '<div class="pay-body"></div>', null, { full: true, cls: 'pay-sheet',
       guard: function () { return st.dirty && !st.done ? { title: 'Close without recording?', text: 'What you typed will be lost.', ok: 'Close anyway', cancel: 'Keep editing' } : null; } });
@@ -196,10 +201,12 @@ var Pay = (function () {
         (st.afterErr ? '<span class="err">' + esc(st.afterErr) + '</span>' : '') + (st.afterErr && st.after != null ? '<span class="hint"><button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button></span>' : st.afterErr ? '' : '<span class="hint" id="payafterh">' + (st.after != null ? 'Changed by hand. <button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button>' : cardHint()) + '</span>') + '</label>';
       if (fromDep) {
         var sb = srcBooking(), left = sb ? payDepositLeft(sb) : 0;
-        var thisLeft = payDepositLeft(b), thisOff = thisLeft <= 0.004;
-        h += '<div class="field"><span>Deposit of</span><div class="seg pay-depof"><button type="button" class="' + (st.depOf === 'this' ? 'on' : '') + '" data-depof="this"' + (thisOff ? ' disabled' : '') + '>This booking (' + esc(b.code) + ')' + (thisOff ? '<small>No deposit left</small>' : '') + '</button><button type="button" class="' + (st.depOf === 'other' ? 'on' : '') + '" data-depof="other">Another booking</button></div>' +
+        var thisLeft = payDepositLeft(b), thisOff = thisLeft <= 0.004, held = payDepHeld(b);
+        h += '<div class="field"><span>Deposit of</span><div class="seg pay-depof"><button type="button" class="' + (st.depOf === 'this' ? 'on' : '') + '" data-depof="this"' + (thisOff ? ' disabled' : '') + '>This booking (' + esc(b.code) + ')' + (thisOff ? '<small>No deposit left</small>' : held && st.depOf !== 'this' ? '<small>Kept until the car is back</small>' : '') + '</button><button type="button" class="' + (st.depOf === 'other' ? 'on' : '') + '" data-depof="other">Another booking</button></div>' +
           (st.depOf === 'other' ? '<button type="button" class="carfield ' + (sb ? 'picked-car' : 'empty-car') + '" id="payother">' + I('list') + '<span class="grow">' + (sb ? '<span class="pk-plate pay-pn">' + esc(sb.code) + ' · ' + esc(cust(sb.cust).name) + '</span><span class="pk-sub">Deposit left <span class="money">' + rm(left) + '</span></span>' : 'Choose the booking whose deposit pays this') + '</span>' + I('chev') + '</button>' + (st.otherErr ? '<span class="err">' + esc(st.otherErr) + '</span>' : '') : '') +
-          (sb ? '<span class="hint">No money comes in: the amount is taken off the deposit of ' + esc(sb.code) + ' (' + rm(left) + ' left) and the refund of that deposit is smaller by the same amount.</span>' : '') + '</div>';
+          (sb ? '<span class="hint">No money comes in: the amount is taken off the deposit of ' + esc(sb.code) + ' (' + rm(left) + ' left) and the refund of that deposit is smaller by the same amount.</span>' : '') +
+          (sb && sb.id === b.id && held ? '<span class="hint tone-amber-text">The car is not back yet, so this deposit is still its security. Using it leaves ' + rm(Math.max(0, left - total())) + ' to cover damage, fuel or late return.</span>' : '') +
+          (sb && sb.cust !== b.cust ? '<span class="hint tone-amber-text">This deposit belongs to ' + esc(cust(sb.cust).name) + ', not ' + esc(cust(b.cust).name) + '.</span>' : '') + '</div>';
       }
       /* when */
       h += '<div class="pay-h">Received on</div><div class="chiprow pay-when">' + [['now', 'Now'], ['earlier', 'Earlier today'], ['yesterday', 'Yesterday']].map(function (x) { return '<button type="button" class="fchip' + (st.atMode === x[0] ? ' on' : '') + '" data-when="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
@@ -245,6 +252,8 @@ var Pay = (function () {
           var d = st.items[0]; if (d.on) { d.on = false; d.touched = false; say('A security deposit cannot be paid from a deposit'); if (!ticked().length) st.items[1].on = true; }
           /* nothing left on this booking's deposit: go straight to another booking's */
           if (st.depOf === 'this' && payDepositLeft(b) <= 0.004) { st.depOf = 'other'; suggest(); draw(); if (!st.other) pickOther(); return; }
+          /* the car is not back: its own deposit stays as security, so another booking's deposit is the default */
+          if (st.depOf === 'this' && payDepHeld(b) && !st.depOk) st.depOf = 'other';
         }
         suggest(); draw();
       }; });
@@ -256,7 +265,11 @@ var Pay = (function () {
       var pc = $('#paycash', body); if (pc) pc.onclick = function () { Pickers.staff({ title: 'Who has the cash?', selected: [st.cashTo], onPick: function (p) { if (p) { st.cashTo = p.id; draw(); } } }); };
       var pa = $('#payafter', body); if (pa) pa.oninput = function () { st.after = pa.value; st.afterErr = ''; pa.classList.remove('bad'); var hh = $('#payafterh', body); if (hh) hh.innerHTML = 'Changed by hand. <button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button>'; var rr = $('#payafterr', body); if (rr) rr.onclick = function () { st.after = null; draw(); }; };
       var par = $('#payafterr', body); if (par) par.onclick = function () { st.after = null; draw(); };
-      $$('[data-depof]', body).forEach(function (el) { el.onclick = function () { st.depOf = el.dataset.depof; st.otherErr = ''; suggest(); draw(); if (st.depOf === 'other' && !st.other) pickOther(); }; });
+      $$('[data-depof]', body).forEach(function (el) { el.onclick = function () {
+        var to = el.dataset.depof, go = function () { st.depOf = to; st.otherErr = ''; suggest(); draw(); if (st.depOf === 'other' && !st.other) pickOther(); };
+        if (to === 'this' && payDepHeld(b) && !st.depOk) { askOwnDeposit().then(function (y) { if (y) { st.depOk = true; go(); } }); return; }
+        go();
+      }; });
       var po = $('#payother', body); if (po) po.onclick = pickOther;
       $$('[data-when]', body).forEach(function (el) { el.onclick = function () {
         st.atMode = el.dataset.when; st.atErr = ''; var n = new Date();
@@ -274,9 +287,14 @@ var Pay = (function () {
       $('#paysts', body).onchange = function () { st.status = this.checked; };
       $('#paygo', body).onclick = submit;
     }
+    /* using a booking's own deposit before the car is back */
+    function askOwnDeposit() {
+      var left = payDepositLeft(b);
+      return confirm({ icon: 'warn', title: 'Use the deposit before the car is back?', text: 'The deposit of ' + b.code + ' (' + rm(left) + ') is the security for this rental. The car is not back yet, so whatever you use now is not there to cover damage, fuel or a late return.', ok: 'Use it anyway', cancel: 'Keep the deposit', primary: 'cancel' });
+    }
     function pickOther() {
       Pickers.booking({ title: 'Whose deposit pays this?', filter: function (x) { return x.id !== b.id && payDepositLeft(x) > 0; }, selected: st.other,
-        first: function (x) { return x.cust === b.cust; }, firstLabel: 'Same customer first', sub: function (x) { return '<span class="pk-dep"><small>Deposit left</small><b class="money">' + rm(payDepositLeft(x)) + '</b></span>'; }, onPick: function (x) { st.other = x.id; st.otherErr = ''; suggest(); draw(); } });
+        first: function (x) { return x.cust === b.cust; }, firstLabel: 'Same customer: ' + cust(b.cust).name, otherLabel: 'Other customers', sub: function (x) { return '<span class="pk-dep"><small>Deposit left</small><b class="money">' + rm(payDepositLeft(x)) + '</b></span>'; }, onPick: function (x) { st.other = x.id; st.otherErr = ''; suggest(); draw(); } });
     }
     function submit() {
       st.checked = true; st.err = ''; st.afterErr = ''; st.otherErr = ''; st.atErr = '';
@@ -298,10 +316,18 @@ var Pay = (function () {
         var charge = Math.round((tot - after) * 100) / 100, take = payChargeLine(lines);
         if (charge >= 0 && take && take.amt >= charge) lines.forEach(function (l) { l.after = Math.round((l.amt - (l === take ? charge : 0)) * 100) / 100; });
       }
-      payOverAsk(payOver(b, lines)).then(function (go) {
+      var asks = Promise.resolve(true);
+      if (fromDep && (src || b).id === b.id && payDepHeld(b) && !st.depOk) asks = asks.then(function (ok) { return ok && askOwnDeposit().then(function (y) { if (y) st.depOk = true; return y; }); });
+      var other = fromDep && src && src.cust !== b.cust;
+      if (other) asks = asks.then(function (ok) { return ok && confirm({ icon: 'warn', title: 'Use another customer’s deposit?', text: 'This deposit belongs to ' + cust(src.cust).name + ' (' + src.code + '). Use ' + rm(tot) + ' of it to pay ' + cust(b.cust).name + '’s booking ' + b.code + '? ' + firstName(cust(src.cust).name) + ' gets ' + rm(tot) + ' less back.', ok: 'Yes, use it', cancel: 'Go back', primary: 'cancel' }); });
+      var dupRef = !fromDep && String(st.ref || '').trim() ? payFindDup(null, st.ref) : null;
+      if (dupRef) asks = asks.then(function (ok) { return ok && confirm({ icon: 'warn', title: 'Reference already used', text: payDupText(dupRef).replace(/^This slip was/, 'Reference ' + String(st.ref).trim() + ' was') + '. Check it is not the same money twice.', ok: 'Record anyway', cancel: 'Go back and check', primary: 'cancel' }); });
+      asks.then(function (ok) { return ok ? payOverAsk(payOver(b, lines)) : false; }).then(function (go) {
         if (!go) return;
         var ps = previewStatus(), stOn = st.status != null ? st.status : !!ps;
         var res = record(b, { items: lines, method: st.method, cashTo: st.cashTo, afterCharge: after, depositOf: fromDep ? (src || b).id : null, ref: st.ref, note: st.note, at: at, issueReceipt: st.receipt && can('billing.issue_receipt'), updateStatus: stOn });
+        if (other) { bLog(b, 'Paid from the deposit of another customer: ' + cust(src.cust).name + ' (' + src.code + '), confirmed by ' + myName()); bLog(src, rm(tot) + ' of this deposit paid ' + cust(b.cust).name + '’s booking ' + b.code + ' (another customer), confirmed by ' + myName()); save(); }
+        if (dupRef) { bLog(b, 'Recorded with reference ' + String(st.ref).trim() + ', also on ' + dupRef.b.code + ' (checked by ' + myName() + ')'); save(); }
         success(res);
         payRerender();
       });
@@ -367,8 +393,10 @@ var Pay = (function () {
   function askVoid(b, p, done) {
     if (!can('billing.void')) { say('Ask the owner for Void payments access'); return; }
     var dep = (p.items || []).some(function (i) { return i.kind === 'Security deposit'; });
+    var srcB = p.method === 'Deposit adjustment' ? (bk(p.depositOf) || b) : null, srcR = srcB && typeof Deposit !== 'undefined' ? Deposit.refundOf(srcB.id) : null;
     sheet('<div class="confirm"><div class="confirm-ic danger">' + I('warn', 2) + '</div><h3>Void this payment of ' + rm(payTotal(p)) + '?</h3><p class="lead">It stays on record, marked VOID, and comes off the booking’s receipt.' +
-      (p.method === 'Deposit adjustment' ? ' The amount goes back to the deposit it was taken from.' : '') + (dep && b.paymentStatus === 'Deposit Received' ? ' The booking may go back to Deposit Due.' : '') + '</p>' +
+      (p.method === 'Deposit adjustment' && !srcR ? ' The amount goes back to the deposit it was taken from.' : '') + (dep && b.paymentStatus === 'Deposit Received' ? ' The booking may go back to Deposit Due.' : '') + '</p>' +
+      (srcR ? '<div class="banner amber pay-voidret">' + I('bank') + '<div><b>The deposit of ' + esc(srcB.code) + ' was ' + (+srcR.amt > 0 ? 'returned' : 'closed') + ' on ' + esc(dFull(srcR.at)) + '.</b> Voiding puts ' + rm(payTotal(p)) + ' back on it, so ' + esc(cust(srcB.cust).name) + ' is owed ' + rm(payTotal(p)) + ' more. It goes back to Deposits, To refund.</div></div>' : '') +
       '<label class="field"><span>Reason</span><textarea class="inp" id="pvr" rows="2" maxlength="300" placeholder="For example: wrong amount"></textarea><span class="err" id="pvre" hidden>Type why it is being voided</span></label>' +
       '<div class="sheet-foot stack"><button type="button" class="btn danger solid" id="pvgo">Void payment</button><button type="button" class="btn link" onclick="closeSheet()">Keep it</button></div></div>', function (sh) {
         setTimeout(function () { var t = $('#pvr', sh); if (t) t.focus(); }, 300);

@@ -64,7 +64,7 @@ VIEWS.bookings = function (r) {
   var f = BK_TESTS[r.a] ? r.a : 'upcoming';
   var nUp = S.bookings.filter(BK_TESTS.upcoming).length, nRoad = S.bookings.filter(BK_TESTS.road).length;
   var html = topbar('Bookings', { sub: nUp + ' upcoming · ' + nRoad + ' on the road' }) + '<main class="bkpage">' +
-    '<div class="bk-tools"><label class="search bk-search">' + I('search') + '<input id="bkq" type="search" placeholder="Name, phone, plate, no." value="' + esc(bkSearch) + '" autocomplete="off" enterkeyhint="search">' +
+    '<div class="bk-tools"><label class="search bk-search">' + I('search') + '<input id="bkq" type="search" placeholder="Name, phone, IC, plate, no." value="' + esc(bkSearch) + '" autocomplete="off" enterkeyhint="search">' +
     '<button type="button" class="bk-clear" id="bkclear" aria-label="Clear search"' + (bkSearch ? '' : ' hidden') + '>' + I('x', 2.2) + '</button></label>' +
     '<button type="button" class="bk-fbtn' + (bkFilterCount() ? ' on' : '') + '" id="bkfbtn" onclick="bkFilterSheet()">' + I('filter') + '<span>Filters</span>' + (bkFilterCount() ? '<b class="bk-badge">' + bkFilterCount() + '</b>' : '') + '</button></div>' +
     '<div class="bk-quick"><a href="#availability">' + I('car') + 'Free cars</a><a href="#calendar">' + I('cal') + 'Calendar</a></div>' +
@@ -183,12 +183,22 @@ function bkNextStep(b) {
   if ((st === 'Agreement Signed' || st === 'Car Delivered') && !canHand) return null;
   if (st === 'Pending' || st === 'Confirmed') return { label: 'Send agreement', icon: 'send', on: 'bkSendAgreement(' + id + ')', hint: 'Sends the booking form link to the customer' };
   if (st === 'Agreement Sent') return { label: 'Mark signed', icon: 'check', on: 'bkMarkSigned(' + id + ')', hint: 'Waiting for the customer to sign the form' };
-  if (st === 'Agreement Signed') return { label: 'Hand over the car', icon: 'key', on: 'Handover.start(' + id + ',\'out\')', hint: 'Ends at Car Delivered' };
+  if (st === 'Agreement Signed') { var oo = typeof hoCarOutWith === 'function' ? hoCarOutWith(b) : null; if (oo && bkStillOut(b)) return null; return { label: 'Hand over the car', icon: 'key', on: 'Handover.start(' + id + ',\'out\')', hint: 'Ends at Car Delivered' }; }
   if (st === 'Car Delivered') return { label: 'Take the car back', icon: 'in', on: 'Handover.start(' + id + ',\'in\')', hint: isLate(b) ? 'The car is late. It was due back ' + when(b.end) : 'Ends at Car Returned' };
   if (st === 'Car Returned') return { label: 'Complete', icon: 'check', on: 'completeBk(' + id + ')', hint: b.paymentStatus === 'Refund Pending' ? 'The deposit is still waiting to be returned' : 'Closes the booking' };
   return null;
 }
 function bkRepeat(b) { return repeatText(b.cust, b.id); }
+/* the car of an upcoming booking is still out on another booking: the booking page says so instead of offering a plain handover */
+function bkStillOut(b) {
+  if (UPCOMING.indexOf(b.bookingStatus) < 0 || typeof hoCarOutWith !== 'function') return '';
+  var o = hoCarOutWith(b); if (!o) return '';
+  /* only once it matters: the other rental is late or runs into this one, or this one starts within a day */
+  if (!(isLate(o) || new Date(o.end) > new Date(b.start) || new Date(b.start).getTime() < Date.now() + DAY)) return '';
+  return '<div class="banner red bk-cb bk-stillout">' + I('car') + '<div><b>' + esc(hoCarOutText(b, o)) + '</b>Take it back before you hand it over, or give this booking another car.' +
+    '<div class="ho-bact">' + (can('bookings.change_status') || can('bookings.edit') || (o.assigned || []).indexOf(S.me) >= 0 ? '<button type="button" class="btn sm" onclick="Handover.start(\'' + o.id + '\',\'in\')">' + I('in') + 'Take back first</button>' : '') +
+    '<a class="btn sm ghost" href="#booking/' + o.id + '">Open ' + esc(o.code) + '</a>' + (can('bookings.edit') ? '<button type="button" class="btn sm ghost" onclick="editBk(\'' + b.id + '\')">Change car</button>' : '') + '</div></div></div>';
+}
 function bkCustBanner(b, cu) {
   var notes = (S.notes || []).filter(function (n) { return n.cust === cu.id; }).sort(function (a, z) { return (z.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || new Date(z.at) - new Date(a.at); });
   var lines = function (flag) { return notes.filter(function (n) { return n.flag === flag; }).slice(0, 2).map(function (n) { return n.text; }); };
@@ -199,6 +209,20 @@ function bkCustBanner(b, cu) {
   if (notes.length) return box('blue', 'note', 'Notes about this customer', lines('info').concat([rep]));
   if (rep) return box('blue', 'user', rep, []);
   return '';
+}
+/* the customer's licence: red when it has expired, amber when it ends before the car comes back (same look as the car papers banner) */
+function licenceState(cu, endIso) {
+  var exp = cu && cu.licenceExp; if (!exp) return null;
+  var today = toLocalInput(new Date()), d = dFull(exp + 'T00:00:00');
+  if (exp < today) return { tone: 'red', text: 'Licence expired on ' + d };
+  if (endIso && exp < toLocalInput(endIso)) return { tone: 'amber', text: 'Licence ends on ' + d + ', before the car comes back' };
+  return null;
+}
+function bkLicBanner(b, cu) {
+  if (b.bookingStatus === 'Completed' || b.bookingStatus === 'Cancelled' || b.bookingStatus === 'Car Returned') return '';
+  var ls = licenceState(cu, b.end); if (!ls) return '';
+  return '<div class="banner ' + ls.tone + ' bk-cb">' + I('warn') + '<div><b>' + esc(ls.text) + '</b>' + (ls.tone === 'red' ? 'Do not hand over the car until the customer shows a valid licence.' : 'Check the new licence before the handover.') +
+    (byId(S.customers, cu.id) && can('customers.edit') ? '<div><button type="button" class="btn sm ghost" onclick="Cust.open(\'' + cu.id + '\')">Update the licence</button></div>' : '') + '</div></div>';
 }
 function bkCarBanner(b, c) {
   if (!c || b.bookingStatus === 'Completed' || b.bookingStatus === 'Cancelled') return '';
@@ -281,11 +305,15 @@ function bkShareSheet(id, kind) {
       $('#bkcp', sh).onclick = function () { Share.copy(Links.form(b), 'Link copied'); sent('copy'); };
     });
 }
-function bkMarkSigned(id) {
+function bkMarkSigned(id, o) {
+  o = o || {};
   confirm({ icon: 'info', title: 'Mark the form as signed?', text: 'Do this only when the customer signed on paper or told you they signed. Normally the form marks itself when they sign.', ok: 'Yes, mark signed', cancel: 'Go back' }).then(function (yes) {
     if (!yes) return; var b = bk(id), prev = b.bookingStatus;
     b.submitted = true; b.submittedAt = b.submittedAt || new Date().toISOString();
+    /* picked as a status from a later step (Car Delivered back to Agreement Signed): the rules only move early statuses */
+    if (o.to && EARLY.indexOf(prev) < 0 && prev !== 'Agreement Signed') b.bookingStatus = 'Agreement Signed';
     var ch = applyStatusRules(b, prev);
+    if (o.done) o.done();
     bLog(b, 'Form marked as signed by ' + myName() + (ch.length ? ' (' + ch.join(', ') + ')' : ''), { bookingStatus: [prev, b.bookingStatus] }); save();
     notify('change', b.code + ' is signed', '', '#booking/' + id, { self: true }); render(false, true);
   });
@@ -327,11 +355,21 @@ function bkDepositChip(b) {
   var ps = b.paymentStatus;
   if (ps === 'Refund Pending') {
     var x = typeof Deposit !== 'undefined' ? Deposit.info(b) : { net: calcBooking(b).depositReceived, basis: calcBooking(b).depositReceived };
+    var dueNow = b.bookingStatus !== 'Cancelled' && can('billing.record_payment') ? bkDueFromDeposit(b, x) : null;
+    if (dueNow) return '<div class="bk-dep wait bk-dep-due">' + I('cash') + '<div class="grow"><b>' + rm(dueNow.due) + ' still due. Use the deposit for it?</b><small>' + rm(x.net) + ' deposit held' + (dueNow.left > 0.004 ? ', then ' + rm(dueNow.left) + ' goes back' : ', so nothing goes back') + '</small>' +
+      '<div class="ho-bact"><button class="btn sm" onclick="Pay.open(\'' + b.id + '\',{method:\'Deposit adjustment\',kinds:[\'Rental payment\'],amount:' + dueNow.use + '})">Use ' + rm(dueNow.use) + ' of the deposit</button><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">Deposit details</button></div></div></div>';
     return '<div class="bk-dep wait">' + I('bank') + '<div class="grow"><b>' + (b.bookingStatus === 'Cancelled' ? 'Money paid: waiting to be returned' : 'Deposit: waiting to be returned') + '</b><small>' + rm(Math.max(0, x.net)) + (Math.abs(x.net - x.basis) > 0.009 ? ' of ' + rm(x.basis) : '') + ' to return' + (b.refundPendingAt ? ' · since ' + dShort(b.refundPendingAt) : '') + '</small></div><button class="btn sm" onclick="Deposit.open(\'' + b.id + '\')">' + (b.bookingStatus === 'Cancelled' ? 'Return the money' : 'Return the deposit') + '</button></div>';
   }
   if (b.bookingStatus === 'Cancelled' && b.cancelMoney === 'credit' && typeof Deposit !== 'undefined') { var xc = Deposit.info(b); if (!xc.refund && xc.net > 0.004) return '<div class="bk-dep wait">' + I('cash') + '<div class="grow"><b>Kept as credit for the customer</b><small>' + rm(xc.net) + ' left to use on a later booking</small></div><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">Details</button></div>'; }
   if (ps === 'Deposit Refunded') return '<div class="bk-dep done">' + I('check', 2.2) + '<div class="grow"><b>' + (function () { var xr = typeof Deposit !== 'undefined' ? Deposit.info(b) : null, cx = b.bookingStatus === 'Cancelled'; if (xr && xr.state === 'used') return (cx ? 'Money paid' : 'Deposit') + ': used for payments'; if (xr && xr.refund && !(+xr.refund.amt > 0)) return cx ? (b.cancelMoney === 'fee' ? 'Money paid: kept as cancellation fee' : 'Money paid: kept, nothing returned') : 'Deposit: kept, nothing returned'; return cx ? 'Money paid: returned to the customer' : 'Deposit: returned to the customer'; })() + '</b></div><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">See details</button></div>';
   return '';
+}
+/* rent still owed while the deposit waits to go back: how much of the deposit can pay it ({due, use, left}) or null */
+function bkDueFromDeposit(b, x) {
+  var m = calcBooking(b), rentL = typeof payLeft === 'function' ? payLeft(b, 'Rental payment', []) : m.due;
+  if (!(m.due > 0.99) || !(rentL > 0.99) || !(x && x.net > 0.004) || x.refund) return null;
+  var use = Math.round(Math.min(rentL, m.due, x.net) * 100) / 100;
+  return { due: m.due, use: use, left: Math.max(0, Math.round((x.net - use) * 100) / 100) };
 }
 function bkInspection(b) {
   var ins = b.inspection || {}, ag = ins.agent, cu = ins.customer;
@@ -361,6 +399,8 @@ function bkStaff(b) {
 
 VIEWS.booking = function (r) {
   var b = bk(r.a); if (!b) return { html: topbar('Booking', { back: '#bookings' }) + '<main><div class="empty">This booking is not here any more.</div></main>' };
+  /* a deposit used up by payments shows as used only once the car is back (and opens again when money is put back on it) */
+  if (typeof Deposit !== 'undefined' && (b.paymentStatus === 'Refund Pending' || b.paymentStatus === 'Deposit Refunded')) { try { Deposit.sync(b.id); } catch (e) { console.error(e); } }
   var c = car(b.car) || {}, cu = cust(b.cust), p = calcBooking(b), st = b.bookingStatus, seeAmt = can('bookings.see_amounts');
   var step = bkNextStep(b), canEdit = can('bookings.edit') && st !== 'Cancelled' && st !== 'Completed';
   var dueTag = !seeAmt || st === 'Cancelled' ? '' : p.overpaid ? '<span class="small b bal extra">' + rm(p.overpaid) + ' overpaid, to refund</span>' : p.due > 0 ? '<span class="small b bal due">' + rm(p.due) + ' to collect</span>' : '<span class="small b bal paid">Paid in full</span>';
@@ -371,7 +411,7 @@ VIEWS.booking = function (r) {
     '<button class="btn sm ghost" onclick="Docs.open(\'' + b.id + '\')">' + I('receipt') + 'Invoice and receipts</button></div>' : '';
   var tel = String(cu.phone || '').replace(/[^\d+]/g, '');
   var html = topbar(b.code, { back: '#bookings', sub: 'Made ' + ago(b.created) + (b.source && b.source !== 'Staff' ? ' on ' + b.source : ' by ' + who(b.createdBy)) }) + '<main class="bkd">' +
-    bkCustBanner(b, cu) + bkCarBanner(b, c) +
+    bkCustBanner(b, cu) + bkLicBanner(b, cu) + bkCarBanner(b, c) + bkStillOut(b) +
     '<div class="hero"><div class="bk-hchips">' + statusChip(b) + payChip(b) + '<span class="chip tone-grey">' + esc(p.duration) + '</span></div>' +
     '<div class="carpic">' + carSVG(c.color, c.shape) + '</div>' +
     '<h3>' + esc(cu.name) + '</h3><div class="muted small">' + esc((c.make || '') + ' ' + (c.model || '')) + ' · <b style="color:var(--text)">' + esc(c.plate || '') + '</b>' + (b.cover ? ' · ' + esc(b.cover.name) : '') + '</div>' +
@@ -428,7 +468,7 @@ function bkStatusPick(id, axis) {
         if (isB && v === 'Cancelled') { closeSheet(true); setTimeout(function () { cancelBk(id); }, 30); return; }
         if (isB && (cur === 'Cancelled' || cur === 'Completed') && v !== 'Cancelled' && v !== 'Completed') { var cl = bkClash(b); if (cl) { closeSheet(true); setTimeout(function () { bkClashSheet(b, cl); }, 30); return; } }
         if (isB && cur === 'Cancelled' && v !== 'Completed') { delete b.cancelMoney; if (b.paymentStatus === 'Refund Pending' && !(window.Deposit && Deposit.refundOf(b.id))) { b.paymentStatus = calcBooking(b).depositReceived > 0 ? 'Deposit Received' : 'Deposit Due'; delete b.refundPendingAt; } }
-        if (isB) { var ch = setBookingStatus(b, v); notify('change', b.code + ': ' + b.bookingStatus, ch.length ? ch.join(', ') : '', '#booking/' + id, { self: true }); }
+        if (isB) { bkStatusGo(b, v); return; }
         else {
           if (v === 'Deposit Refunded' && lockRef) { say('Record the refund on Deposits'); return; }
           var mm = calcBooking(b), shortBy = v === 'Deposit Received' ? Math.max(0, mm.deposit - mm.depositReceived) : v === 'Full Payment Received' ? mm.due : 0;
@@ -443,6 +483,55 @@ function bkStatusPick(id, axis) {
         closeSheet(); render(false, true);
       };
     });
+}
+
+/* a booking status picked by hand. Signing, handing over and taking back each have their own flow: the sheet sends staff there,
+   or asks before it skips them. The toast reports the status that was really stored. */
+function bkStatusGo(b, v) {
+  var id = b.id, ins = b.inspection || {}, cur = b.bookingStatus, c = car(b.car) || {};
+  var finish = function (pre) {
+    if (pre) pre();
+    var ch = setBookingStatus(b, v);
+    closeSheet(); render(false, true);
+    if (b.bookingStatus === v) notify('change', b.code + ': ' + v, ch.length ? ch.join(', ') : '', '#booking/' + id, { self: true });
+    else say(b.code + ' stays at ' + b.bookingStatus);
+  };
+  var openFlow = function (dir) { closeSheet(true); setTimeout(function () { Handover.start(id, dir); }, 320); };
+  if (v === 'Agreement Signed' && !b.submitted) { bkMarkSigned(id, { to: true, done: function () { closeSheet(); } }); return; }
+  if (EARLY.indexOf(v) >= 0 && b.submitted) {
+    confirm({ icon: 'warn', title: 'Clear the signature?', text: 'The customer signed the form on ' + dFull(b.submittedAt || b.created) + '. Moving the booking back to ' + v + ' clears the signature, so the customer must sign the form again.',
+      ok: 'Clear it and set ' + v, cancel: 'Keep it signed', primary: 'cancel' }).then(function (y) {
+      if (y) finish(function () { b.submitted = false; delete b.submittedAt; bLog(b, 'Signature cleared by ' + myName() + ': the customer must sign the form again'); });
+    });
+    return;
+  }
+  if (v === 'Car Delivered' && !ins.agent) {
+    bkChoice({ title: 'No handover was recorded', text: 'The handover checklist records the km, fuel and photos of ' + (c.plate || 'the car') + ' before it goes out. Without it there is nothing to compare with at take back.',
+      main: hoValid(b, 'out') ? 'Hand over with the checklist' : '', alt: 'Set Car Delivered anyway' }).then(function (r) { if (r === 'main') openFlow('out'); else if (r === 'alt') finish(); });
+    return;
+  }
+  if (v === 'Car Returned' && !ins.ret) {
+    var never = cur !== 'Car Delivered' && !ins.agent;
+    bkChoice({ title: never ? 'This car was never handed over' : 'No take back was recorded',
+      text: never ? (c.plate || 'The car') + ' has no handover on this booking, so it never went out. Setting Car Returned frees the car from now on, and the deposit waits to be returned.' : 'The take back checklist records the km, fuel, damage and late hours. Without it nothing is checked.',
+      main: cur === 'Car Delivered' ? 'Take back with the checklist' : '', alt: 'Set Car Returned anyway', danger: never }).then(function (r) {
+      if (r === 'main') openFlow('in');
+      else if (r === 'alt') finish(function () { b.actualEnd = new Date().toISOString(); });
+    });
+    return;
+  }
+  finish(v === 'Car Returned' && !b.actualEnd ? function () { b.actualEnd = new Date().toISOString(); } : null);
+}
+/* a stacked question with a main way forward, a second way and Go back. Resolves 'main', 'alt' or null (Go back, X or the phone's Back). */
+function bkChoice(o) {
+  return new Promise(function (res) {
+    var done = false, fin = function (v) { if (done) return; done = true; res(v); };
+    sheet('<div class="confirm"><div class="confirm-ic warn">' + I('warn', 2) + '</div><h3>' + esc(o.title) + '</h3><p class="lead">' + esc(o.text) + '</p><div class="sheet-foot stack">' +
+      (o.main ? '<button type="button" class="btn" data-v="main">' + esc(o.main) + '</button>' : '<button type="button" class="btn" data-v="">Go back</button>') +
+      '<button type="button" class="btn link' + (o.danger || !o.main ? ' red' : '') + '" data-v="alt">' + esc(o.alt) + '</button>' + (o.main ? '<button type="button" class="btn link" data-v="">Go back</button>' : '') + '</div></div>', function (sh) {
+        $$('[data-v]', sh).forEach(function (bt) { bt.onclick = function () { var v = bt.dataset.v || null; fin(v); closeSheet(true); }; });
+      }, { stack: true, onClose: function () { fin(null); } });
+  });
 }
 
 /* ---------------- change booking ---------------- */
@@ -489,12 +578,16 @@ function editBk(id) {
           (bz.booking && can('bookings.edit') ? '<button type="button" class="btn sm ghost bk-openclash" data-open="' + bz.booking.id + '">Open ' + esc(bz.booking.code) + ' to give it another car</button>' : '') + '</div></div>' : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '';
         var was = calcBooking(b).payable, now = calcBooking(t).payable, diff = now - was;
         $('#e_prev').innerHTML = bad ? '' : seeAmt ? 'New total <b class="money">' + rm(now) + '</b> <span class="muted">(was ' + rm(was) + (Math.abs(diff) >= 0.01 ? ', ' + (diff > 0 ? '+' : '') + rm(diff) : ', no change') + ')</span> · ' + esc(durationText(v.s, v.e)) : esc(durationText(v.s, v.e));
-        $('#e_save').disabled = bad || !bz.free;
+        var noAddr = bkEditAddrErr(sh);
+        $('#e_save').disabled = bad || !bz.free || !!noAddr;
         var oc = $('.bk-openclash', sh); if (oc) oc.onclick = function () { var to = oc.dataset.open; closeAllSheets(); location.hash = '#booking/' + to; setTimeout(function () { if (route().a === to) editBk(to); }, 120); };
       };
-      $('#es_t', sh).addEventListener('change', function () { if ($('#ee_d').value) $('#ee_t').value = $('#es_t').value; preview(); });
-      $('#ee_d', sh).addEventListener('change', function () { if (!started) $('#ee_t').value = $('#es_t').value; preview(); });
-      ['#es_d', '#ee_t', '#e_cov'].forEach(function (s) { $(s, sh).addEventListener('change', preview); });
+      /* the return time follows the pick-up time only while they matched (whole days) and nobody set the return time in this sheet */
+      var eeTouched = false, wholeDays = toTimeInput(b.start) === toTimeInput(b.end);
+      $('#ee_t', sh).addEventListener('change', function () { eeTouched = true; });
+      $('#es_t', sh).addEventListener('change', function () { if (wholeDays && !eeTouched && $('#ee_d').value) $('#ee_t').value = $('#es_t').value; preview(); });
+      ['#es_d', '#ee_d', '#ee_t', '#e_cov'].forEach(function (s) { $(s, sh).addEventListener('change', preview); });
+      ['#e_ppn', '#e_rpn'].forEach(function (s) { $(s, sh).addEventListener('input', preview); });
       $('#e_pp', sh).addEventListener('change', function () { var v = parsePlace(this.value); $('#e_ppn_w').hidden = v.kind !== 'client'; d.rates.delivery = placeFee(v.kind, v.id, 'pick'); var i = $('[data-rate=delivery]', sh); if (i) i.value = money2(d.rates.delivery); preview(); });
       $('#e_rp', sh).addEventListener('change', function () { var v = parsePlace(this.value); $('#e_rpn_w').hidden = v.kind !== 'client'; d.rates['return'] = placeFee(v.kind, v.id, 'ret'); var i = $('[data-rate=return]', sh); if (i) i.value = money2(d.rates['return']); preview(); });
       $$('[data-rate]', sh).forEach(function (i) { i.addEventListener('input', function () { var v = parseMoney(i.value); i.classList.toggle('bad', i.value !== '' && isNaN(v)); d.rates[i.dataset.rate] = isNaN(v) ? 0 : v; preview(); }); });
@@ -510,12 +603,42 @@ function editBk(id) {
       preview();
     });
 }
-function bkSaveEdit(id, v, d) {
+/* delivery to (or collection from) the client needs an address, the same rule as New booking. Shows the error under the field; returns it or '' */
+function bkEditAddrErr(sh) {
+  var out = '';
+  [['#e_pp', '#e_ppn', '#e_ppn_w', 'Type the delivery address'], ['#e_rp', '#e_rpn', '#e_rpn_w', 'Type the collection address']].forEach(function (x) {
+    var sel = $(x[0], sh), inp = $(x[1], sh), w = $(x[2], sh); if (!sel || !inp || !w) return;
+    var need = parsePlace(sel.value).kind === 'client' && !inp.value.trim(), e = $('.err', w);
+    if (need && !e) { e = document.createElement('span'); e.className = 'err'; w.appendChild(e); }
+    if (e) e.textContent = need ? x[3] : '';
+    inp.classList.toggle('bad', need);
+    if (need && !out) out = x[3];
+  });
+  return out;
+}
+/* what the customer signed for, in one line: 'WCC 4418, 26 Nov to 3 Dec, RM 1,552.00' */
+function bkSignedFor(b) { var c = car(b.car) || {}; return (c.plate || '') + ', ' + dShort(b.start) + ' to ' + dShort(b.end) + (can('bookings.see_amounts') ? ', ' + rm(calcBooking(b).payable) : ''); }
+function bkSaveEdit(id, v, d, okSigned) {
   var b = bk(id), ch = [], changes = {};
   if (!(v.e > v.s)) { say('Return must be after pick-up'); return; }
   var bz = busy(d.car, v.s, v.e, b.id); if (!bz.free) { say(car(d.car).plate + ': ' + bz.reason); return; }
   if ($$('.bk-amts .inp.bad').length) { say('Fix the amounts in red, for example 150.00'); return; }
+  var addrErr = bkEditAddrErr(document); if (addrErr) { say(addrErr); return; }
   var before = calcBooking(b).payable;
+  /* the signed (or sent) form shows the car, dates and price: changing them means the customer signs again */
+  var formOut = b.bookingStatus === 'Agreement Signed' || b.bookingStatus === 'Agreement Sent';
+  if (formOut && !okSigned) {
+    var tryB = Object.assign({}, b, { start: v.s.toISOString(), end: v.e.toISOString(), car: d.car, rates: d.rates, cover: v.cover });
+    var major = v.s.getTime() !== new Date(b.start).getTime() || v.e.getTime() !== new Date(b.end).getTime() || d.car !== b.car ||
+      JSON.stringify(v.cover || null) !== JSON.stringify(b.cover || null) || Math.abs(calcBooking(tryB).payable - before) >= 0.01;
+    if (major) {
+      var signed = b.bookingStatus === 'Agreement Signed';
+      confirm({ icon: 'warn', title: signed ? 'Change a signed booking?' : 'Change a booking after sending the form?',
+        text: (signed ? 'The customer signed for ' : 'The form sent to the customer shows ') + bkSignedFor(b) + '. After this change the booking goes back to Confirmed and the form must be ' + (signed ? 'signed again' : 'sent again') + '. Send the form again?',
+        ok: 'Save and send the form again', cancel: 'Go back' }).then(function (y) { if (y) bkSaveEdit(id, v, d, true); });
+      return;
+    }
+  }
   var set = function (k, val, text) { var old = b[k]; if (JSON.stringify(old) === JSON.stringify(val)) return; changes[k] = [old, val]; b[k] = val; if (text) ch.push(text); };
   if (v.s.getTime() !== new Date(b.start).getTime() || v.e.getTime() !== new Date(b.end).getTime()) ch.push('dates to ' + dShort(v.s) + ' ' + hm(v.s) + ' to ' + dShort(v.e) + ' ' + hm(v.e));
   set('start', v.s.toISOString()); set('end', v.e.toISOString());
@@ -532,6 +655,14 @@ function bkSaveEdit(id, v, d) {
   if (!ch.length) { say('Nothing changed'); return; }
   var after = calcBooking(b).payable;
   bLog(b, 'Changed ' + ch.join('; ') + (Math.abs(after - before) >= 0.01 ? ' (total ' + rm(before) + ' to ' + rm(after) + ')' : ''), changes); save();
+  if (okSigned && (b.bookingStatus === 'Agreement Signed' || b.bookingStatus === 'Agreement Sent')) {
+    var wasSigned = !!b.submitted;
+    b.submitted = false; delete b.submittedAt;
+    setBookingStatus(b, 'Confirmed', { text: wasSigned ? 'Booking changed after signing, form must be signed again' : 'Booking changed after the form was sent, form must be sent again' });
+    render(false, true);
+    setTimeout(function () { if (bk(id)) bkShareSheet(id, 'form'); }, 320);
+    return;
+  }
   /* a paid booking that now costs more has money due again */
   if (after > before + 0.99 && calcBooking(b).due > 0.99 && (b.paymentStatus === 'Full Payment Received' || b.paymentStatus === 'Extension Paid')) setPaymentStatus(b, 'Extension Due', 'the total went up by ' + rm(after - before));
   notify('change', b.code + ' changed', after > before + 0.99 ? rm(after - before) + ' more to collect' : '', '#booking/' + b.id, { self: true }); render(false, true);
