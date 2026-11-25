@@ -195,7 +195,7 @@ function bkStillOut(b) {
   var o = hoCarOutWith(b); if (!o) return '';
   /* only once it matters: the other rental is late or runs into this one, or this one starts within a day */
   if (!(isLate(o) || new Date(o.end) > new Date(b.start) || new Date(b.start).getTime() < Date.now() + DAY)) return '';
-  return '<div class="banner red bk-cb bk-stillout">' + I('car') + '<div><b>' + esc(hoCarOutText(b, o)) + '</b>Take it back before you hand it over, or give this booking another car.' +
+  return '<div class="banner red bk-cb bk-stillout">' + I('car') + '<div><b>' + esc(hoCarOutText(b, o)) + '.</b> Take it back before you hand it over, or give this booking another car.' +
     '<div class="ho-bact">' + (can('bookings.change_status') || can('bookings.edit') || (o.assigned || []).indexOf(S.me) >= 0 ? '<button type="button" class="btn sm" onclick="Handover.start(\'' + o.id + '\',\'in\')">' + I('in') + 'Take back first</button>' : '') +
     '<a class="btn sm ghost" href="#booking/' + o.id + '">Open ' + esc(o.code) + '</a>' + (can('bookings.edit') ? '<button type="button" class="btn sm ghost" onclick="editBk(\'' + b.id + '\')">Change car</button>' : '') + '</div></div></div>';
 }
@@ -221,7 +221,7 @@ function licenceState(cu, endIso) {
 function bkLicBanner(b, cu) {
   if (b.bookingStatus === 'Completed' || b.bookingStatus === 'Cancelled' || b.bookingStatus === 'Car Returned') return '';
   var ls = licenceState(cu, b.end); if (!ls) return '';
-  return '<div class="banner ' + ls.tone + ' bk-cb">' + I('warn') + '<div><b>' + esc(ls.text) + '</b>' + (ls.tone === 'red' ? 'Do not hand over the car until the customer shows a valid licence.' : 'Check the new licence before the handover.') +
+  return '<div class="banner ' + ls.tone + ' bk-cb">' + I('warn') + '<div><b>' + esc(ls.text) + '.</b> ' + (ls.tone === 'red' ? 'Do not hand over the car until the customer shows a valid licence.' : 'Check the new licence before the handover.') +
     (byId(S.customers, cu.id) && can('customers.edit') ? '<div><button type="button" class="btn sm ghost" onclick="Cust.open(\'' + cu.id + '\')">Update the licence</button></div>' : '') + '</div></div>';
 }
 function bkCarBanner(b, c) {

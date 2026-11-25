@@ -169,7 +169,7 @@ var Deposit = (function () {
       /* rent still owed while the deposit waits: use the deposit for it before returning the rest */
       var dueNow = !x.cancelled && !x.refund && can('billing.record_payment') && typeof bkDueFromDeposit === 'function' ? bkDueFromDeposit(b, x) : null;
       if (dueNow) h += '<div class="banner amber dep-due-rent">' + I('cash') + '<div><b>' + rm(dueNow.due) + ' rent and charges still due.</b> Use the deposit for it, then return the rest (' + rm(dueNow.left) + ').<div><button type="button" class="btn sm" id="depUseDue">Use ' + rm(dueNow.use) + ' of the deposit</button></div></div></div>';
-      var osm = canEdit && !x.cancelled ? openSummons(b) : [];
+      var osm = canEdit && !x.cancelled && x.state !== 'hand' && x.state !== 'used' ? openSummons(b) : [];
       if (osm.length) h += '<div class="banner amber dep-sm">' + I('warn') + '<div class="grow"><b>' + osm.length + ' summons not settled</b> on this booking.' + osm.map(function (s) { return '<div class="dep-smrow"><span class="grow">' + esc(s.notice || 'Summons') + ' · <b class="nowrap">' + rm(summonsAmt(s)) + '</b></span><button type="button" class="btn sm" data-smadd="' + s.id + '">Add as adjustment</button></div>'; }).join('') + '</div></div>';
       h += '<div class="sec" id="depAdj"><h2>' + (x.cancelled ? 'Adjustments from money paid' : 'Adjustments from deposit') + '</h2>' + (canEdit ? '<button type="button" id="depAdd">' + I('plus', 2.4) + ' Add</button>' : '') + '</div><div class="list">';
       var lines = x.adj.concat(x.used).sort(function (a, c2) { return new Date(a.at) - new Date(c2.at); });

@@ -270,7 +270,7 @@ var CarPage = (function () {
   }
 
   /* ---------- update km ---------- */
-  /* odometers only go up: not lower than a reading before the date, not higher than one after it, max 1,500,000 */
+  /* odometers only go up: not lower than a reading before the date (or, for a reading of today, the km stored on the car), not higher than one after it, max 1,500,000 */
   function kmProblem(carId, kmv, at) {
     if (isNaN(kmv) || kmv <= 0) return 'Type the km shown on the dashboard, numbers only.';
     if (kmv > 1500000) return 'That is more than 1,500,000 km. Check the number.';
@@ -282,7 +282,7 @@ var CarPage = (function () {
     });
     if (before && kmv < +before.km) return 'Lower than the reading of ' + M7.km(before.km) + ' on ' + dShort(before.at) + '. Odometers only go up.';
     var c = car(carId), base = c ? +c.km || 0 : 0;
-    if (!after && base && kmv < base && (!before || base > +before.km)) return 'Lower than the reading of ' + M7.km(base) + ' on this car. Odometers only go up.';
+    if (!after && base && kmv < base && (!before || base > +before.km) && t >= Date.now() - DAY) return 'Lower than the reading of ' + M7.km(base) + ' on this car. Odometers only go up.';
     if (after && kmv > +after.km) return 'Higher than the later reading of ' + M7.km(after.km) + ' on ' + dShort(after.at) + '. Check the date.';
     return '';
   }
