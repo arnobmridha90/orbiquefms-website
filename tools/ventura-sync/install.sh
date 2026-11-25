@@ -58,7 +58,8 @@ echo "== 2. Read-only MySQL login 'fms_sync'"
 mkdir -p $CONF; chmod 700 $CONF
 SOCK=$(q "SELECT @@socket") || { echo "FAILED: cannot log in to MySQL with $DEB"; exit 1; }
 if [ ! -s $CONF/my.cnf ]; then
-  P=$(head -c 32 /dev/urandom | sha256sum | cut -c1-40)
+  # long and mixed (upper, lower, digits, a sign) so it passes MySQL's password policy; no quotes or # in it
+  P="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-36)-Fs9.q"
   q "CREATE USER IF NOT EXISTS 'fms_sync'@'localhost' IDENTIFIED BY '$P'; ALTER USER 'fms_sync'@'localhost' IDENTIFIED BY '$P';" || { echo "FAILED: could not create the login"; exit 1; }
   (umask 077; printf '[client]\nuser=fms_sync\npassword=%s\nsocket=%s\n' "$P" "$SOCK" > $CONF/my.cnf); unset P
 fi
