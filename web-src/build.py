@@ -19,6 +19,11 @@ body = head + '<style>\n' + css + '\n/* Tabler icons used by the template system
 for bad in ['ventura', 'xtrecy']:
     if re.search(bad, body, re.I): print('FORBIDDEN word found:', bad)
 used = set(re.findall(r"tabler-([a-z0-9-]+)", js + css)) | set(re.findall(r"i\(['\"]([a-z0-9-]+)['\"]", js))
+used |= set(re.findall(r"icon:\s*['\"]([a-z0-9-]+)['\"]", js))
+used |= set(re.findall(r"^\s*'[a-z-]+': \['[^']*', '([a-z0-9-]+)',", js, re.M))   # PAGE_META menu icons
+used |= set(re.findall(r"iconBtn\(\s*['\"]([a-z0-9-]+)['\"]", js))               # UI.iconBtn('x', ...)
+for body_ in re.findall(r"var [A-Z0-9_]*ICONS[A-Z0-9_]* = ([\[{].*?[\]}]);\n", js, re.S):  # icon maps and lists: TEAM_SEC_ICONS = {k: 'icon'}
+    used |= set(x for x in re.findall(r"['\"]([a-z][a-z0-9-]+)['\"]", body_) if not x.startswith('icon:'))
 have = set(re.findall(r'\.tabler-([a-z0-9-]+)\{', icons))
 missing = sorted(u for u in used - have if not u.startswith('icon'))
 ICONSET = os.environ.get('TABLER_JSON', '/home/claude/iconify/node_modules/@iconify-json/tabler/icons.json')

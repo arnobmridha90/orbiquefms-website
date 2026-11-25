@@ -10,7 +10,7 @@
 .pg-cars .cr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:20px}
 .pg-cars .cr-card{background:var(--paper);border-radius:8px;box-shadow:var(--sh-md);overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:box-shadow .15s,transform .15s}
 .pg-cars .cr-card:hover{box-shadow:var(--sh-xl);transform:translateY(-2px)}
-.pg-cars .cr-card:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.pg-cars .cr-card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .pg-cars .cr-photo{position:relative;background:linear-gradient(180deg,var(--hover),transparent);padding:18px 16px 6px}
 .pg-cars .cr-acts{position:absolute;top:8px;right:8px;display:flex;gap:4px}
 .pg-cars .cr-acts .ib{background:var(--paper);box-shadow:var(--sh-sm)}
@@ -89,4 +89,28 @@
   .cr-rv-r{grid-template-columns:36px minmax(0,1fr);row-gap:6px}
   .cr-rv-now,.cr-rv-r > div:last-child{grid-column:2}
   .cr-rv-now::before{content:'Now: ';color:var(--text3)}
+}
+/* W5: filter chips and the car profile */
+.pg-cars .cr-chips{flex:1 1 100%;display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.pg-cars .cr-chips .ui-fchip{min-height:38px;white-space:nowrap}
+.cr-prof{display:flex;flex-direction:column;gap:16px}
+.cr-ph{display:flex;gap:16px;align-items:center}
+.cr-ph-img{width:180px;flex:none;border-radius:8px;background:var(--hover);padding:6px}
+.cr-ph-t{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cr-ph-plate{font-size:22px;font-weight:700;letter-spacing:.14em;color:var(--text);align-self:flex-start}
+.cr-pacts .btn{min-height:40px}
+.cr-pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cr-pt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--divider);border-radius:8px;padding:10px 12px;min-width:0}
+.cr-pt-ic{font-size:20px;color:var(--primary-text);flex:none;margin-top:2px}
+.cr-pt-b{display:flex;flex-direction:column;gap:3px;min-width:0;align-items:flex-start}
+.cr-pt-l{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);font-weight:600}
+.cr-pt-b b{font-size:15px;color:var(--text)}
+.cr-pt-b small{color:var(--text2);font-size:12.5px;line-height:1.4}
+.cr-pt-b small.cr-bad{color:var(--error)}
+.cr-pt-b small.cr-warn{color:var(--warning-text, var(--text2))}
+.cr-plink{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--primary-text);cursor:pointer;text-decoration:underline;min-height:24px}
+@media (max-width:640px){
+  .cr-ph{flex-direction:column;align-items:stretch}
+  .cr-ph-img{width:100%}
+  .cr-pgrid{grid-template-columns:1fr}
 }

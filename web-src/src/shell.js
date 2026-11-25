@@ -9,11 +9,14 @@ var PAGE_META = {
   'dashboard': ['Dashboard', 'layout-dashboard', 'dashboard.view'],
   'bookings': ['Bookings', 'calendar-event', 'bookings.view'],
   'customers': ['Customers', 'users', 'customers.view'],
+  'leads': ['Booking assistant', 'brand-whatsapp', 'leads.view'],
   'signatures': ['Signatures', 'signature', 'signatures.view'],
   'damage-packages': ['Damage Packages', 'shield-check', 'damage_packages.view'],
   'reports': ['Reports', 'report-analytics', 'reports.view'],
   'invoices': ['Invoices', 'file-invoice', 'billing.view'],
+  'staff-reports': ['Staff income and expenses', 'user-dollar', 'expenses.view'],
   'expenses': ['Expenses', 'receipt-2', 'expenses.view'],
+  'income': ['Income', 'coins', 'expenses.view'],
   'summons': ['Summons', 'gavel', 'summons.view'],
   'deposits': ['Deposit refunds', 'cash-banknote', 'deposits.view'],
   'tasks': ['Tasks', 'checklist', 'tasks.view'],
@@ -33,15 +36,15 @@ var PAGE_META = {
   'website': ['Website', 'world', 'home_settings.view']
 };
 /* old addresses that still work */
-var PAGE_ALIASES = { employees: ['team', { view: 'people' }], users: ['team', { view: 'people' }], roles: ['team', { view: 'templates' }], overview: ['dashboard'], damage: ['damage-packages'], installments: ['instalments'], home: ['home-settings'], 'apps/calendar': ['calendar'], login: ['dashboard'] };
+var PAGE_ALIASES = { 'staff-report': ['staff-reports'], staffreports: ['staff-reports'], assistant: ['leads'], 'booking-assistant': ['leads'], employees: ['team', { view: 'people' }], users: ['team', { view: 'people' }], roles: ['team', { view: 'templates' }], overview: ['dashboard'], damage: ['damage-packages'], installments: ['instalments'], home: ['home-settings'], 'apps/calendar': ['calendar'], login: ['dashboard'] };
 function pageAllowed(id) { var m = PAGE_META[id]; if (!m) return true; var need = m[2]; if (!need) return true; return [].concat(need).every(function (c) { return can(c); }); }
 function pageTitle(id) { var p = PAGES[id]; return (p && p.title) || (PAGE_META[id] ? PAGE_META[id][0] : 'Page'); }
 
 /* ---------------- a few words in French and Arabic (menu and top bar only) ---------------- */
 var LANGS = [['en', 'English'], ['fr', 'Français'], ['ar', 'العربية']];
 var I18N = {
-  fr: { 'Dashboard': 'Tableau de bord', 'Bookings': 'Réservations', 'Customers': 'Clients', 'Signatures': 'Signatures', 'Damage Packages': 'Forfaits dommages', 'Reports': 'Rapports', 'Invoices': 'Factures', 'Expenses': 'Dépenses', 'Summons': 'Amendes', 'Deposit refunds': 'Cautions à rendre', 'Operations': 'Opérations', 'Tasks': 'Tâches', 'List View': 'Liste', 'Add Task': 'Ajouter une tâche', 'Calendar': 'Calendrier', 'Fleet Management': 'Flotte', 'Cars': 'Voitures', 'Availability Checker': 'Disponibilité', 'Maintenance': 'Entretien', 'Tracking': 'Suivi', 'Schedules': 'Planning', 'Instalments': 'Mensualités', 'System Settings': 'Réglages du système', 'FAQs': 'FAQ', 'Reviews': 'Avis', 'Home Settings': 'Page d\'accueil', 'Team & access': 'Équipe et accès', 'Team': 'Équipe', 'Activity log': 'Journal', 'Search': 'Rechercher', 'Settings': 'Réglages', 'Logout': 'Déconnexion', 'Live': 'En direct' },
-  ar: { 'Dashboard': 'لوحة التحكم', 'Bookings': 'الحجوزات', 'Customers': 'العملاء', 'Signatures': 'التواقيع', 'Damage Packages': 'باقات الأضرار', 'Reports': 'التقارير', 'Invoices': 'الفواتير', 'Expenses': 'المصاريف', 'Summons': 'المخالفات', 'Deposit refunds': 'استرداد التأمين', 'Operations': 'العمليات', 'Tasks': 'المهام', 'List View': 'القائمة', 'Add Task': 'إضافة مهمة', 'Calendar': 'التقويم', 'Fleet Management': 'إدارة الأسطول', 'Cars': 'السيارات', 'Availability Checker': 'التوفر', 'Maintenance': 'الصيانة', 'Tracking': 'التتبع', 'Schedules': 'الجداول', 'Instalments': 'الأقساط', 'System Settings': 'إعدادات النظام', 'FAQs': 'الأسئلة', 'Reviews': 'التقييمات', 'Home Settings': 'الصفحة الرئيسية', 'Team & access': 'الفريق والصلاحيات', 'Team': 'الفريق', 'Activity log': 'سجل النشاط', 'Search': 'بحث', 'Settings': 'الإعدادات', 'Logout': 'تسجيل الخروج', 'Live': 'مباشر' }
+  fr: { 'Dashboard': 'Tableau de bord', 'Bookings': 'Réservations', 'Customers': 'Clients', 'Booking assistant': 'Assistant de réservation', 'Staff income and expenses': 'Revenus et dépenses du personnel', 'Income': 'Revenus', 'Signatures': 'Signatures', 'Damage Packages': 'Forfaits dommages', 'Reports': 'Rapports', 'Invoices': 'Factures', 'Expenses': 'Dépenses', 'Summons': 'Amendes', 'Deposit refunds': 'Cautions à rendre', 'Operations': 'Opérations', 'Tasks': 'Tâches', 'List View': 'Liste', 'Add Task': 'Ajouter une tâche', 'Calendar': 'Calendrier', 'Fleet Management': 'Flotte', 'Cars': 'Voitures', 'Availability Checker': 'Disponibilité', 'Maintenance': 'Entretien', 'Tracking': 'Suivi', 'Schedules': 'Planning', 'Instalments': 'Mensualités', 'System Settings': 'Réglages du système', 'FAQs': 'FAQ', 'Reviews': 'Avis', 'Home Settings': 'Page d\'accueil', 'Team & access': 'Équipe et accès', 'Team': 'Équipe', 'Activity log': 'Journal', 'Search': 'Rechercher', 'Settings': 'Réglages', 'Logout': 'Déconnexion', 'Live': 'En direct' },
+  ar: { 'Dashboard': 'لوحة التحكم', 'Bookings': 'الحجوزات', 'Customers': 'العملاء', 'Booking assistant': 'مساعد الحجز', 'Staff income and expenses': 'دخل ومصاريف الموظفين', 'Income': 'الدخل', 'Signatures': 'التواقيع', 'Damage Packages': 'باقات الأضرار', 'Reports': 'التقارير', 'Invoices': 'الفواتير', 'Expenses': 'المصاريف', 'Summons': 'المخالفات', 'Deposit refunds': 'استرداد التأمين', 'Operations': 'العمليات', 'Tasks': 'المهام', 'List View': 'القائمة', 'Add Task': 'إضافة مهمة', 'Calendar': 'التقويم', 'Fleet Management': 'إدارة الأسطول', 'Cars': 'السيارات', 'Availability Checker': 'التوفر', 'Maintenance': 'الصيانة', 'Tracking': 'التتبع', 'Schedules': 'الجداول', 'Instalments': 'الأقساط', 'System Settings': 'إعدادات النظام', 'FAQs': 'الأسئلة', 'Reviews': 'التقييمات', 'Home Settings': 'الصفحة الرئيسية', 'Team & access': 'الفريق والصلاحيات', 'Team': 'الفريق', 'Activity log': 'سجل النشاط', 'Search': 'بحث', 'Settings': 'الإعدادات', 'Logout': 'تسجيل الخروج', 'Live': 'مباشر' }
 };
 function T(s) { var d = I18N[S.lang]; return d && d[s] || s; }
 
@@ -66,7 +69,13 @@ var API = {
   openDeposit: function (code) { go('deposits', { booking: code }); },
   openSummons: function (id) { go('summons', { summons: id }); },
   openInspection: function (code) { go('bookings', { booking: code, inspection: '1' }); },
-  openPerson: function (id) { go('team', { person: id }); }
+  openPerson: function (id) { go('team', { person: id }); },
+  /* added for parity: owners replace them in their page files */
+  bankIn: function (userId) { go('invoices', { tab: 'cash', action: 'bankin', staff: userId || '' }); },          /* invoices.js (invBankInSheet) */
+  openLead: function (id) { go('leads', { lead: id }); },                                                          /* leads.js */
+  openStaffReport: function (userId, params) { go('staff-reports', Object.assign({ person: userId || '' }, params || {})); },   /* staff-reports.js */
+  openIncome: function (userId) { go('income', { person: userId || '' }); },                                        /* income.js */
+  makeHandoverTasks: function (code) { go('tasks', { action: 'handover', booking: code }); }                       /* tasks.js */
 };
 
 /* ---------------- the address: #b=0&page=bookings&action=add ---------------- */
@@ -77,9 +86,18 @@ function writeHash() {
     if (S.sec === 'dash') { parts.push('page=' + S.page); Object.keys(S.params || {}).forEach(function (k) { if (S.params[k] !== '' && S.params[k] != null) parts.push(k + '=' + encodeURIComponent(S.params[k])); }); }
     if (S.sec === 'bf') parts.push('bf=' + S.bf.screen);
     var h = '#' + parts.join('&');
-    if (location.hash !== h) history.replaceState(null, '', h);
+    /* a Back step is still on its way: write the address once it has landed */
+    if (UI.hist.busy()) { UI.hist.later(writeHash); return; }
+    /* another page (or company, or booking form screen) is a new history entry so Back returns to it;
+       tabs, filters and other small changes only replace the address */
+    var key = navKey();
+    if (writeHash.key != null && key !== writeHash.key) UI.hist.push(h);
+    else if (location.hash !== h || !(history.state && history.state.fms)) UI.hist.replace(h);
+    writeHash.key = key;
   } catch (e) { /* the address cannot change inside some viewers; nothing depends on it */ }
 }
+writeHash.key = null;
+function navKey() { return S.sec + '|' + S.b + '|' + (S.sec === 'dash' ? S.page : '') + '|' + (S.sec === 'bf' ? S.bf.screen : ''); }
 var HASH_KEYS = ['b', 'sec', 'page', 'bf', 'pf', 'set', 'theme', 'drawer', 'full', 'rail', 'agreed', 'lang', 'user'];
 function readHash(h) {
   var params = {};
@@ -107,11 +125,14 @@ function readHash(h) {
 
 /* ---------------- navigation ---------------- */
 /* go('bookings') or go('tasks', {action:'add'}) */
+/* With unsaved changes in an open drawer or dialog it asks first ("Leave without saving?"). */
 function go(page, params) {
   var al = PAGE_ALIASES[page]; if (al) { params = Object.assign({}, al[1] || {}, params || {}); page = al[0]; }
-  UI.closeAll();
-  S.sec = 'dash'; S.page = page; S.params = params || {}; S.drawer = null; S.modal = null; S.nav = false;
-  render(); window.scrollTo(0, 0);
+  return UI.leave(function () {
+    UI.closeAll(); UI.clearToasts();
+    S.sec = 'dash'; S.page = page; S.params = params || {}; S.drawer = null; S.modal = null; S.nav = false;
+    render(); window.scrollTo(0, 0);
+  });
 }
 
 /* ---------------- mounting the page ---------------- */
@@ -134,6 +155,8 @@ function mountPage() {
   var host = document.getElementById('page-host'); if (!host) return;
   if (CUR) CUR.offs.forEach(function (f) { f(); });
   var id = S.page, p = PAGES[id];
+  /* S.visit counts arrivals on a page (another page or company), not redraws: pages use it to drop old drafts */
+  var vk = B().id + ':' + id; if (S.lastMount !== vk) { S.visit = (S.visit || 0) + 1; S.lastMount = vk; }
   var root = document.createElement('div'); root.className = 'pg pg-' + id;
   host.innerHTML = ''; host.appendChild(root);
   CUR = { id: id, root: root, offs: [], ctx: null };
@@ -323,7 +346,7 @@ UI.userMenu = function (anchor) {
   ].concat(others.map(function (x) { var r = byId(D().roles, x.role); return { label: x.name, hint: x.superAdmin ? 'Owner' : r ? r.name : '', checked: x.id === u.id, onClick: function () { S.user[B().id] = x.id; render(); UI.toast('You now see what ' + x.name + ' may see.', { tone: 'info' }); } }; })).concat([
     { divider: true },
     { label: T('Settings'), icon: 'settings', onClick: function () { go('settings'); } },
-    { label: T('Logout'), icon: 'logout', danger: true, onClick: function () { DB.log('Signed out', 'Team member', u.id, u.name + ' signed out'); UI.closeAll(); S.sec = 'login'; S.drawer = null; render(); window.scrollTo(0, 0); } }
+    { label: T('Logout'), icon: 'logout', danger: true, onClick: function () { UI.leave(function () { DB.log('Signed out', 'Team member', u.id, u.name + ' signed out'); UI.closeAll(); UI.clearToasts(0); S.sec = 'login'; S.drawer = null; render(); window.scrollTo(0, 0); }); } }
   ]), { width: 270 });
 };
 
@@ -340,7 +363,7 @@ UI.palette = (function () {
     add('Your account', 'Settings', 'adjustments', function () { go('settings'); }, 'Start page, menu layout, locations');
     if (pageAllowed('website')) add('Your account', 'Website templates', 'world', function () { go('website'); });
     var acts = [['bookings.create', 'Add Booking', 'calendar-plus', function () { API.newBooking(); }], ['expenses.add', 'Add Expense', 'receipt-2', function () { API.addExpense(); }], ['tasks.create', 'Add Task', 'checklist', function () { go('tasks', { action: 'add' }); }],
-      ['billing.record_payment', 'Upload payment slip', 'upload', function () { API.uploadSlips(); }], ['billing.record_payment', 'Record payment', 'cash', function () { API.recordPayment(''); }], ['cars.create', 'New Car', 'car', function () { go('cars', { action: 'add' }); }],
+      ['billing.record_payment', 'Upload payment slip', 'upload', function () { API.uploadSlips(); }], ['billing.record_payment', 'Record payment', 'cash', function () { API.recordPayment(''); }], ['expenses.view', 'Bank in cash', 'building-bank', function () { API.bankIn(); }], ['cars.create', 'New Car', 'car', function () { go('cars', { action: 'add' }); }],
       ['maintenance.create', 'Log a service', 'tool', function () { API.logService(); }], ['summons.add', 'Add summons', 'gavel', function () { go('summons', { action: 'add' }); }], ['users.create', 'Add person', 'user-plus', function () { go('team', { action: 'add' }); }], ['calendar.view', 'Check availability', 'calendar-search', function () { go('availability'); }]];
     acts.forEach(function (a) { if (can(a[0])) add('Actions', a[1], a[2], a[3]); });
     Object.keys(PAGES).forEach(function (id) { var p = PAGES[id]; if (p && p.search && pageAllowed(id)) p.search.forEach(function (s) { add(s.group || PAGE_META[id] && PAGE_META[id][0] || 'More', s.label, s.icon || 'point', function () { go(id); if (s.run) setTimeout(function () { s.run(CUR && CUR.ctx); }, 30); }, s.hint, s.keywords); }); });

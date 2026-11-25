@@ -9,12 +9,16 @@
 var SMS_AUTH = [['PDRM', 'PDRM (police)'], ['JPJ', 'JPJ (road transport)'], ['Other', 'Other (council, toll, etc.)']];
 var SMS_OFFENCES = ['Exceeding the speed limit', 'Beating a red light', 'Parking in a no-parking zone', 'Using the emergency lane', 'Not wearing a seat belt', 'Double parking', 'Using a phone while driving', 'No road tax shown'];
 var SMS_PLACES = ['Jalan Contoh 3, KM 12', 'Lebuhraya Sampel, KM 41.2', 'Persiaran Demo, near the mall', 'Jalan Ujian 7', 'Lebuh Contoh, toll plaza exit'];
+/* the three kinds of "no booking", each with its own Show them */
+var SMS_NB = { 'nb-car': { state: 'none', one: 'car nobody had at that time', many: 'cars nobody had at that time' }, 'nb-plate': { state: 'notfleet', one: 'plate not in your fleet', many: 'plates not in your fleet' }, 'nb-unread': { state: 'unknown', one: 'plate or date not read yet', many: 'plates or dates not read yet' } };
 var SMS_OPEN = function (s) { return s.status !== 'Paid' && s.status !== 'Waived'; };
 
 /* ---------------- extra sample data: a picture still to check, a picture with nothing read, one with two bookings ---------------- */
 DATA_INIT.push(function (d, brand) {
   if (d.smsReady) return; d.smsReady = true;
   var R = rng(9090 + brand.code.charCodeAt(0)), ri = function (a, b) { return a + Math.floor(R() * (b - a + 1)); };
+  var fee0 = d.company && d.company.summonsAdminFee != null ? d.company.summonsAdminFee : 20;
+  d.summons.forEach(function (s) { if (s.fee === 20 && !s.chargedAt && s.status !== 'Paid') s.fee = fee0; });
   d.summons.forEach(function (s) { s.check = s.check || []; s.note = s.note || ''; s.payment = s.payment || null; s.addedAt = s.addedAt || s.at; });
   /* the picture that still needs a check: the number could not be read */
   var rv = d.summons.filter(function (s) { return s.fromPicture && !s.reviewed; })[0];
@@ -22,13 +26,13 @@ DATA_INIT.push(function (d, brand) {
   d.summons.forEach(function (s) { if (s.fromPicture && !s.reading) s.reading = { notice: s.notice }; });
   /* a picture where nothing could be read */
   var t = new Date(TODAY.getTime() - 2 * DAY - 5 * 36e5);
-  d.summons.push({ id: 'sum-' + (d.summons.length + 1), authority: 'PDRM', council: '', notice: '', plate: '', car: null, at: null, offence: '', speed: 0, limit: 0, place: '', fine: 0, fee: 20, asked: 0, booking: null, candidates: [], chosenByHand: false,
+  d.summons.push({ id: 'sum-' + (d.summons.length + 1), authority: 'PDRM', council: '', notice: '', plate: '', car: null, at: null, offence: '', speed: 0, limit: 0, place: '', fine: 0, fee: fee0, asked: 0, booking: null, candidates: [], chosenByHand: false,
     fromPicture: true, reviewed: false, picture: { name: 'IMG_20261017_0931.jpg', blurry: true }, reading: {}, check: ['notice', 'plate', 'at', 'fine', 'offence'], status: 'Needs a booking', paidOn: null, receipt: null, reason: '', addedAt: t, addedBy: d.users[0].name, chargedAt: null, note: '', payment: null });
   /* two bookings of one car that touch: a summons at that moment matches both */
   var live = d.bookings.filter(function (x) { return x.status !== 'Cancelled' && x.start < TODAY; }), pair = null;
   live.forEach(function (a) { if (pair) return; live.forEach(function (b) { if (pair || a === b || a.car !== b.car) return; if (b.start >= a.start && b.start <= a.end && b.start < TODAY) pair = [a, b]; }); });
   if (pair) {
-    d.summons.push({ id: 'sum-' + (d.summons.length + 1), authority: 'JPJ', council: '', notice: 'JPJ-' + ri(1000, 9999) + '-' + ri(10000, 99999), plate: pair[0].car.plate, car: pair[0].car.id, at: new Date(pair[1].start.getTime()), offence: 'Beating a red light', speed: 0, limit: 0, place: SMS_PLACES[3], fine: 300, fee: 20, asked: 0,
+    d.summons.push({ id: 'sum-' + (d.summons.length + 1), authority: 'JPJ', council: '', notice: 'JPJ-' + ri(1000, 9999) + '-' + ri(10000, 99999), plate: pair[0].car.plate, car: pair[0].car.id, at: new Date(pair[1].start.getTime()), offence: 'Beating a red light', speed: 0, limit: 0, place: SMS_PLACES[3], fine: 300, fee: fee0, asked: 0,
       booking: null, candidates: [pair[0].code, pair[1].code], chosenByHand: false, fromPicture: false, reviewed: true, picture: null, check: [], status: 'Needs a booking', paidOn: null, receipt: null, reason: '', addedAt: new Date(TODAY.getTime() - 26 * 36e5), addedBy: d.users[0].name, chargedAt: null, note: '', payment: null });
   }
   /* paid summons: the payment and its receipt on the booking */
@@ -43,6 +47,8 @@ DATA_INIT.push(function (d, brand) {
 });
 
 /* ---------------- helpers ---------------- */
+/* the admin fee a new summons starts with: Settings, not a fixed number */
+function smsFee() { var c = CO(); return c && c.summonsAdminFee != null ? Number(c.summonsAdminFee) : 20; }
 function smsPlateKey(p) { return String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 function smsCarOf(plate, d) { var k = smsPlateKey(plate); if (!k) return null; return (d || D()).cars.filter(function (c) { return smsPlateKey(c.plate) === k; })[0] || null; }
 function smsTitle(s) { var a = s.authority === 'Other' ? (s.council || 'Other') : s.authority; return s.notice ? a + ' ' + s.notice : a + ' notice (number not read)'; }
@@ -105,13 +111,16 @@ function smsPicture(s) {
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 function smsNextReceipt(d) { var mx = 0; d.receipts.forEach(function (r) { var n = +String(r.no).split('-').pop(); if (n > mx) mx = n; }); var pre = String((d.company && d.company.numbering && d.company.numbering.rcpPrefix) || 'RCP').replace(/-+$/, ''); return pre + '-' + NOW().getFullYear() + '-' + String(mx + 1).padStart(5, '0'); }
+/* the WhatsApp text: what the summons is, how much, and where to pay (bank details from Settings, never an IC) */
 function smsMessage(s) {
-  var x = findBooking(s.booking), b = B();
-  return 'Hello ' + (x ? x.cust.name.split(' ')[0] : '') + ', this is ' + b.name + '. A ' + smsAuthLabel(s) + ' summons was issued for ' + (x ? carName(x.car) + ' ' : '') + s.plate + ' while it was rented to you (booking ' + s.booking + ').\n\n' +
-    'Notice: ' + (s.notice || 'not shown') + '\nWhen: ' + (s.at ? UI.fmt.dateTime(s.at) : '-') + '\nOffence: ' + (s.offence || '-') + (smsSpeed(s) ? ' (' + smsSpeed(s) + ')' : '') + (s.place ? '\nWhere: ' + s.place : '') +
-    '\nFine: ' + UI.fmt.money(s.fine) + (s.fee ? '\nOur admin fee: ' + UI.fmt.money(s.fee) : '') + '\n\nPlease pay ' + UI.fmt.money(s.asked) + '. Reply here if you have any question.';
+  var x = findBooking(s.booking), b = B(), bank = (CO() && CO().bank) || {};
+  var acct = bank.accNo && String(bank.accNo).trim() ? [bank.bank || bank.name, bank.accName, bank.accNo].filter(function (z) { return z && String(z).trim(); }) : [];
+  return 'Hi ' + (x ? x.cust.name.split(' ')[0] : 'there') + ', this is ' + b.name + '.\nA ' + smsAuthLabel(s) + ' summons was issued to the car you rented (' + (x ? carName(x.car) + ', ' : '') + s.plate + (s.booking ? ', booking ' + s.booking : '') + ').\n\n' +
+    'Notice no: ' + (s.notice || 'not shown') + (s.offence ? '\nOffence: ' + s.offence : '') + (smsSpeed(s) ? '\nSpeed: ' + smsSpeed(s) : '') + (s.place ? '\nPlace: ' + s.place : '') + '\nDate and time: ' + (s.at ? UI.fmt.dateTime(s.at) : '-') +
+    '\nFine: ' + UI.fmt.money(s.fine) + (s.fee ? ', our admin fee: ' + UI.fmt.money(s.fee) : '') + '\nAmount to pay us: ' + UI.fmt.money(s.asked || s.fine + (s.fee || 0)) + '\n\n' +
+    (acct.length ? 'Please transfer to: ' + acct.join(', ') + '.' : 'Please tell us how you would like to pay.') + '\nUse ' + (s.booking || s.notice || 'the notice number') + ' as the payment reference and send us the slip. Thank you.';
 }
-function smsWaLink(phone, text) { var digits = String(phone || '').replace(/\D/g, ''); return digits.length >= 9 ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent(text) : ''; }
+function smsWaLink(phone, text) { return UI.waNumber(phone).replace(/\D/g, '').length >= 9 ? UI.waLink(phone, text) : ''; }
 
 /* ---------------- the form (Add a summons and the Details block) ---------------- */
 function smsFormHtml(v, o) {
@@ -123,8 +132,9 @@ function smsFormHtml(v, o) {
     UI.select({ key: 'authority', label: 'Issued by', options: SMS_AUTH, value: v.authority || 'PDRM', disabled: dis, attrs: { 'data-sms': 'auth' } }) +
     '<div class="sms-council"' + (v.authority === 'Other' ? '' : ' hidden') + '>' + UI.input({ key: 'council', label: 'Council or office', value: v.council, placeholder: 'For example DBKL or MBPJ', readonly: dis }) + '</div>' +
     UI.input({ key: 'notice', label: 'Notice / summons number', value: v.notice, readonly: dis, help: note('notice'), error: o.err && o.err.notice }) +
-    UI.input({ key: 'plate', label: 'Car plate', value: v.plate, readonly: dis, help: note('plate'), error: o.err && o.err.plate, attrs: { autocapitalize: 'characters' } }) +
-    UI.input({ key: 'at', label: 'Date and time of the offence', type: 'datetime-local', value: at, readonly: dis, help: note('at'), error: o.err && o.err.at }) +
+    (dis ? UI.input({ key: 'plate', label: 'Car plate', value: v.plate, readonly: dis, help: note('plate'), error: o.err && o.err.plate, attrs: { autocapitalize: 'characters' } })
+      : (function () { var typed = !!(v.plate && !smsCarOf(v.plate)); return '<div class="sms-platebox"><div class="sms-carpk" data-help="' + esc(note('plate')) + '" data-err="' + esc(o.err && o.err.plate || '') + '"' + (typed ? ' hidden' : '') + '></div><div class="sms-pt"' + (typed ? '' : ' hidden') + '>' + UI.input({ key: 'plate', label: 'Plate on the notice', value: v.plate, help: typed ? 'Not one of our cars. Check every letter and number.' : note('plate'), error: o.err && o.err.plate, attrs: { autocapitalize: 'characters' } }) + '</div><button type="button" class="btn t sm sms-ptog" data-sms-ptog>' + (typed ? 'Pick one of our cars instead' : 'Plate is not one of our cars? Type it') + '</button></div>'; })()) +
+    UI.dateTimeField({ key: 'at', label: 'Date and time of the offence', value: at, step: 15, max: NOW(), chips: [{ label: 'Today', days: 0 }, { label: 'Yesterday', days: -1 }], disabled: dis, help: note('at'), error: o.err && o.err.at }) +
     UI.input({ key: 'offence', label: 'What the offence was', value: v.offence, readonly: dis, help: note('offence'), attrs: { list: 'sms-offences' } }) +
     '<datalist id="sms-offences">' + SMS_OFFENCES.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>' +
     UI.input({ key: 'speed', label: 'Speed (km/h)', type: 'number', min: 0, value: v.speed || '', readonly: dis, help: 'The higher number on the notice.', error: o.err && o.err.speed }) +
@@ -149,13 +159,33 @@ function smsCheckForm(v, strict) {
   if (v.notice && D().summons.some(function (s) { return s.notice === v.notice && s.id !== strict; })) err.notice = 'A summons with this number is already in the list.';
   return err;
 }
-function smsWireForm(el) { el.addEventListener('change', function (ev) { if (ev.target.matches('[data-sms="auth"]')) { var c = el.querySelector('.sms-council'); if (c) c.hidden = ev.target.value !== 'Other'; } }); }
+function smsWireForm(el) {
+  el.addEventListener('change', function (ev) {
+    if (ev.target.matches('[data-sms="auth"]')) { var c = el.querySelector('.sms-council'); if (c) c.hidden = ev.target.value !== 'Other'; }
+    if (ev.target.matches('[data-key="at"]') && el.__smsPk) { var at = ev.target.value ? UI.parseDate(ev.target.value) : null; el.__smsPk.setDates(at, at ? new Date(at.getTime() + 6e4) : null); }
+  });
+  el.addEventListener('click', function (ev) {
+    var t = ev.target.closest('[data-sms-ptog]'); if (!t) return;
+    var box = t.closest('.sms-platebox'), pk = box.querySelector('.sms-carpk'), pt = box.querySelector('.sms-pt'), typing = pt.hidden;
+    pt.hidden = !typing; pk.hidden = typing;
+    t.textContent = typing ? 'Pick one of our cars instead' : 'Plate is not one of our cars? Type it';
+    if (typing) { var inp = pt.querySelector('input'); if (inp) { inp.focus(); inp.select(); } }
+    else if (el.__smsPk) { var c2 = el.__smsPk.car(); pt.querySelector('input').value = c2 ? c2.plate : ''; }
+  });
+}
+/* mount the searchable car picker on the plate field; the badge says who had the car at the time of the offence */
+function smsMountCar(el, v) {
+  var box = el.querySelector('.sms-carpk'); if (!box) { el.__smsPk = null; return; }
+  var car = smsCarOf(v.plate), at = v.at || null;
+  el.__smsPk = UI.carPicker(box, { key: 'smsCar', label: 'Car plate', value: car ? car.id : '', placeholder: 'Search plate or model', title: 'Which car got the summons?', help: box.getAttribute('data-help') || 'The badge shows the booking that had the car at the time of the offence', error: box.getAttribute('data-err') || '', start: at, end: at ? new Date(at.getTime() + 6e4) : null,
+    onChange: function (id, c) { var inp = el.querySelector('.sms-pt input[data-key="plate"]'); if (inp) inp.value = c ? c.plate : ''; } });
+}
 
 /* ---------------- dialogs ---------------- */
 function smsAdd(prefill, onClosed) {
   if (!can('summons.add')) { UI.toast('Your login cannot add summons.', { tone: 'warn' }); return; }
-  var v = Object.assign({ authority: 'PDRM', fee: 20 }, prefill || {}), err = {};
-  var dl = UI.dialog({ title: 'Add a summons', width: 'lg', onClose: function () { if (onClosed) onClosed(); }, body: function (el) { el.innerHTML = '<p class="b2 sms-lead">We look for the booking that had the car at that time and tie it for you.</p>' + smsFormHtml(v, { err: err }); }, buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Add summons', icon: 'plus', onClick: function (dlg) {
+  var v = Object.assign({ authority: 'PDRM', fee: smsFee() }, prefill || {}), err = {};
+  var dl = UI.dialog({ title: 'Add a summons', width: 'lg', onClose: function () { if (onClosed) onClosed(); }, body: function (el) { el.innerHTML = '<p class="b2 sms-lead">We look for the booking that had the car at that time and tie it for you.</p>' + smsFormHtml(v, { err: err }); smsMountCar(el, v); }, buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Add summons', icon: 'plus', onClick: function (dlg) {
     v = smsReadForm(dlg.body); err = smsCheckForm(v, true);
     if (Object.keys(err).length) { dlg.refresh(); UI.toast('Check the fields marked in red.', { tone: 'warn' }); return false; }
     var s = Object.assign(v, { id: 'sum-' + Date.now().toString(36), car: null, asked: 0, booking: null, candidates: [], chosenByHand: false, fromPicture: false, reviewed: true, picture: null, check: [], status: '', paidOn: null, receipt: null, reason: '', addedAt: NOW(), addedBy: DB.actor(), chargedAt: null, payment: null });
@@ -192,8 +222,8 @@ function smsPaid(s, after) {
   var x = findBooking(s.booking); if (!x) return;
   var slip = null;
   var dl = UI.dialog({ title: 'Mark as paid', width: 'md',
-    body: function (el) { el.innerHTML = '<div class="col gap12"><p class="b2" style="margin:0">The payment is recorded on booking ' + x.code + ' as "Other payment" and a receipt is made.</p>' + UI.input({ key: 'amt', label: 'Amount received (RM)', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: (s.asked || s.fine + (s.fee || 0)).toFixed(2) }) + UI.choice({ key: 'method', label: 'How they paid', value: 'Online Transfer', options: LISTS.methods }) + UI.input({ key: 'when', label: 'When', type: 'datetime-local', value: UI.isoDateTime(NOW()) }) + UI.input({ key: 'ref', label: 'Slip or reference', placeholder: 'For example the transfer reference' }) + '<div class="sms-slip"></div></div>';
-      UI.dropzone(el.querySelector('.sms-slip'), { accept: 'image/*,.pdf', label: slip ? slip.name : 'Add the slip (optional)', hint: slip ? 'Added. Drop another to change it.' : 'A picture or PDF of the transfer slip.', icon: slip ? 'circle-check' : 'receipt', onFiles: function (fs) { UI.readImage(fs[0], { max: 1400 }).then(function (r) { slip = { name: r.name, size: r.size, dataUrl: r.dataUrl, at: NOW() }; var f = UI.form(el); dl.refresh(); el.querySelector('[data-key="amt"]').value = f.amt; el.querySelector('[data-key="ref"]').value = f.ref || ''; el.querySelector('[data-key="when"]').value = f.when; }); } }); },
+    body: function (el) { el.innerHTML = '<div class="col gap12"><p class="b2" style="margin:0">The payment is recorded on booking ' + x.code + ' as "Other payment" and a receipt is made.</p>' + UI.input({ key: 'amt', label: 'Amount received (RM)', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: (s.asked || s.fine + (s.fee || 0)).toFixed(2) }) + UI.choice({ key: 'method', label: 'How they paid', value: 'Online Transfer', options: LISTS.methods }) + UI.dateTimeField({ key: 'when', label: 'When', value: NOW(), step: 15, max: NOW(), chips: [{ label: 'Today', days: 0 }, { label: 'Yesterday', days: -1 }] }) + UI.input({ key: 'ref', label: 'Slip or reference', placeholder: 'For example the transfer reference' }) + '<div class="sms-slip"></div></div>';
+      UI.dropzone(el.querySelector('.sms-slip'), { accept: 'image/*,.pdf', label: slip ? slip.name : 'Add the slip (optional)', hint: slip ? 'Added. Drop another to change it.' : 'A picture or PDF of the transfer slip.', icon: slip ? 'circle-check' : 'receipt', onFiles: function (fs) { UI.readImage(fs[0], { max: 1400 }).then(function (r) { slip = { name: r.name, size: r.size, dataUrl: r.dataUrl, at: NOW() }; var f = UI.form(el); dl.refresh(); el.querySelector('[data-key="amt"]').value = f.amt; el.querySelector('[data-key="ref"]').value = f.ref || ''; if (f.when) UI.setDateField(el.querySelector('[data-key="when"]'), UI.parseDate(f.when), true); }); } }); },
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Record payment', icon: 'check', onClick: function (dlg) {
       var f = UI.form(dlg.body), a = Math.round((+f.amt || 0) * 100) / 100, when = f.when ? UI.parseDate(f.when) : NOW();
       if (!(a > 0)) { UI.toast('Type the amount received.', { tone: 'warn' }); return false; }
@@ -318,7 +348,7 @@ function smsDrawer(id, onClosed) {
     UI.toast('Read again: found ' + got.join(', ') + '. Check them, then press Confirm.', { tone: 'ok' });
   }
   var H = head();
-  var dr = UI.drawer({ title: H.t, subtitle: H.sub, width: 640, body: body, live: true, actions: UI.status('summons', s.status),
+  var dr = UI.drawer({ title: H.t, subtitle: H.sub, width: 640, body: function (el) { el.innerHTML = body(); smsMountCar(el, s); }, live: true, actions: UI.status('summons', s.status),
     foot: [{ label: 'Close', kind: 'o' }], onClose: function () { if (onClosed) onClosed(); } });
   var offData = on('data', function () { if (dr.closed) { offData(); return; } if (D().summons.indexOf(s) < 0) { dr.close(true); return; } var h2 = head(); dr.setTitle(h2.t, h2.sub); dr.setActions(UI.status('summons', s.status)); });
   smsWireForm(dr.body);
@@ -415,7 +445,7 @@ function smsImport(onClosed) {
     return [{ label: 'Back', kind: 'g', onClick: function () { st.step = 1; dl.setTitle('Import summons', 'Step 1 of 2'); dl.refresh(); dl.setFoot(foot()); return false; } }, { label: 'Add ' + plural(n, 'summons').replace('summonss', 'summons'), icon: 'check', disabled: !n, onClick: function () {
       var list = toAdd(), tied = 0;
       list.forEach(function (r) {
-        var s = { id: 'sum-' + Date.now().toString(36) + r.line, authority: r.auth, council: r.council, notice: r.notice, plate: r.plate, car: null, at: r.at, offence: r.offence, speed: 0, limit: 0, place: r.place, fine: r.fine, fee: 20, asked: 0, booking: null, candidates: [], chosenByHand: false, fromPicture: false, reviewed: true, picture: null, check: [], status: '', paidOn: null, receipt: null, reason: '', addedAt: NOW(), addedBy: DB.actor(), chargedAt: null, note: 'Imported from ' + (st.file || 'pasted rows'), payment: null };
+        var s = { id: 'sum-' + Date.now().toString(36) + r.line, authority: r.auth, council: r.council, notice: r.notice, plate: r.plate, car: null, at: r.at, offence: r.offence, speed: 0, limit: 0, place: r.place, fine: r.fine, fee: smsFee(), asked: 0, booking: null, candidates: [], chosenByHand: false, fromPicture: false, reviewed: true, picture: null, check: [], status: '', paidOn: null, receipt: null, reason: '', addedAt: NOW(), addedBy: DB.actor(), chargedAt: null, note: 'Imported from ' + (st.file || 'pasted rows'), payment: null };
         Object.assign(s, smsMatchPatch(s, true)); s.status = smsRestatus(s); if (s.booking) tied++;
         DB.add('summons', s, { first: true, silent: true, text: DB.actor() + ' imported summons ' + smsTitle(s) });
       });
@@ -460,7 +490,7 @@ function smsUpload(files, onClosed) {
         if (dup) { it.state = 'done'; it.res = { outcome: 'duplicate', id: dup.id }; res(); return; }
         var pic = { name: it.name, size: it.size };
         var finish = function () {
-          var s = { id: 'sum-' + Date.now().toString(36) + it.id, authority: h % 4 === 1 ? 'JPJ' : 'PDRM', council: '', notice: '', plate: '', car: null, at: null, offence: '', speed: 0, limit: 0, place: '', fine: 0, fee: 20, asked: 0, booking: null, candidates: [], chosenByHand: false, fromPicture: true, reviewed: false, picture: pic, check: [], status: '', paidOn: null, receipt: null, reason: '', addedAt: NOW(), addedBy: DB.actor(), chargedAt: null, note: '', payment: null, reading: {} };
+          var s = { id: 'sum-' + Date.now().toString(36) + it.id, authority: h % 4 === 1 ? 'JPJ' : 'PDRM', council: '', notice: '', plate: '', car: null, at: null, offence: '', speed: 0, limit: 0, place: '', fine: 0, fee: smsFee(), asked: 0, booking: null, candidates: [], chosenByHand: false, fromPicture: true, reviewed: false, picture: pic, check: [], status: '', paidOn: null, receipt: null, reason: '', addedAt: NOW(), addedBy: DB.actor(), chargedAt: null, note: '', payment: null, reading: {} };
           if (h % 7 === 5) { s.check = ['notice', 'plate', 'at', 'fine', 'offence']; pic.blurry = !pic.dataUrl; it.res = { outcome: 'unread', review: true }; }
           else {
             var past = d0.bookings.filter(function (x) { return x.status !== 'Cancelled' && x.end < NOW() && x.start > NOW() - 120 * DAY; });
@@ -557,7 +587,8 @@ PAGES['summons'] = {
       return d.summons.filter(function (s) {
         if (st.bk && s.booking !== st.bk) return false;
         var w = smsView(s);
-        if (v === 'review' && !w.review) return false; if (v === 'nobook' && !w.nobook) return false; if (v === 'pick' && !w.pick) return false; if (v === 'ready' && !w.ready) return false; if (v === 'charged' && !w.charged) return false; if (v === 'paid' && !w.paid) return false;
+        if (v === 'review' && !w.review) return false; if (v === 'nobook' && !w.nobook) return false;
+        if (SMS_NB[v] && !(w.nobook && smsLookup(s).state === SMS_NB[v].state)) return false; if (v === 'pick' && !w.pick) return false; if (v === 'ready' && !w.ready) return false; if (v === 'charged' && !w.charged) return false; if (v === 'paid' && !w.paid) return false;
         if (q) { var x = findBooking(s.booking); var hay = [s.notice, s.plate, smsPlateKey(s.plate), s.booking, s.authority, s.council, s.offence, x ? x.cust.name : ''].join(' ').toLowerCase(); if (hay.indexOf(q) < 0) return false; }
         return true;
       }).sort(function (a, b) { return (+(b.at || b.addedAt || 0)) - (+(a.at || a.addedAt || 0)); });
@@ -565,12 +596,14 @@ PAGES['summons'] = {
     function draw() {
       var K = counts(), n = K.n, m = K.m;
       var nb = d.summons.filter(function (s) { return smsView(s).nobook; }), nbFleet = nb.filter(function (s) { return smsLookup(s).state === 'none'; }).length, nbPlate = nb.filter(function (s) { return smsLookup(s).state === 'notfleet'; }).length, nbOther = nb.length - nbFleet - nbPlate;
-      var alert = nb.length ? '<div class="alert bad sms-alert" role="alert">' + i('alert-circle') + '<div class="grow"><b>' + plural(nb.length, 'summons').replace('summonss', 'summons') + ' ' + (nb.length === 1 ? 'has' : 'have') + ' no booking (' + UI.fmt.money(sum(nb.map(function (s) { return s.fine; }))) + ').</b> ' + [nbFleet ? nbFleet + ' for a car of yours that nobody had at that time' : '', nbPlate ? nbPlate + ' with a plate that is not one of your cars' : '', nbOther ? nbOther + ' with the plate or the date not read yet' : ''].filter(Boolean).join(' / ') + '. Nobody can be charged for these until you find out who had the car.</div>' + UI.btn('Show them', { kind: 't', size: 'sm', attrs: { 'data-act': 'view', 'data-v': 'nobook' } }) + '</div>' : '';
+      var nbLine = function (n2, key) { return n2 ? '<li><span class="grow"><b class="num">' + n2 + '</b> ' + esc(n2 === 1 ? SMS_NB[key].one : SMS_NB[key].many) + '</span><button type="button" class="btn t sm sms-show" data-act="view" data-v="' + key + '"' + (st.f.view === key ? ' aria-pressed="true"' : '') + '>Show them</button></li>' : ''; };
+      var alert = nb.length ? '<div class="alert bad sms-alert" role="alert">' + i('link-off') + '<div class="grow"><b>' + nb.length + ' ' + (nb.length === 1 ? 'summons has' : 'summons have') + ' no booking (' + UI.fmt.money(sum(nb.map(function (s) { return s.fine; }))) + ')</b><ul class="sms-nbl">' + nbLine(nbFleet, 'nb-car') + nbLine(nbPlate, 'nb-plate') + nbLine(nbOther, 'nb-unread') + '</ul></div></div>' : '';
       var card = function (id, label, note, cnt, money, tone, icon) { return '<button type="button" class="card sms-cnt' + (st.f.view === id ? ' on' : '') + ' ' + tone + '" data-act="view" data-v="' + id + '" aria-pressed="' + (st.f.view === id) + '"><span class="sms-ci">' + i(icon) + '</span><span class="grow"><span class="sms-cl">' + label + '</span><b class="num">' + cnt + '</b><span class="b2">' + note + ' · ' + UI.money(money) + '</span></span></button>'; };
       root.innerHTML = '<div class="pg-h"><div><h1>Summons</h1><p>Record each PDRM or JPJ summons. We find the booking that had the car at that time, and you charge that customer.</p></div><div class="acts">' +
         (C.up ? UI.btn('Upload pictures', { icon: 'photo-up', attrs: { 'data-act': 'upload' } }) : '') + (C.imp ? UI.btn('Import', { kind: 'o', icon: 'file-import', attrs: { 'data-act': 'import' } }) : '') + (C.add ? UI.btn('Add summons', { kind: 'o', icon: 'plus', attrs: { 'data-act': 'add' } }) : '') + '</div></div>' +
         '<div class="col gap16">' + alert + (C.up ? '<div class="sms-drop"></div>' : '') +
         '<div class="sms-cnts">' + card('nobook', 'No booking', 'nobody had the car', n.nobook, m.nobook, 'bad', 'link-off') + card('review', 'Needs review', 'read from pictures', n.review, m.review, 'warn', 'eye-check') + card('ready', 'Ready to charge', 'tap to see them', n.ready, m.ready, 'info', 'brand-whatsapp') + card('charged', 'Charged this month', 'asked from customers', m.nC, m.chargedM, 'pri', 'send') + card('paid', 'Paid this month', 'received', m.nP, m.paidM, 'ok', 'circle-check') + '</div>' +
+        (SMS_NB[st.f.view] ? UI.alert('Showing: ' + SMS_NB[st.f.view].many + '.', 'pri', { action: UI.btn('Show all', { kind: 't', size: 'sm', attrs: { 'data-act': 'everything' } }) }) : '') +
         (st.bk ? UI.alert('Showing the summons of one booking only (' + st.bk + ').', 'pri', { action: UI.btn('Show all', { kind: 't', size: 'sm', attrs: { 'data-act': 'allbk' } }) }) : '') +
         '<div class="card sms-card"><div class="sms-flt"></div><div class="sms-tbl"></div></div></div>';
       if (C.up) UI.dropzone(root.querySelector('.sms-drop'), { accept: 'image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf', multiple: true, camera: true, icon: 'photo-scan', label: 'Upload summons images', hint: 'Drop photos, screenshots or PDFs of the notices here. We read the date, time and plate, find who had the car, and skip any we already have.', onFiles: function (fs) { smsUpload(fs); } });

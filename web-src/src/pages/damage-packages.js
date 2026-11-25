@@ -19,14 +19,14 @@ function dpOpen(id) {
   function example() {
     var dl = +v.daily || 0, mx = +v.max || 0;
     if (!dl && !mx) return '<div class="dp-ex faint">' + i('calculator') + '<span>Type the rates to see what a customer pays.</span></div>';
-    return '<div class="dp-ex">' + i('calculator') + '<div><b>For a 3 day rental</b><span>The customer pays <b class="num">' + UI.money(dl * 3) + '</b> for cover (' + UI.money(dl) + ' x 3 days). If the car is damaged, the most they pay is <b class="num">' + UI.money(mx) + '</b>.</span></div></div>';
+    return '<div class="dp-ex">' + i('calculator') + '<div><b>For a 3 day rental</b><span>The customer pays <b class="num">' + UI.money(dl * 3) + '</b> for cover (' + UI.money(dl) + ' x 3 days). If the car is damaged, this cover pays up to <b class="num">' + UI.money(mx) + '</b>.</span></div></div>';
   }
   function body(el) {
     var uses = pk ? dpUses(pk) : [], live = uses.filter(function (x) { return x.status !== 'Cancelled' && x.status !== 'Returned'; });
     el.innerHTML = '<div class="dp-form">' + (edit
       ? UI.input({ key: 'name', label: 'Name', required: true, value: v.name, placeholder: 'e.g. Standard cover', error: errs.name ? 'Name is required' : '' }) +
         '<div class="dp-g2">' + UI.input({ key: 'daily', label: 'Daily Rate', type: 'number', min: 0, step: '0.01', required: true, prefix: 'RM', value: v.daily, placeholder: 'e.g. 25.00', error: errs.daily || '' }) +
-        UI.input({ key: 'max', label: 'Maximum Coverage', type: 'number', min: 0, step: '0.01', required: true, prefix: 'RM', value: v.max, placeholder: 'e.g. 5000.00', error: errs.max || '' }) + '</div>'
+        UI.input({ key: 'max', label: 'Maximum Coverage', type: 'number', min: 0, step: '0.01', required: true, prefix: 'RM', value: v.max, placeholder: 'e.g. 5000.00', help: 'The most this cover pays for damage.', error: errs.max || '' }) + '</div>'
       : '<div class="dp-kv">' + UI.kv('Name', esc(pk.name)) + UI.kv('Daily Rate', UI.money(pk.daily)) + UI.kv('Maximum Coverage', UI.money(pk.max)) + '</div>') +
       '<div id="dp-ex">' + example() + '</div>' +
       (pk ? '<div class="dp-uses">' + i('calendar-event') + '<div><b>' + (uses.length ? 'Chosen on ' + plural(uses.length, 'booking') + (live.length ? ', ' + live.length + ' still open' : '') : 'Not chosen on any booking yet') + '</b><span class="b2">' + (uses.length ? 'Latest: ' + uses.slice().sort(function (a, b) { return b.n - a.n; }).slice(0, 3).map(function (x) { return '<a href="#" data-dp-bk="' + x.code + '">' + x.code + '</a>'; }).join(', ') + '. Changing the rates only changes new bookings and bookings you save again.' : 'Staff pick a package under Rental info when they make a booking.') + '</span></div></div>' : '') +
@@ -77,7 +77,7 @@ PAGES['damage-packages'] = {
   render: function (root, ctx) {
     var d = ctx.data, st = ctx.state; st.f = st.f || {};
     var canEdit = ctx.can('damage_packages.edit'), canDel = ctx.can('damage_packages.delete');
-    root.innerHTML = '<div class="pg-h"><div><h1>Damage Packages</h1><p>Cover customers can add to a booking: what it costs per day and the most they pay if the car is damaged.</p></div><div class="acts">' +
+    root.innerHTML = '<div class="pg-h"><div><h1>Damage Packages</h1><p>Cover customers can add to a booking: what it costs per day and the most it pays if the car is damaged.</p></div><div class="acts">' +
       (ctx.can('damage_packages.create') ? UI.btn('New Package', { icon: 'plus', attrs: { 'data-dp-new': 1 } }) : '') + '</div></div>' +
       '<div class="card"><div id="dp-f"></div><div id="dp-t"></div></div>';
     var rowsFor = function () { var q = (st.f.q || '').toLowerCase().trim(); return d.damagePackages.filter(function (p) { return !q || (p.name + ' ' + p.daily + ' ' + p.max).toLowerCase().indexOf(q) >= 0; }); };
@@ -91,13 +91,13 @@ PAGES['damage-packages'] = {
       onRowClick: function (p) { dpOpen(p.id); },
       columns: [
         { key: 'name', label: 'Name', sort: true, render: function (p) { return '<div class="dp-name"><span class="dp-ic">' + i('shield-check') + '</span><b class="t1c">' + esc(p.name) + '</b></div>'; } },
-        { key: 'daily', label: 'Daily Rate (RM)', align: 'right', sort: true, nowrap: true, render: function (p) { return '<span class="num">' + dpMoney(p.daily) + '</span>'; } },
-        { key: 'max', label: 'Max Coverage (RM)', align: 'right', sort: true, nowrap: true, render: function (p) { return '<div class="dp-max"><span class="num">' + dpMoney(p.max) + '</span><span class="dp-bar"><i style="width:' + Math.round(p.max / maxMax * 100) + '%"></i></span></div>'; } },
-        { key: 'uses', label: 'Bookings', align: 'right', sort: function (p) { return dpUses(p, d).length; }, render: function (p) { var n = dpUses(p, d).length; return n ? '<span class="num">' + n + '</span>' : '<span class="faint">0</span>'; } },
+        { key: 'daily', label: 'Daily Rate', money: true, sort: true, nowrap: true, render: function (p) { return UI.money(p.daily); } },
+        { key: 'max', label: 'Max Coverage', money: true, sort: true, nowrap: true, render: function (p) { return '<div class="dp-max">' + UI.money(p.max) + '<span class="dp-bar"><i style="width:' + Math.round(p.max / maxMax * 100) + '%"></i></span></div>'; } },
+        { key: 'uses', label: 'Bookings', align: 'center', sort: function (p) { return dpUses(p, d).length; }, render: function (p) { var n = dpUses(p, d).length; return n ? '<span class="num">' + n + '</span>' : '<span class="faint">0</span>'; } },
         { key: 'act', label: 'Actions', align: 'right', render: acts }
       ],
       empty: { icon: 'shield-off', title: 'No damage packages found.', text: st.f.q ? 'Try another name.' : 'Add the cover options staff can offer on a booking.', action: !st.f.q && ctx.can('damage_packages.create') ? UI.btn('New Package', { icon: 'plus', attrs: { 'data-dp-new': 1 } }) : '' },
-      card: function (p) { return '<div class="dp-card"><div class="dp-name"><span class="dp-ic">' + i('shield-check') + '</span><b>' + esc(p.name) + '</b></div><div class="dp-card-n"><span><small>Daily Rate</small><b class="num">RM ' + dpMoney(p.daily) + '</b></span><span><small>Max Coverage</small><b class="num">RM ' + dpMoney(p.max) + '</b></span><span><small>Bookings</small><b class="num">' + dpUses(p, d).length + '</b></span></div>' + acts(p) + '</div>'; }
+      card: function (p) { return '<div class="dp-card"><div class="dp-name"><span class="dp-ic">' + i('shield-check') + '</span><b>' + esc(p.name) + '</b></div><div class="dp-card-n"><span><small>Daily Rate</small><b class="num">' + UI.fmt.money(p.daily) + '</b></span><span><small>Max Coverage</small><b class="num">' + UI.fmt.money(p.max) + '</b></span><span><small>Bookings</small><b class="num">' + dpUses(p, d).length + '</b></span></div>' + acts(p) + '</div>'; }
     });
     UI.filters(root.querySelector('#dp-f'), { values: st.f, fields: [{ type: 'search', key: 'q', placeholder: 'Search...' }], onChange: function () { t.setRows(rowsFor()); }, extra: '<span class="grow"></span><span class="b2">' + plural(d.damagePackages.length, 'package') + '</span>' });
     UI.on(root, 'click', '[data-dp-new]', function () { dpOpen(null); });

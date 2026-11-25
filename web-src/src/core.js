@@ -57,7 +57,7 @@ function carName(c) { return c.make + ' ' + c.model; }
 function carModel(c) { return c.make + ' ' + c.model.split(' ')[0]; }
 
 /* status colours: the template system's own */
-var BOOKING_COLORS = { 'Pending': '#94a3b8', 'Confirmed': '#94a3b8', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#ef4444', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' };
+var BOOKING_COLORS = { 'Pending': '#94a3b8', 'Confirmed': '#0891b2', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#6366f1', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' };
 var PAY_COLORS = { 'Deposit due': '#ef4444', 'Deposit Received': '#eab308', 'Full Payment Received': '#10b981', 'Extension due': '#ef4444', 'Extension paid': '#22c55e', 'Refund Pending': '#3b82f6', 'Deposit Refunded': '#f97316' };
 function schip(label, color) { return '<span class="schip" style="color:' + color + ';border-color:' + color + '4d;background:' + color + '26">' + esc(label) + '</span>'; }
 function bchip(b) { return schip(b.status, BOOKING_COLORS[b.status] || '#94a3b8'); }
@@ -77,7 +77,14 @@ function applyTheme(b) {
     '--hero-a': heroA, '--hero-b': heroB, '--hero-line': C.onDark(p, heroB, 4),
     '--t1-glow': C.mix(p, '#000000', .72), '--t1-red': C.onDark(p, '#020202', 4)
   };
+  /* a red brand makes focus rings and ticked rows look like errors: use the dark brand colour for those instead
+     (the mobile app does the same). Buttons and the menu keep the brand colour. */
+  var hs = C.hsl(p), nearRed = hs[1] > .35 && Math.min(hs[0], 360 - hs[0]) <= 25;
+  var dk = nearRed ? (C.lum(s) < .2 ? s : C.mix(s, '#000000', .5)) : p;
+  set['--focus-l'] = nearRed ? dk : p; set['--focus-d'] = nearRed ? '#C9CCD6' : C.onDark(p, '#2F3349', 3);
+  set['--sel-rgb'] = C.ch(nearRed ? dk : p);
   for (var k in set) r.setProperty(k, set[k]);
+  document.documentElement.classList.toggle('brand-dark-accent', nearRed);
 }
 
 /* ---------------- picking colours from an uploaded logo ---------------- */
@@ -162,8 +169,9 @@ function toast(msg, o) { return UI.toast(msg, o); }
 
 /* actions, by name */
 var A = {
-  brand: function (v) { UI.closeAll(); S.b = +v; applyTheme(B()); S.drawer = null; S.modal = null; render(); emit('brand', B()); },
-  sec: function (v) { UI.closeAll(); S.drawer = null; S.modal = null; S.nav = false; S.ws.full = null; if (v === 'web') { S.sec = 'dash'; S.page = 'website'; } else { S.sec = v; if (v === 'dash' && S.page === 'website') S.page = 'dashboard'; } if (v === 'pf') applyTheme(B()); render(); window.scrollTo(0, 0); },
+  brand: function (v) { UI.leave(function () { UI.closeAll(); UI.clearToasts(0); S.b = +v; applyTheme(B()); S.drawer = null; S.modal = null; render(); emit('brand', B()); }, { onStay: function () { render(); } }); },
+  sec: function (v) { UI.leave(function () { A.sec0(v); }); },
+  sec0: function (v) { UI.closeAll(); UI.clearToasts(); S.drawer = null; S.modal = null; S.nav = false; S.ws.full = null; if (v === 'web') { S.sec = 'dash'; S.page = 'website'; } else { S.sec = v; if (v === 'dash' && S.page === 'website') S.page = 'dashboard'; } if (v === 'pf') applyTheme(B()); render(); window.scrollTo(0, 0); },
   nav: function (v) { go(v); },
   close: function () { S.drawer = null; S.modal = null; render(); },
   go: function (v, el) { var p = {}; (el.getAttribute('data-p') || '').split('&').forEach(function (kv) { if (kv) { var q = kv.split('='); p[q[0]] = decodeURIComponent(q[1] || ''); } }); go(v, p); },

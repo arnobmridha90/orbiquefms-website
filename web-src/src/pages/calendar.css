@@ -34,7 +34,7 @@
 .pg-calendar .cl-hd.hr b{width:auto;height:auto;border-radius:4px;padding:2px 6px;font-size:13px}
 .pg-calendar .cl-car{position:sticky;left:0;z-index:6;background:var(--paper);display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--divider);border-right:1px solid var(--divider);cursor:pointer;min-width:0}
 .pg-calendar .cl-car:hover{background:var(--hover)}
-.pg-calendar .cl-car:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.pg-calendar .cl-car:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 .pg-calendar .cl-ph{width:52px;flex:none;border-radius:5px;background:var(--hover)}
 .pg-calendar .cl-ci{display:flex;flex-direction:column;min-width:0;line-height:1.25}
 .pg-calendar .cl-ci b{font-size:14px;color:var(--text);letter-spacing:.04em}
@@ -87,3 +87,27 @@
 @media (max-width:400px){
   .pg-calendar .cl-views button{padding:7px 9px;font-size:13px}
 }
+/* the grid is as wide as its columns, so the sticky car column stays pinned at any sideways scroll (min-width set in calendar.js) */
+/* plate box, click-to-book cue, today in the list */
+.pg-calendar .cl-q{width:190px}
+.pg-calendar .cl-q .inp{margin:0}
+.pg-calendar .cl-q input{height:36px}
+.pg-calendar .cl-hint{margin-left:auto;color:var(--text3)}
+.pg-calendar .cl-hint i{font-size:15px}
+.pg-calendar .cl-track.book{cursor:pointer}
+.pg-calendar .cl-track.book:hover .cl-bg i{background-color:rgb(var(--primary-rgb) / .025)}
+.pg-calendar .cl-lday.td{color:rgb(var(--error-rgb))}
+.pg-calendar .cl-lday.td b{color:rgb(var(--error-rgb))}
+.pg-calendar .cl-lday{scroll-margin-top:12px}
+@media (max-width:760px){.pg-calendar .cl-q{width:100%;order:-1}.pg-calendar .cl-right{width:100%}.pg-calendar .cl-hint{display:none}}
+.pg-calendar .cl-list{position:relative}
+.pg-calendar .cl-lday{background:linear-gradient(var(--hover),var(--hover)),var(--paper)}
+.pg-calendar .cl-lnone{padding:12px 16px;border-bottom:1px solid var(--divider);color:var(--text2);font-size:13.5px}
+
+/* a booking inside its car's workshop time, and that workshop bar: red outline and a warning icon */
+.pg-calendar .cl-ev.clash{box-shadow:0 0 0 2px #dc2626,0 1px 2px rgb(0 0 0 / .15);z-index:3}
+.pg-calendar .cl-ev .cl-cx{font-size:13px;margin-right:4px;vertical-align:-2px;color:#fff;filter:drop-shadow(0 0 1px rgb(0 0 0 / .5))}
+.pg-calendar .cl-ev.yellow .cl-cx{color:#991b1b;filter:none}
+.pg-calendar .cl-lt{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:92px}
+.pg-calendar .cl-lt b{color:var(--text);font-weight:600}
+.pg-calendar .cl-lt .chip{font-size:11.5px}

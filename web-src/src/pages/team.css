@@ -91,3 +91,18 @@
 .pg-team .tm-cell .sw input:disabled+span{opacity:.55}
 @media (max-width:760px){.pg-team .tm-g1{min-width:150px;padding-left:12px!important}}
 .tm-dh .av{width:42px;height:42px;font-size:16px}
+/* W4: requirement warnings, private car group, password send row, email note */
+.tm-req{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin:0 12px 10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--warning,#b26a00) 12%,var(--paper));border:1px solid color-mix(in srgb,var(--warning,#b26a00) 35%,transparent)}
+.tm-req>i{color:var(--warning,#b26a00);font-size:18px;flex:0 0 auto}
+.tm-req .grow{min-width:180px}
+.tm-req .btn{min-height:40px}
+.tm-priv{margin:8px 0 4px;padding:10px 12px;border:1px dashed var(--divider);border-radius:10px;background:color-mix(in srgb,var(--text2) 4%,transparent)}
+.tm-priv-h{display:flex;gap:8px;align-items:center;color:var(--text1)}
+.tm-priv>p{margin:4px 0 6px}
+.tm-priv .tm-code:last-child{border-bottom:0}
+.tm-pwsend{margin-top:8px}
+.tm-pwsend .btn{min-height:40px}
+.tm-emw:empty{display:none}
+.tm-emw .alert{margin:0}
+.tm-emw{grid-column:1/-1}
+.tm-gwarn{color:var(--warning,#b26a00)}

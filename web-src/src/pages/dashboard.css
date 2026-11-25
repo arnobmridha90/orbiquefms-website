@@ -58,7 +58,8 @@
 .dsh-clear i{color:var(--success);font-size:20px}
 
 /* KPI */
-.dsh-info{border:0;background:transparent;padding:0;display:inline-grid;place-items:center;color:var(--text3);font-size:15px;cursor:help;width:20px;height:20px;border-radius:50%}
+.dsh-info{border:0;background:transparent;padding:0;display:inline-grid;place-items:center;vertical-align:middle;color:var(--text3);font-size:16px;cursor:help;width:40px;height:40px;margin:-12px -12px -12px -10px;border-radius:50%}
+.dsh-info:focus-visible{outline:2px solid var(--focus);outline-offset:-6px}
 .dsh-info:hover{color:var(--text);background:var(--hover)}
 .dsh-k1{grid-template-columns:repeat(var(--n,5),minmax(0,1fr))}
 @media (max-width:1250px){.dsh-k1{grid-template-columns:repeat(6,minmax(0,1fr))}}
@@ -259,3 +260,23 @@ button.dsh-legi:hover{background:var(--hover)}
 /* dark: the theme sets --primary-text for light paper only, so lift it here */
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pg-dashboard{--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}}
 :root[data-theme="dark"] .pg-dashboard{--primary-text:color-mix(in srgb,var(--primary) 55%,#fff)}
+
+/* W5: cars not counted, phone folds */
+.dsh-nc .dsh-cb{display:flex;flex-direction:column;gap:12px}
+.dsh-ncplates{display:flex;flex-wrap:wrap;gap:6px}
+.dsh-ncp{font-weight:600;letter-spacing:.02em}
+.dsh-ncp small{font-weight:400;color:var(--text2)}
+.dsh-ncfigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.dsh-ncf{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;background:var(--hover)}
+.dsh-ncf b{font-size:17px;font-weight:600;color:var(--text)}
+.dsh-fold{display:block}
+.dsh-foldb{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 16px;border:1px solid var(--divider);border-radius:12px;background:var(--paper);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.dsh-foldb b{display:block;font-size:15px;font-weight:600}
+.dsh-foldb small{display:block;font-size:12px;color:var(--text2)}
+.dsh-foldb:hover{background:var(--hover)}
+.dsh-foldb > i{font-size:20px;color:var(--text2)}
+@media (max-width:760px){
+  .dsh .dsh-fold + .dsh-fold{margin-top:-12px}
+  .dsh-top1{display:block}
+  .dsh-ncfigs{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

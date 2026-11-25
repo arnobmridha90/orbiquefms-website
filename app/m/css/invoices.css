@@ -1,0 +1,56 @@
+/* invoices screens (M3): Invoice and receipts sheet, invoice preview, #invoices list. Shared classes live in base.css. */
+.iv-line { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 14.5px; }
+.iv-line:first-child { border-top: 0; }
+.iv-line .grow { flex: 1; min-width: 0; }
+.iv-line small { display: block; font-size: 12px; color: var(--muted); }
+.iv-line .money { min-width: 104px; text-align: center; font-weight: 640; }
+.iv-line.tot { background: #FBFBFC; font-weight: 700; }
+.iv-line.big { font-weight: 760; font-size: 16px; background: #F4F6F9; }
+.iv-for { margin: 0 0 10px; }
+.iv-lines { margin-bottom: 14px; overflow: hidden; }
+/* booking sheet */
+.dc-sheet .sec:first-child { margin-top: 6px; }
+.dc-card { padding: 4px 12px 10px; }
+.dc-doc { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 8px 2px; text-align: left; border-bottom: 1px solid var(--line); }
+.dc-doc:active { background: #F7F8FA; }
+.dc-doc > svg { width: 22px; height: 22px; color: var(--brand-ink); flex: none; }
+.dc-doc .grow { flex: 1; min-width: 0; }
+.dc-doc b { display: block; font-weight: 680; font-size: 15px; }
+.dc-doc small { display: block; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-doc .money { font-weight: 700; min-width: 96px; text-align: center; }
+.dc-doc.void { opacity: .6; }
+.dc-doc.void > svg { color: var(--muted); }
+.dc-doc + .dc-doc { border-top: 0; }
+.dc-send { display: flex; gap: 8px; padding-top: 10px; }
+.dc-send .btn.sm:first-child { flex: 1; }
+.dc-send .btn.sm { min-width: 44px; }
+.dc-sent { padding: 6px 2px 8px; }
+.dc-changed { margin: 10px 0 0; }
+.dc-changed .grow { flex: 1; }
+.dc-changed .btn, .dc-miss .btn { display: flex; margin-top: 8px; }
+.dc-miss { margin: 10px 0 0; }
+.dc-miss .grow { flex: 1; }
+.dc-void { height: 40px; margin-top: 2px; }
+.dc-none { display: flex; gap: 12px; align-items: center; padding: 12px 2px; }
+.dc-none > svg { width: 22px; height: 22px; color: var(--faint); flex: none; }
+.dc-none b { display: block; }
+.dc-none small { display: block; color: var(--muted); font-size: 13px; }
+.dc-pad { padding: 0 2px 6px; }
+.dc-old { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 4px; }
+.dc-old button { display: block; width: 100%; text-align: left; font-size: 13px; color: var(--muted); padding: 8px 2px; min-height: 36px; }
+/* #invoices */
+.iv-tabs { display: grid; grid-template-columns: repeat(3, 1fr); background: #E6E8EC; border-radius: 12px; padding: 3px; margin: 6px 0 10px; }
+.iv-tabs button { height: 38px; border-radius: 9px; font-weight: 650; font-size: 14px; color: #4A5160; }
+.iv-tabs button.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.iv-sep { width: 1px; background: var(--line); margin: 6px 2px; flex: none; }
+.iv-count { margin: 4px 2px 8px; }
+.iv-d { font-weight: 500; }
+.iv-slip { display: inline-block; vertical-align: -3px; margin-right: 4px; color: var(--brand-ink); }
+.iv-slip svg { width: 15px; height: 15px; }
+.ivl .card2 .c2-end small { margin-top: 3px; }
+.ivl .card2.muted .c2-t1 { color: var(--muted); }
+.iv-more { margin: 12px 0 4px; }
+.dc-send .btn.sm { padding: 0 11px; white-space: nowrap; font-size: 14px; gap: 6px; }
+.dc-send .btn.sm svg { width: 18px; height: 18px; }
+/* a voided document keeps its amount for the record, struck through so nobody counts it */
+.dc-doc.void .money, .card2.muted[data-doc] .c2-end .money { text-decoration: line-through; color: var(--muted); }

@@ -1,0 +1,99 @@
+/* team screens (M9). Shared classes live in base.css. Home and More styles live here too (M9 owns no home.css). */
+
+/* ---- Home ---- */
+.hm-main { position: relative; }
+.hm-ptr { height: 0; opacity: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; transition: height .2s, opacity .2s; }
+.hm-ptr svg { width: 18px; height: 18px; transition: transform .2s; }
+.hm-ptr.ready svg { transform: rotate(180deg); color: var(--brand-ink); }
+.hm-install { align-items: center; padding-right: 4px; }
+.hm-install-a { display: flex; gap: 10px; align-items: flex-start; flex: 1; min-width: 0; color: inherit; }
+.hm-hello { margin: 8px 0 4px; }
+.hm-hi { font-size: 22px; font-weight: 780; letter-spacing: -.02em; }
+.hm-need { min-height: 60px; }
+.hm-n { min-width: 36px; height: 36px; padding: 0 8px; border-radius: 11px; display: grid; place-items: center; font-weight: 780; font-size: 16px; flex: none; font-variant-numeric: tabular-nums; }
+.hm-n.tone-red { background: var(--t-red-bg); color: var(--t-red); }
+.hm-n.tone-amber { background: var(--t-amber-bg); color: var(--t-amber); }
+.hm-need .t2 { white-space: normal; }
+.hm-clear { display: flex; gap: 12px; align-items: center; padding: 14px; }
+.hm-clear > svg { width: 34px; height: 34px; padding: 7px; border-radius: 50%; background: var(--t-green-bg); color: var(--t-green); flex: none; }
+.hm-needs-list .c2-end { text-align: center; }
+.hm-quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hm-quick .gtile { min-height: 84px; justify-content: center; line-height: 1.2; padding: 10px 4px; }
+.hm-cash { justify-content: center; gap: 3px; background: var(--t-green-bg); border-color: transparent; }
+.hm-cash-k { font-size: 12px; font-weight: 600; color: var(--t-green); }
+.hm-cash b { font-size: 15px; font-weight: 760; color: var(--text); }
+.hm-cash.owed { background: var(--t-amber-bg); }
+.hm-cash.owed .hm-cash-k { color: var(--t-amber); }
+.hm-ho .time b small { font-size: 10px; font-weight: 700; margin-left: 1px; color: var(--muted); }
+.hm-drafts { margin-top: 14px; }
+.hm-drafts .nb-draftcard { margin-bottom: 8px; }
+.hm-next { overflow: hidden; }
+.hm-next-top { display: flex; gap: 14px; padding: 14px; color: inherit; align-items: center; }
+.hm-next-when { flex: none; min-width: 96px; }
+.hm-cd { display: block; font-size: 20px; font-weight: 790; letter-spacing: -.02em; color: var(--brand-ink); line-height: 1.15; }
+.hm-next.late .hm-cd { color: var(--t-red); }
+.hm-next-when small { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; font-weight: 600; }
+.hm-next-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; color: var(--muted); }
+.hm-next-who b { color: var(--text); font-size: 15.5px; font-weight: 680; }
+.hm-next-who span { display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-next-who svg { width: 14px; height: 14px; flex: none; }
+.hm-next-act { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); background: #FAFBFC; flex-wrap: wrap; }
+.hm-next-act .grow { flex: 1; }
+.hm-next-act .btn { height: 42px; }
+.hm-tiles .tile { min-height: 74px; }
+.hm-money { font-size: 19px; text-align: left; }
+.hm-ho.done { opacity: .62; }
+.hm-ho.done .t1 { font-weight: 560; }
+
+/* ---- More ---- */
+.mo-me { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-top: 6px; color: inherit; }
+.mo-me .grow { flex: 1; min-width: 0; }
+.mo-grid .gtile { min-height: 82px; justify-content: center; line-height: 1.2; }
+.mo-tile .gi { position: relative; }
+.mo-badge { position: absolute; top: -7px; right: -10px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; font-size: 11px; font-weight: 750; font-style: normal; display: grid; place-items: center; border: 2px solid var(--card); }
+.mo-badge.tone-red { background: var(--t-red); color: #fff; }
+.mo-badge.tone-amber { background: #E39A12; color: #fff; }
+.mo-badge.tone-blue { background: var(--t-blue); color: #fff; }
+
+/* ---- Team list ---- */
+.tm-list { display: flex; flex-direction: column; gap: 8px; }
+.tm-card { display: flex; align-items: center; padding: 4px 6px 4px 0; }
+.tm-card.off { background: #FAFAFB; }
+.tm-main { display: flex; gap: 12px; align-items: center; flex: 1; min-width: 0; padding: 10px 4px 10px 14px; color: inherit; }
+.tm-main .grow { flex: 1; min-width: 0; }
+.tm-name { font-weight: 680; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-chips, .st-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 3px; }
+.tm-acts { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.tm-acts .iconbtn { width: 44px; height: 44px; color: var(--brand-ink); }
+.tm-acts .tm-wa { color: #128C4A; }
+.tm-addbtn { margin-top: 14px; }
+
+/* ---- Person ---- */
+.tm-head { display: flex; gap: 14px; align-items: center; padding: 14px; margin-top: 6px; margin-bottom: 12px; }
+.tm-head .grow { flex: 1; min-width: 0; }
+.tm-bigav { width: 56px; height: 56px; font-size: 19px; }
+.tm-hname { font-size: 19px; font-weight: 760; letter-spacing: -.01em; }
+.tm-actbtn { margin-bottom: 4px; }
+.tm-kv { margin-top: 10px; }
+.tm-docs .thumb { width: 104px; height: 86px; }
+.tm-docs .thumb span { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 6px; }
+.tm-docbig { width: 100%; border-radius: 12px; display: block; }
+.tm-area .chev { transition: transform .2s; }
+.tm-area .chev.up { transform: rotate(180deg); }
+.tm-codes { padding: 4px 14px 12px; display: grid; gap: 6px; background: #FAFBFC; }
+.tm-code { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--faint); }
+.tm-code svg { width: 15px; height: 15px; flex: none; }
+.tm-code.on { color: var(--text); }
+.tm-code.on svg { color: var(--t-green); }
+.tm-note { margin: 8px 4px 0; }
+.tm-pwchecks { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: -4px 2px 12px; font-size: 12.5px; color: var(--faint); }
+.tm-pwchecks span { display: inline-flex; align-items: center; gap: 4px; }
+.tm-pwchecks svg { width: 14px; height: 14px; }
+.tm-pwchecks .ok { color: var(--t-green); }
+.tm-pw { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; }
+.tm-pwrow { margin-bottom: 6px; }
+.tm-pwrow .btn { flex: 1; width: auto; }
+.tm-roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.hm-ho .ho .time { width: 60px; }
+.mo-grid .gtile { font-size: 11.5px; padding-left: 2px; padding-right: 2px; white-space: normal; overflow-wrap: anywhere; letter-spacing: -.01em; }
+.mo-set a.row .t1, .hm-ho .t1, .tm-person a.row .t1, .act-list a.row .act-t, .hm-needs-list .c2-t1 { color: var(--text); }

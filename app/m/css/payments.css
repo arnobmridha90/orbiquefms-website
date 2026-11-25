@@ -1,0 +1,122 @@
+/* payments screens (M3): Record payment, payment details, slips. Shared classes live in base.css. */
+.pay-sheet .pay-body, .sl-sheet .sl-body { flex: 1 0 auto; }
+.pay-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #F6F7F9; border: 1px solid var(--line); border-radius: 12px; padding: 9px 6px; margin: 2px 0 10px; text-align: center; }
+.pay-sum small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.pay-sum b { font-size: 14.5px; }
+.pay-quick { margin: 0 0 6px; padding: 2px 0 6px; flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+.pay-quick .fchip { flex: 0 0 auto; }
+.pay-quick .fchip b { font-weight: 700; margin-left: 2px; }
+.pay-h { font-size: 13px; font-weight: 700; color: #454C59; margin: 14px 0 4px; }
+.pay-hint { margin-bottom: 8px; }
+.pay-items { overflow: hidden; }
+.pay-items.bad { border-color: var(--t-red); }
+.pay-it { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 10px 6px 4px; border-top: 1px solid var(--line); min-height: 56px; }
+.pay-it:first-child { border-top: 0; }
+.pay-it.on { background: #F7F9FC; }
+.pay-tick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 6px; text-align: left; border-radius: 10px; }
+.pay-tick:active { background: rgba(0,0,0,.04); }
+.pay-tick .box { width: 24px; height: 24px; border-radius: 7px; border: 2px solid #C3C8D0; display: grid; place-items: center; flex: none; background: #fff; color: #fff; }
+.pay-tick .box svg { width: 15px; height: 15px; }
+.pay-it.on .box { background: var(--brand); border-color: var(--brand); }
+.pay-tick .grow { flex: 1; min-width: 0; }
+.pay-tick b { display: block; font-weight: 640; font-size: 15px; }
+.pay-tick small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.pay-it.lock .pay-tick { opacity: .55; }
+.pay-it.lock small { color: var(--t-amber); opacity: 1; }
+.pay-amt { width: 132px; flex: none; }
+.pay-amt .inp { height: 44px; text-align: center; padding-left: 36px; padding-right: 8px; }
+.pay-err { flex-basis: 100%; text-align: right; margin: 0 0 4px; }
+.pay-tot { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border-top: 1px solid var(--line); background: #FBFBFC; }
+.pay-tot b { font-size: 17px; }
+.pay-meth { margin-bottom: 6px; }
+.pay-meth button, .pay-depof button { flex: 1 1 auto; min-height: 42px; }
+.pay-depof button small { display: block; font-size: 11px; font-weight: 500; opacity: .8; }
+.pay-depof button:disabled { opacity: .55; }
+.pay-credit .btn { margin-top: 6px; }
+.pay-mhint { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.pay-mhint svg { width: 16px; height: 16px; }
+.pay-cashto .pay-pn, .pay-pn { font-size: 15.5px; font-weight: 700; letter-spacing: 0; }
+.pay-lnk { color: var(--brand-ink); font-weight: 650; font-size: 13.5px; text-decoration: underline; text-underline-offset: 2px; padding: 8px 0; min-height: 36px; }
+.pay-when { margin-bottom: 4px; }
+.pay-dt { grid-template-columns: 1.2fr 1fr; margin-bottom: 4px; }
+.pay-gap { margin-top: 12px; }
+.pay-sws { margin-top: 4px; }
+.pay-sw { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--line); min-height: 58px; cursor: pointer; }
+.pay-sw:first-child { border-top: 0; }
+.pay-sw .grow { flex: 1; min-width: 0; }
+.pay-sw b { display: block; font-size: 14.5px; font-weight: 640; }
+.pay-sw small { display: block; font-size: 12.5px; color: var(--muted); }
+.pay-errb { margin-top: 12px; }
+.pay-over-q { font-size: 16px; line-height: 1.45; margin: 8px 0 10px; color: var(--text); }
+.pay-over-list { display: grid; gap: 6px; text-align: left; margin-bottom: 4px; }
+.pay-over-list div { background: var(--t-amber-bg); color: #5E3A05; border-radius: 10px; padding: 9px 11px; font-size: 13.5px; }
+/* success */
+.pay-done { text-align: center; padding-top: 10px; }
+.pay-done-ic { width: 60px; height: 60px; border-radius: 50%; background: var(--t-green-bg); color: var(--t-green); display: grid; place-items: center; margin: 0 auto 10px; }
+.pay-done-ic svg { width: 30px; height: 30px; }
+.pay-done h3 { font-size: 20px; margin-bottom: 12px; }
+.pay-done .banner { text-align: left; }
+.pay-done-items { text-align: left; margin-bottom: 12px; }
+.pay-done-end .btn { flex: 1; }
+/* payment details */
+.pd-kvs { margin-top: 10px; }
+.pd-kv { display: flex; gap: 12px; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 14px; }
+.pd-kv:first-child { border-top: 0; }
+.pd-kv span { color: var(--muted); flex: none; }
+.pd-kv b { font-weight: 600; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.pd-kv .pay-lnk { padding: 0; min-height: 0; font-size: 14px; }
+.pd-thumbs .thumb { width: 84px; height: 110px; }
+.pd-noslip { padding: 4px 2px 6px; }
+.pay-detail .sec { margin-top: 14px; }
+/* slip viewer */
+.sv-sheet { background: #1A1D23; color: #fff; }
+.sv-sheet .sheet-head h3 { color: #fff; }
+.sv-sheet .sheet-head .lead, .sv-sheet .hint { color: #B4BAC5; }
+.sv-sheet .iconbtn { color: #fff; }
+.sv-list { display: grid; gap: 16px; }
+.sv { margin: 0; }
+.sv-img { display: block; width: 100%; overflow: auto; border-radius: 10px; background: #2A2E36; max-height: 78vh; }
+.sv-img img { display: block; width: 100%; height: auto; }
+.sv-img.zoom img { width: 220%; max-width: none; }
+.sv figcaption { font-size: 12.5px; color: #B4BAC5; margin-top: 6px; }
+.sv-tip { text-align: center; margin-top: 10px; }
+/* slip upload */
+.sl-pick { display: grid; gap: 8px; margin: 6px 0 4px; }
+.sl-empty { text-align: center; padding: 16px 10px 8px; color: var(--muted); font-size: 14px; }
+.sl-empty svg { width: 34px; height: 34px; margin: 0 auto 8px; color: var(--faint); }
+.sl-empty b { display: block; color: var(--text); font-size: 16px; margin-bottom: 4px; }
+.sl-card { padding: 12px 14px 14px; margin-bottom: 12px; }
+.sl-card.done { background: #FBFDFB; }
+.sl-top { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+.sl-top .grow { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.sl-top .grow b { font-size: 16px; }
+.sl-top .grow small { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.sl-top .iconbtn { margin: -4px -8px 0 0; color: var(--muted); }
+.sl-thumb { width: 64px; height: 84px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #F1F3F6; flex: none; }
+.sl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sl-pdf { width: 100%; height: 100%; min-height: 80px; display: grid; place-items: center; font-weight: 800; color: var(--t-red); background: #FFF5F5; }
+.sl-reading { display: flex; align-items: center; gap: 10px; padding: 12px 4px; color: var(--muted); font-size: 14px; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid #D6DAE0; border-top-color: var(--brand); animation: slspin .8s linear infinite; flex: none; }
+@keyframes slspin { to { transform: rotate(360deg); } }
+.sl-card .banner { margin-bottom: 10px; }
+.sl-card .carfield .pk-sub { white-space: normal; }
+.sl-card .carfield.bad { border-color: var(--t-red); }
+.sl-fixed { cursor: default; }
+.sl-kinds { margin-bottom: 2px; }
+.sl-kinds button { min-height: 40px; padding: 0 11px; }
+.sl-khint { margin: 0 0 2px; }
+.sl-split-h { margin: 0 0 8px; }
+.sl-parts { display: grid; gap: 8px; }
+.sl-part { display: grid; grid-template-columns: 1fr 120px 40px; gap: 6px; align-items: center; }
+.sl-part .iconbtn { color: var(--muted); }
+.sl-gap { font-size: 13px; font-weight: 650; margin-top: 8px; }
+.sl-gap.ok { color: var(--t-green); }
+.sl-gap.off { color: var(--t-amber); }
+.sl-plinks { display: flex; gap: 18px; flex-wrap: wrap; }
+.sl-rec { width: 100%; margin-top: 4px; height: 44px; }
+.sl-more { margin-top: 2px; }
+.sl-sum { text-align: center; margin-bottom: 6px; }
+.sl-route .btn { width: auto; }
+.pay-err { color: var(--t-red); font-size: 12.5px; font-weight: 600; }
+.carfield .pay-pn { font-size: 15.5px; font-weight: 700; letter-spacing: 0; }
+.sl-card .btn.sm.sl-rec { width: 100%; height: 44px; margin-top: 4px; }

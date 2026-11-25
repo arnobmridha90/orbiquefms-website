@@ -1,0 +1,75 @@
+/* settings screens (M9). Shared classes live in base.css. Notifications and Install styles live here too. */
+.st-edit { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 4px; font-size: 13.5px; font-weight: 650; color: var(--brand-ink); }
+.st-edit svg { width: 15px; height: 15px; }
+.st-main .sec { align-items: center; }
+.st-card { padding: 4px 14px; }
+.st-kv { display: flex; gap: 12px; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.st-kv:first-child { border-top: 0; }
+.st-kv span { color: var(--muted); flex: none; }
+.st-kv b { font-weight: 620; text-align: right; overflow-wrap: anywhere; }
+.st-tap[disabled] { opacity: 1; cursor: default; }
+.st-fees .row > span { width: 96px; flex: none; text-align: center; font-size: 13.5px; font-weight: 640; white-space: nowrap; }
+.st-fees .row { gap: 6px; }
+.st-feehead { min-height: 34px !important; padding-top: 6px !important; padding-bottom: 6px !important; background: #FAFBFC; }
+.st-feehead > span { font-size: 11.5px !important; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700 !important; }
+.st-sub { font-size: 13px; font-weight: 700; color: var(--text); margin: 12px 2px 6px; }
+.st-lead { margin: -2px 2px 4px; }
+.st-wrap { white-space: normal !important; }
+.st-amt { width: 92px; flex: none; text-align: center; font-weight: 680; }
+.st-sigcard { padding: 14px; min-height: 80px; display: grid; place-items: center; }
+.st-sigcard img { max-width: 100%; max-height: 120px; }
+.st-sigpad { position: relative; height: 200px; border: 1.5px dashed #C9CED6; border-radius: 14px; background: #fff; touch-action: none; overflow: hidden; }
+.st-sigpad canvas { position: absolute; inset: 0; touch-action: none; }
+.st-sigline { position: absolute; left: 24px; right: 24px; bottom: 46px; border-bottom: 1.5px solid #D6DAE0; pointer-events: none; }
+.st-sighint { position: absolute; left: 26px; bottom: 52px; color: var(--faint); font-size: 14px; pointer-events: none; }
+.st-me { padding: 14px; }
+.st-me .seg { margin: 8px 0 14px; }
+.st-mek { font-weight: 700; font-size: 14.5px; }
+.st-me p { margin: 2px 0 0; }
+.st-me .btnrow { margin-top: 10px; }
+.st-me .btnrow .btn { flex: 1; width: auto; }
+.st-swrow { display: flex; align-items: center; gap: 12px; min-height: 52px; margin-bottom: 8px; cursor: pointer; }
+.st-swrow b { display: block; font-size: 14.5px; font-weight: 620; }
+.st-swrow small { display: block; color: var(--muted); font-size: 12.5px; }
+.st-agents { margin: 0 0 8px; }
+.st-pct .inp { text-align: left; }
+.st-rate { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.st-rate .grow { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-rateinp { width: 120px; flex: none; }
+
+/* ---- Notifications ---- */
+.nt-card { padding: 14px; margin-bottom: 12px; }
+.nt-card > .b { margin-bottom: 4px; }
+.nt-card > .small { margin-bottom: 12px; }
+.nt-row { align-items: flex-start; }
+.nt-row .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.nt-row .ic svg { width: 19px; height: 19px; }
+.nt-row .sw { margin-top: 4px; }
+.nt-desc { white-space: normal !important; }
+.nt-try { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; margin-top: 4px; padding: 0 14px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 650; color: var(--brand-ink); }
+.nt-try svg { width: 14px; height: 14px; }
+.nt-foot { margin: 8px 4px 0; }
+.nt-qrow { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; }
+.nt-qrow b { display: block; font-size: 15px; }
+.nt-qrow small { display: block; color: var(--muted); font-size: 13px; }
+.nt-times { grid-template-columns: 1fr 1fr; margin-top: 12px; }
+.nt-times .field { margin-bottom: 0; }
+.nt-now { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--t-blue); font-weight: 600; }
+.nt-now svg { width: 15px; height: 15px; }
+.k-job { background: #E6EFFD; color: #1D5FC9; }
+.k-tomorrow { background: #EEEAFD; color: #5B47C9; }
+.k-lead { background: #E3F7EA; color: #128C4A; }
+.k-service { background: #FDEBDD; color: #B4520B; }
+.k-alarm { background: #FCE9EA; color: #C8242F; }
+
+/* ---- Install ---- */
+.in-hero { padding: 18px; text-align: center; margin-top: 6px; }
+.in-logo { width: 72px; height: 72px; border-radius: 18px; overflow: hidden; margin: 0 auto 10px; box-shadow: 0 6px 18px -8px rgba(0,0,0,.4); }
+.in-logo svg { display: block; width: 100%; height: 100%; }
+.in-ic { display: inline; width: 18px; height: 18px; vertical-align: -3px; }
+.st-fees .t1, .st-fees .t2 { white-space: normal; }
+.st-fees .row > span { width: 84px; }
+#stTab { flex-wrap: nowrap; gap: 6px; }
+#stTab button { flex: 1; padding: 0 4px; min-height: 42px; }
+.st-pct { position: relative; }
+.st-pct i { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-style: normal; font-weight: 650; color: var(--muted); pointer-events: none; }

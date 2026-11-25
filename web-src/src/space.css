@@ -78,7 +78,8 @@
 
 /* ---------- Bookings: the booking drawer ---------- */
 .bkx-dl{gap:24px}
-.bkx-dl.two{grid-template-columns:minmax(0,1fr) 370px;gap:28px}
+@media (min-width:1101px){.bkx-dl.two{grid-template-columns:minmax(0,1fr) 370px;gap:28px}}
+@media (max-width:1100px){.bkx-dl.two{grid-template-columns:minmax(0,1fr)}}
 .bkx-dl.two .bkx-side{gap:20px}
 .bkx-form{gap:22px}
 .bkx-sec{border-radius:12px}
@@ -117,3 +118,36 @@
 .pg-customers .cu-mail{max-width:150px}
 .pg-customers .cu-flags{gap:6px;max-width:150px}
 .pg-customers .ui-t td,.pg-customers .ui-t th{padding-left:14px;padding-right:14px}
+
+/* phone tap targets: every control a finger presses is at least 40 x 40 px (the icon or text inside stays the same size) */
+@media (max-width:760px){
+  .btn,.btn.sm,.ui-fchip,.ui-dtf-chips .ui-fchip,.bkx-lens .ui-fchip,.sx-b,.d-item,.d-logo{min-height:40px}
+  .ib,.ib.sm{min-width:40px;min-height:40px}
+  .d-av{width:40px;height:40px}
+  .d-search button{width:40px;height:40px}
+  .ui-pager .pgs button{min-width:40px;min-height:40px}
+  .inp select,.inp input:not([type=checkbox]):not([type=radio]):not([type=range]),.ui-pager select{min-height:40px}
+  .d-foot a{display:inline-flex;align-items:center;min-height:40px;padding:0 6px}
+  /* the booking and payment status chips in the list and the drawer: a 40 px tall button around each chip */
+  .bkx-stb{min-height:40px}
+  .bkx-sts2{gap:0}
+  .bkx-sts{gap:4px 8px}
+  .cu-nbk{display:inline-flex;align-items:center;min-height:40px}
+  .cu-link{min-height:40px}
+  .bkx-ln-a{gap:4px}
+}
+
+/* brand colour close to red (CONTRACT 2.6): a picked choice chip uses the dark accent, so it never looks like a warning */
+.brand-dark-accent .ui-fchip[aria-pressed="true"],
+.brand-dark-accent .av-chip[aria-pressed="true"],
+.brand-dark-accent .pg-availability .av-chip[aria-pressed="true"],
+.brand-dark-accent .exp-chip[aria-pressed="true"],
+.brand-dark-accent .exp-ic[aria-pressed="true"],
+.brand-dark-accent .pg-reports .rpt-chip[aria-pressed="true"]{background:var(--focus);border-color:var(--focus);color:#fff;box-shadow:none}
+
+/* a page with a floating add button (Expenses on a phone): the back-to-top button and the toasts sit above it,
+   so the two round buttons never overlap and a message never covers the add button */
+@media (max-width:760px){
+  body:has(.exp-fab) .d-totop{bottom:calc(20px + env(safe-area-inset-bottom) + 56px + 12px);right:25px}
+  body:has(.exp-fab) #ui-toasts{bottom:calc(20px + env(safe-area-inset-bottom) + 56px + 12px)}
+}

@@ -7,7 +7,28 @@
    =================================================================== */
 var MT_PAPER_ICON = { 'Road tax': 'receipt-tax', 'Insurance': 'shield-check', 'PUSPAKOM': 'clipboard-check', 'Rental permit': 'file-certificate', 'Car grant': 'license', 'Other': 'file-text' };
 var MT_PAPER_LONG = { 'PUSPAKOM': 'PUSPAKOM inspection', 'Rental permit': 'Rental permit (APAD)' };
+var MT_FILE_KINDS = ['Invoice', 'Receipt', 'Quotation', 'Photo before', 'Photo after', 'Warranty', 'Other'];
+var MT_ODO_SRC = { manual: 'Typed in', service: 'Service', handover: 'Hand-over', 'return': 'Return' };
 var MT_TABS = [{ id: 'due', label: 'Due now', icon: 'alert-triangle' }, { id: 'log', label: 'Service log', icon: 'clipboard-list' }, { id: 'docs', label: 'Documents and renewals', icon: 'file-certificate' }, { id: 'workshop', label: 'Workshop', icon: 'tool' }, { id: 'vendors', label: 'Vendors', icon: 'building-store' }, { id: 'costs', label: 'Costs', icon: 'report-money' }];
+
+/* ---------------- extra sample data: file kinds, odometer sources and readings that are not trusted ---------------- */
+DATA_INIT.push(function (d) {
+  if (d.mtReady) return; d.mtReady = true;
+  var srcs = ['service', 'handover', 'return', 'manual', 'handover'];
+  (d.odometer || []).forEach(function (o, k) { if (!o.source) o.source = srcs[k % srcs.length]; });
+  (d.jobs || []).forEach(function (j, k) {
+    (j.files || []).forEach(function (f) { if (!f.kind) f.kind = /photo|\.jpe?g|\.png/i.test(f.name) ? 'Photo after' : 'Invoice'; });
+    if (j.status === 'Done' && k % 7 === 2 && (j.files || []).length) j.files.push({ name: 'before-' + (j.id || k) + '.jpg', size: 180 * 1024 + k * 517, kind: 'Photo before', caption: 'Before the work started' });
+  });
+  /* readings from the agent link that did not move the odometer */
+  var cars = d.cars.filter(function (c) { return c.fleet === 'Active'; });
+  [[1, 61200, 'More than 50,000 km above the last reading, so it did not change the car\'s odometer.'], [4, -2350, 'Lower than an earlier reading. An odometer only goes up, so it did not change the car\'s odometer.']].forEach(function (x, n) {
+    var c = cars[x[0]]; if (!c) return;
+    var last = d.odometer.filter(function (o) { return o.car === c.id; }).sort(function (a, b) { return b.at - a.at; })[0];
+    var at = last ? new Date(last.at.getTime() - (n ? 2 : 1) * DAY) : new Date(TODAY.getTime() - 3 * DAY);
+    d.odometer.push({ car: c.id, km: (last ? last.km : c.odo) + x[1], at: at, by: 'Agent link', source: n ? 'return' : 'handover', doubt: x[2] });
+  });
+});
 
 /* ---------------- small shared helpers ---------------- */
 /* open a drawer named in the address (#...&car=car-2) once, keep the address while it is open, clear it on close */
@@ -22,6 +43,12 @@ function b3Open(ctx, param, fn) {
 function mtToday() { var n = NOW(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
 function mtIso(d) { return d ? UI.isoDate(d) : ''; }
 function mtDate(s) { return s ? (s instanceof Date ? s : UI.parseDate(s)) : null; }
+/* the searchable car picker used on every fleet form; cars that are sold are left out unless already chosen */
+function mtCarPick(el, o) {
+  o = o || {};
+  var keep = o.value;
+  return UI.carPicker(el, Object.assign({ key: 'car', label: 'Car', required: true, full: true, placeholder: 'Search plate or model', cars: D().cars.filter(function (c) { return c.fleet !== 'Sold' || c.id === keep; }) }, o));
+}
 function mtCarOpts(all) { return D().cars.filter(function (c) { return all || c.fleet !== 'Sold'; }).map(function (c) { return [c.id, c.plate + ' · ' + carName(c)]; }); }
 function mtCarLine(c) { return c ? esc(c.plate) + ' · ' + esc(carName(c)) : '<span class="faint">No car</span>'; }
 function mtCarCell(c) { return c ? '<div class="mt-car"><b>' + esc(c.plate) + '</b><span>' + esc(carName(c)) + '</span></div>' : '<span class="faint">No car</span>'; }
@@ -79,9 +106,14 @@ function mtClashes(carId, from, to) {
   var end = to || new Date(from.getTime() + DAY);
   return D().bookings.filter(function (x) { return x.car.id === carId && ['Cancelled', 'Completed', 'Car Returned'].indexOf(x.status) < 0 && x.start < end && x.end > from; });
 }
-function mtClashHtml(list) {
+/* o: {forced, canForce}. Without the force the car cannot go in while rentals clash */
+function mtClashHtml(list, o) {
+  o = o || {};
   if (!list.length) return UI.alert('No bookings clash with these dates.', 'ok');
-  return UI.alert('<b>' + plural(list.length, 'booking') + ' clash with these dates.</b> Move them to another car or change the dates.<ul class="mt-clash">' + list.map(function (x) { return '<li>' + esc(x.code) + ' · ' + esc(x.cust.name) + ' · ' + UI.fmt.dateTime(x.start) + ' to ' + UI.fmt.dateTime(x.end) + '</li>'; }).join('') + '</ul>', 'warn', { html: true });
+  var canF = o.canForce == null ? can('maintenance.manage_downtime') : o.canForce;
+  return '<div class="alert warn mt-clashp" role="alert">' + i('calendar-exclamation') + '<div class="grow"><b>Some rentals clash with this workshop time</b><ul class="mt-clash">' + list.map(function (x) { return '<li><b>' + esc(x.code) + '</b>: ' + UI.fmt.dateTime(x.start) + ' to ' + UI.fmt.dateTime(x.end) + ' (' + esc(x.status) + ') · ' + esc(x.cust.name) + '</li>'; }).join('') + '</ul>' +
+    '<div class="b2">Move these rentals to another car first, then try again.</div>' +
+    (canF ? '<button type="button" class="btn sm ' + (o.forced ? 'c mt-forced' : 'o') + ' mt-force" data-force aria-pressed="' + !!o.forced + '">' + i(o.forced ? 'check' : 'alert-triangle') + '<span>' + (o.forced ? 'Will go ahead anyway' : 'Put the car in the workshop anyway') + '</span></button>' : '<div class="b2 mt8">' + i('lock') + ' Only people who manage workshop time can put the car in anyway.</div>') + '</div></div>';
 }
 /* read every [data-key] field into an object while the person types; onChange(key, event) */
 function mtBind(el, f, onChange) {
@@ -175,7 +207,7 @@ PAGES['maintenance'] = {
       UI.stat({ label: 'Due now', value: k.due, note: k.over + ' overdue', icon: 'alert-triangle', tone: k.over ? 'bad' : 'warn', attrs: { 'data-tab': 'due' } }) +
       UI.stat({ label: 'In the workshop', value: k.shop, note: 'cars cannot be booked', icon: 'tool', tone: 'warn', attrs: { 'data-tab': 'workshop' } }) +
       UI.stat({ label: 'Documents expiring', value: k.docs, note: 'within 30 days, or already expired', icon: 'file-alert', tone: 'info', attrs: { 'data-tab': 'docs' } }) +
-      (mtCostsOk() ? UI.stat({ label: 'Spent this month', value: UI.fmt.money(k.spent), note: plural(k.spentN, 'finished job'), icon: 'report-money', tone: 'pri', attrs: { 'data-tab': 'costs' } }) : '') +
+      (mtCostsOk() ? UI.stat({ label: 'Spent this month', value: UI.fmt.money(k.spent), note: plural(k.spentN, 'finished job'), icon: 'report-money', tone: 'grey', attrs: { 'data-tab': 'costs' } }) : '') +
       '</div><div id="mt-tabs" class="mt-tabs"></div><div id="mt-body" class="mt-body"></div>';
     UI.tabs(root.querySelector('#mt-tabs'), { items: MT_TABS.map(function (t) { return Object.assign({}, t, { hidden: t.id === 'costs' && !mtCostsOk() }); }), value: st.tab, onChange: function (id) { st.tab = id; ctx.setParams({ tab: id }); drawTab(); } });
     UI.on(root, 'click', '[data-tab]', function (ev, el) { st.tab = el.getAttribute('data-tab'); ctx.setParams({ tab: st.tab }); ctx.refresh(); });
@@ -248,7 +280,7 @@ function mtWaPreview() {
 function mtTabLog(el, ctx) {
   var st = ctx.state, f = st.logF || (st.logF = {}), d = D();
   var canX = ctx.can('maintenance.export') && mtCostsOk();
-  el.innerHTML = '<div class="card"><div class="card-b tight"><div id="mt-lf"></div><div id="mt-lmore"' + (st.logMore ? '' : ' hidden') + ' class="mt-more"></div></div><div id="mt-lt"></div></div>';
+  el.innerHTML = '<div class="card"><div class="card-b tight"><div class="mt-lcar"></div><div id="mt-lf"></div><div id="mt-lmore"' + (st.logMore ? '' : ' hidden') + ' class="mt-more"></div></div><div id="mt-lt"></div></div>';
   var rows = function () {
     var q = (f.q || '').toLowerCase();
     return d.jobs.filter(function (j) {
@@ -267,8 +299,9 @@ function mtTabLog(el, ctx) {
   };
   var t;
   var refresh = function () { t.setRows(rows()); };
-  UI.filters(el.querySelector('#mt-lf'), { values: f, fields: [{ type: 'search', key: 'q', placeholder: 'Search plate, workshop, note…' }, { type: 'select', key: 'car', label: 'Car', options: mtCarOpts(true), all: 'All cars' }],
-    onChange: function () { refresh(); drawMore(); },
+  var lcar = UI.carPicker(el.querySelector('.mt-lcar'), { key: 'logcar', label: '', aria: 'Car', placeholder: 'All cars: tap to pick one', title: 'Show the jobs of one car', value: f.car || '', clearable: true, badges: false, onChange: function (v) { f.car = v || ''; refresh(); } });
+  UI.filters(el.querySelector('#mt-lf'), { values: f, fields: [{ type: 'search', key: 'q', placeholder: 'Search plate, workshop, note…' }],
+    onChange: function (v, k) { if (k === '*') { f.car = ''; lcar.set('', true); } refresh(); drawMore(); },
     extra: UI.btn('More filters', { kind: st.logMore ? 'tonal' : 'o', size: 'sm', icon: 'adjustments-horizontal', attrs: { 'data-lact': 'more' } }) + '<span class="grow"></span>' +
       (canX ? UI.btn('Excel', { kind: 'o', size: 'sm', icon: 'file-spreadsheet', attrs: { 'data-lact': 'xlsx' } }) : '') +
       (ctx.can('maintenance.create') ? UI.btn('Plan a job', { kind: 'o', size: 'sm', icon: 'calendar-plus', attrs: { 'data-lact': 'plan' } }) + UI.btn('Log a service', { size: 'sm', icon: 'plus', attrs: { 'data-lact': 'log' } }) : '') });
@@ -324,7 +357,7 @@ function mtExport(jobs, filename) {
 }
 /* km a car drove between two dates, from its odometer readings */
 function mtKmDriven(carId, from, to) {
-  var c = carById(carId), r = D().odometer.filter(function (o) { return o.car === carId && (!from || o.at >= from) && (!to || o.at <= to); }).map(function (o) { return o.km; });
+  var c = carById(carId), r = D().odometer.filter(function (o) { return o.car === carId && !o.doubt && (!from || o.at >= from) && (!to || o.at <= to); }).map(function (o) { return o.km; });
   if (c && c.odoAt && (!from || c.odoAt >= from) && (!to || c.odoAt <= to)) r.push(c.odo);
   return r.length > 1 ? Math.max.apply(0, r) - Math.min.apply(0, r) : 0;
 }
@@ -404,7 +437,7 @@ function mtTabVendors(el, ctx) {
   var t;
   UI.filters(el.querySelector('#mt-vf'), { values: f, fields: [{ type: 'search', key: 'q', placeholder: 'Search workshops' }, { type: 'toggle', key: 'old', label: 'Show workshops no longer in use' }], onChange: function () { t.setRows(rows()); },
     extra: ctx.can('maintenance.manage_vendors') ? '<span class="grow"></span>' + UI.btn('Add a workshop', { size: 'sm', icon: 'plus', attrs: { 'data-vact': 'add' } }) : '' });
-  var contact = function (v) { return '<span class="row gap4">' + (v.phone ? '<a class="ib sm" href="tel:' + esc(v.phone.replace(/\s/g, '')) + '" title="Call ' + esc(v.phone) + '" aria-label="Call" data-stop>' + i('phone') + '</a>' : '') + (v.wa || v.phone ? '<a class="ib sm" href="https://wa.me/' + String(v.wa || v.phone).replace(/\D/g, '') + '" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp" data-stop>' + i('brand-whatsapp') + '</a>' : '') + (v.email ? '<a class="ib sm" href="mailto:' + esc(v.email) + '" title="' + esc(v.email) + '" aria-label="Email" data-stop>' + i('mail') + '</a>' : '') + '</span>'; };
+  var contact = function (v) { return '<span class="row gap4">' + (v.phone ? '<a class="ib sm" href="tel:' + esc(v.phone.replace(/\s/g, '')) + '" title="Call ' + esc(v.phone) + '" aria-label="Call" data-stop>' + i('phone') + '</a>' : '') + (v.wa || v.phone ? '<a class="ib sm" href="' + UI.waLink(v.wa || v.phone) + '" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp" data-stop>' + i('brand-whatsapp') + '</a>' : '') + (v.email ? '<a class="ib sm" href="mailto:' + esc(v.email) + '" title="' + esc(v.email) + '" aria-label="Email" data-stop>' + i('mail') + '</a>' : '') + '</span>'; };
   t = UI.table(el.querySelector('#mt-vt'), {
     columns: [{ key: 'name', label: 'Workshop', sort: true, render: function (r) { return '<b class="fw5">' + esc(r.name) + '</b>' + (r.v.active ? '' : ' ' + UI.chip('Not in use', 'grey')) + '<div class="b2">' + UI.phone(r.v.phone) + '</div>'; } },
       { key: 'kind', label: 'Kind', render: function (r) { return esc(r.v.kind); } },
@@ -498,18 +531,20 @@ function mtJobForm(o) {
   var okLabel = function () { return mode === 'finish' ? 'Mark as done' : job ? 'Save changes' : f.when === 'plan' ? 'Plan job' : f.when === 'in' ? 'Put in workshop' : 'Save service'; };
   var linesTotal = function () { return sum(f.lines.map(function (l) { return (Number(l.qty) || 0) * (Number(l.price) || 0); })); };
   var costs = mtCostsOk(), files = can('maintenance.manage_files');
+  f.force = false;
+  var clashes = function () { return f.car && f.date ? mtClashes(f.car, mtDate(f.date), f.back ? new Date(mtDate(f.back).getTime() + DAY) : null).filter(function (x) { return !job || x.code !== job.booking; }) : []; };
   function html() {
     var c = carById(f.car), rem = c && f.type ? d.reminders.filter(function (r) { return r.car === c.id && r.service === f.type; })[0] : null;
     var dateLbl = f.when === 'plan' ? 'Planned date' : f.when === 'in' ? 'Went in on' : 'Date';
-    var h = '<div class="mt-form">' + UI.select({ key: 'car', label: 'Car', required: true, options: mtCarOpts(), value: f.car, placeholder: 'Search plate or model', full: true }) +
+    var h = '<div class="mt-form"><div class="mt-carpk full"></div>' +
       '<div class="inp full"><label>What was done? <span class="ui-req">*</span></label><div class="mt-chips" role="radiogroup">' + LISTS.serviceTypes.map(function (s) { return '<button type="button" role="radio" class="mt-chip" data-svc="' + esc(s) + '" aria-checked="' + (f.type === s) + '">' + esc(s) + '</button>'; }).join('') + '</div></div>' +
       (mode === 'finish' ? '' : UI.choice({ key: 'when', label: 'When?', value: f.when, full: true, options: [['done', 'It is done'], ['plan', 'Plan it for later'], ['in', 'Car is in the workshop now']] })) +
-      UI.input({ key: 'date', label: dateLbl, type: 'date', required: true, value: f.date }) +
+      UI.dateField({ key: 'date', label: dateLbl, required: true, value: f.date }) +
       (costs ? (f.lines.length ? UI.input({ key: 'costShow', label: f.when === 'done' ? 'Total cost' : 'Estimated cost', prefix: 'RM', readonly: true, value: (linesTotal() + (Number(f.tax) || 0)).toFixed(2), help: 'Worked out from the lines below', attrs: { 'data-nobind': '' } }) : UI.input({ key: 'cost', label: f.when === 'done' ? 'Total cost' : 'Estimated cost', type: 'number', prefix: 'RM', min: 0, step: '0.01', value: f.cost, placeholder: '0.00' })) : '') +
       UI.textarea({ key: 'note', label: 'Note (optional)', value: f.note, rows: 2, placeholder: 'What was done, what the mechanic said...' }) + '</div>';
     if (f.when === 'in') {
-      h += '<div class="mt-box mt16"><div class="mt-cap">Workshop time</div>' + UI.switch({ key: 'block', label: 'Block this car for rentals while it is in the workshop', checked: f.block }) + UI.input({ key: 'back', label: 'Expected back (optional)', type: 'date', value: f.back, min: f.date }) +
-        (f.block && f.car ? mtClashHtml(mtClashes(f.car, mtDate(f.date), f.back ? new Date(mtDate(f.back).getTime() + DAY) : null)) : '') + '</div>';
+      h += '<div class="mt-box mt16"><div class="mt-cap">Workshop time</div>' + UI.switch({ key: 'block', label: 'Block this car for rentals while it is in the workshop', checked: f.block }) + UI.dateField({ key: 'back', label: 'Expected back (optional)', value: f.back, min: f.date }) +
+        (f.block && f.car ? mtClashHtml(clashes(), { forced: f.force }) : '') + '</div>';
     }
     var vend = d.vendors.filter(function (v) { return v.active || v.id === f.vendor; }).map(function (v) { return [v.id, v.name + ' (' + v.kind + ')']; });
     var bks = c ? d.bookings.filter(function (x) { return x.car === c && x.status !== 'Cancelled' && x.start <= NOW(); }).slice(-15).reverse().map(function (x) { return [x.code, x.code + ' · ' + x.cust.name + ' · ' + UI.fmt.date(x.start) + ' to ' + UI.fmt.date(x.end)]; }) : [];
@@ -526,11 +561,11 @@ function mtJobForm(o) {
       }).join('') + '<div class="mt-lines-t">Lines total <b class="num" data-lt>' + UI.fmt.money(linesTotal()) + '</b></div></div>' : '') +
         '<div class="row gap8">' + UI.btn('Add a line', { kind: 'tonal', size: 'sm', icon: 'plus', attrs: { 'data-jf': 'line' } }) + UI.btn('Add labour', { kind: 'g', size: 'sm', attrs: { 'data-jf': 'labour' } }) + '</div>' +
         '<div class="mt-cap">Tax and payment</div><div class="mt-form">' + UI.input({ key: 'tax', label: 'Tax (SST)', type: 'number', prefix: 'RM', min: 0, step: '0.01', value: f.tax, placeholder: '0.00' }) + UI.input({ key: 'invoiceNo', label: 'Workshop invoice number', value: f.invoiceNo }) +
-        UI.select({ key: 'paid', label: 'Payment', options: [['yes', 'Paid'], ['no', 'Not paid yet']], value: f.paid }) + (f.paid === 'yes' ? UI.input({ key: 'paidOn', label: 'Paid on', type: 'date', value: f.paidOn }) : '<div></div>') +
-        UI.input({ key: 'warranty', label: 'Warranty until (optional)', type: 'date', value: f.warranty }) + '</div>' : '') +
+        UI.select({ key: 'paid', label: 'Payment', options: [['yes', 'Paid'], ['no', 'Not paid yet']], value: f.paid }) + (f.paid === 'yes' ? UI.dateField({ key: 'paidOn', label: 'Paid on', chips: false, value: f.paidOn }) : '<div></div>') +
+        UI.dateField({ key: 'warranty', label: 'Warranty until (optional)', chips: false, value: f.warranty }) + '</div>' : '') +
       '<div class="mt-cap">Caused by a renter?</div>' + UI.select({ key: 'booking', label: 'Linked booking', options: bks, value: f.booking, placeholder: c ? 'No booking' : 'Choose the car first' }) +
       UI.switch({ key: 'charge', label: 'Charge the customer for this', checked: f.charge }) + (f.charge ? UI.input({ key: 'chargeAmt', label: 'Amount to charge', type: 'number', prefix: 'RM', min: 0, step: '0.01', value: f.chargeAmt, placeholder: '0.00' }) : '') +
-      (files ? '<div class="mt-cap">Invoices and photos</div>' + (f.files.length ? '<div class="mt-files">' + f.files.map(function (x, k) { return '<div class="mt-file">' + (x.dataUrl && /^data:image/.test(x.dataUrl) ? '<img src="' + x.dataUrl + '" alt="">' : i(/pdf/i.test(x.name) ? 'file-type-pdf' : 'photo')) + '<span class="grow ellip">' + esc(x.name) + '<small>' + UI.fmt.size(x.size) + '</small></span>' + UI.iconBtn('x', 'Remove ' + x.name, { size: 'sm', attrs: { 'data-jf': 'rmfile', 'data-k': k } }) + '</div>'; }).join('') + '</div>' : '') + '<div class="mt-dz"></div><div class="b2">Photos (JPG, PNG, WEBP) and PDF files, up to 8 MB each.</div>' : '') +
+      (files ? '<div class="mt-cap">Invoices and photos</div>' + (f.files.length ? '<div class="mt-files">' + f.files.map(function (x, k) { return '<div class="mt-file mt-filek" data-nobind>' + (x.dataUrl && /^data:image/.test(x.dataUrl) ? '<img src="' + x.dataUrl + '" alt="">' : i(/pdf/i.test(x.name) ? 'file-type-pdf' : 'photo')) + '<div class="grow mt-filek-b"><span class="ellip fw5">' + esc(x.name) + ' <small>' + UI.fmt.size(x.size) + '</small></span><div class="mt-filek-f"><select aria-label="What is this file" data-fk="' + k + '" data-fkey="kind">' + UI.options(MT_FILE_KINDS, x.kind || 'Invoice') + '</select><input type="text" maxlength="200" placeholder="Caption (optional)" aria-label="Caption" data-fk="' + k + '" data-fkey="caption" value="' + esc(x.caption || '') + '"></div></div>' + UI.iconBtn('trash', 'Remove ' + x.name, { size: 'sm', attrs: { 'data-jf': 'rmfile', 'data-k': k } }) + '</div>'; }).join('') + '</div>' : '') + '<div class="mt-dz"></div><div class="b2">Photos (JPG, PNG, WEBP) and PDF files, up to 8 MB each. Mark each one as an invoice, receipt, quotation, photo before or photo after.</div>' : '') +
       '<div class="mt-cap">Next service</div>' + (rem ? UI.alert('This car already has a reminder for ' + f.type + ' every ' + [rem.km ? UI.fmt.num(rem.km) + ' km' : '', rem.days ? rem.days + ' days' : ''].filter(Boolean).join(' or every ') + '. It will move forward by itself when this is saved.', 'pri') :
         '<div class="b2">Remind me when the next one is due</div><div class="mt-form">' + UI.input({ key: 'remKm', label: 'After how many km', type: 'number', min: 0, value: f.remKm, placeholder: 'For example 10000' }) + UI.input({ key: 'remDays', label: 'Or after how many days', type: 'number', min: 0, value: f.remDays, placeholder: 'For example 180' }) + '</div>') +
       '</div></section>';
@@ -542,10 +577,15 @@ function mtJobForm(o) {
     var sc = dr.body.scrollTop; box.innerHTML = html(); dr.body.scrollTop = sc;
     dr.setTitle(title(), f.car ? carById(f.car).plate + ' · ' + carName(carById(f.car)) : 'Pick the car and what was done');
     dr.setFoot([{ label: 'Cancel', kind: 'g' }, { label: okLabel(), icon: 'device-floppy', onClick: save }]);
+    var pk = box.querySelector('.mt-carpk');
+    if (pk) { var s0 = f.when !== 'done' && f.date ? mtDate(f.date) : null; mtCarPick(pk, { value: f.car, start: s0, end: s0 ? (f.back ? new Date(mtDate(f.back).getTime() + DAY) : new Date(s0.getTime() + DAY)) : null, help: f.when === 'done' ? '' : 'The badge shows whether the car is free on that date' }); }
     var dz = box.querySelector('.mt-dz');
     if (dz) UI.dropzone(dz, { accept: 'image/jpeg,image/png,image/webp,.pdf', multiple: true, camera: true, label: 'Add photos or PDFs', hint: 'Drop them here, or take a photo', onFiles: function (fs) { Promise.all(fs.map(function (x) { return mtReadFile(x).catch(function (e) { UI.toast(e.message, { tone: 'warn' }); return null; }); })).then(function (rs) { rs.forEach(function (r) { if (r) f.files.push(r); }); paint(); }); } });
   }
-  mtBind(box, f, function (k, ev) { if (ev.type === 'change' && ['car', 'when', 'block', 'back', 'date', 'charge', 'paid', 'tax'].indexOf(k) >= 0) paint(); });
+  mtBind(box, f, function (k, ev) { if (['car', 'back', 'date', 'block'].indexOf(k) >= 0) f.force = false; if (ev.type === 'change' && ['car', 'when', 'block', 'back', 'date', 'charge', 'paid', 'tax'].indexOf(k) >= 0) paint(); });
+  var fileField = function (t) { var k = t.getAttribute('data-fk'); if (k == null) return; var x = f.files[+k]; if (x) { f.files[+k] = Object.assign({}, x); f.files[+k][t.getAttribute('data-fkey')] = t.value; } };
+  box.addEventListener('input', function (ev) { fileField(ev.target); });
+  box.addEventListener('change', function (ev) { fileField(ev.target); });
   box.addEventListener('input', function (ev) {
     var t = ev.target, k = t.getAttribute('data-line'); if (k == null) return;
     var key = t.getAttribute('data-lk'); f.lines[+k][key] = t.type === 'number' ? (t.value === '' ? null : Number(t.value)) : t.value;
@@ -555,6 +595,7 @@ function mtJobForm(o) {
   box.addEventListener('change', function (ev) { var t = ev.target; if (t.getAttribute('data-line') != null) f.lines[+t.getAttribute('data-line')][t.getAttribute('data-lk')] = t.type === 'number' ? (t.value === '' ? null : Number(t.value)) : t.value; });
   box.addEventListener('click', function (ev) {
     var s = ev.target.closest('[data-svc]'); if (s) { f.type = s.getAttribute('data-svc'); paint(); return; }
+    if (ev.target.closest('[data-force]')) { f.force = !f.force; paint(); return; }
     var b = ev.target.closest('[data-jf]'); if (!b) return;
     var a = b.getAttribute('data-jf');
     if (a === 'more') { f.more = !f.more; paint(); }
@@ -568,6 +609,7 @@ function mtJobForm(o) {
     if (!f.car) { UI.toast('Pick the car', { tone: 'warn' }); return false; }
     if (!f.type) { UI.toast('Pick what was done', { tone: 'warn' }); return false; }
     if (!f.date) { UI.toast('Pick the date', { tone: 'warn' }); return false; }
+    if (f.when === 'in' && f.block && clashes().length && !f.force) { UI.toast(can('maintenance.manage_downtime') ? 'Some rentals clash with this workshop time. Move them first, or press "Put the car in the workshop anyway".' : 'Some rentals clash with this workshop time. Move them to another car first.', { tone: 'warn', ms: 6000 }); return false; }
     var c = carById(f.car), date = mtDate(f.date), status = f.when === 'done' ? 'Done' : f.when === 'plan' ? 'Planned' : 'In the workshop';
     var lines = f.lines.filter(function (l) { return l.what || l.price; }).map(function (l) { return { what: l.what || l.type, type: l.type, qty: Number(l.qty) || 1, price: Number(l.price) || 0, partNo: l.partNo || '' }; });
     var total = lines.length ? sum(lines.map(function (l) { return l.qty * l.price; })) + (Number(f.tax) || 0) : (Number(f.cost) || 0);
@@ -578,13 +620,13 @@ function mtJobForm(o) {
     else { rec.by = DB.actor(); rec.at = NOW(); j = DB.add('jobs', rec, { first: true, text: DB.actor() + (status === 'Done' ? ' logged ' : status === 'Planned' ? ' planned ' : ' put ' + c.plate + ' in the workshop for ') + f.type + (status === 'In the workshop' ? '' : ' for ' + c.plate), where: 'Maintenance record' }); }
     D().jobs.sort(function (a, b) { return b.date - a.date; });
     if (status === 'Done') {
-      if (f.odo && f.odo > c.odo) { DB.update('cars', c, { odo: f.odo, odoAt: date }, { silent: true }); D().odometer.push({ car: c.id, km: f.odo, at: date, by: DB.actor() }); }
+      if (f.odo && f.odo > c.odo) { DB.update('cars', c, { odo: f.odo, odoAt: date }, { silent: true }); D().odometer.push({ car: c.id, km: f.odo, at: date, by: DB.actor(), source: 'service', job: j.id }); }
       var rem = D().reminders.filter(function (r) { return r.car === c.id && r.service === f.type; })[0];
       if (rem) DB.update('reminders', rem, { lastAt: date, lastKm: f.odo || c.odo, snoozedUntil: null }, { silent: true });
       else if (f.remKm || f.remDays) DB.add('reminders', { car: c.id, service: f.type, km: Number(f.remKm) || 0, days: Number(f.remDays) || 0, lastAt: date, lastKm: f.odo || c.odo, on: true, snoozedUntil: null }, { text: DB.actor() + ' added a reminder for ' + f.type + ' of ' + c.plate, where: 'Maintenance record' });
       D().downtime.forEach(function (w) { if (w.job === j.id && !w.back) DB.update('downtime', w, { back: true, to: NOW() }, { silent: true }); });
     }
-    if (status === 'In the workshop' && f.block && !D().downtime.some(function (w) { return w.job === j.id && !w.back; })) DB.add('downtime', { car: c.id, reason: f.type === 'Accident repair' ? 'Accident' : 'Service', from: date, to: mtDate(f.back), job: j.id, note: f.type, back: false }, { text: DB.actor() + ' blocked ' + c.plate + ' for the workshop', where: 'Maintenance record' });
+    if (status === 'In the workshop' && f.block && !D().downtime.some(function (w) { return w.job === j.id && !w.back; })) DB.add('downtime', { car: c.id, reason: f.type === 'Accident repair' ? 'Accident' : 'Service', from: date, to: mtDate(f.back), job: j.id, note: f.type, back: false }, { text: DB.actor() + ' blocked ' + c.plate + ' for the workshop' + (f.force && clashes().length ? ' anyway, with ' + plural(clashes().length, 'rental') + ' clashing' : ''), where: 'Maintenance record' });
     mtSyncWorkshop(c.id);
     UI.toast(status === 'Done' ? (mode === 'finish' ? 'Marked as done' : 'Service saved') : status === 'Planned' ? 'Job planned for ' + UI.fmt.date(date) : c.plate + ' is in the workshop', { action: job ? null : { label: 'Open', run: function () { mtJobDrawer(j.id); } } });
   }
@@ -622,11 +664,11 @@ function mtJobDrawer(id, onClose) {
       UI.kv('Payment', j.paid ? 'Paid on ' + UI.fmt.date(j.paidOn || j.date) : 'Not paid yet') + UI.kv('Linked booking', bk ? '<button type="button" class="mt-link" data-jd="booking">' + esc(bk.code) + ' · ' + esc(bk.cust.name) + '</button>' + (j.charge ? ' ' + UI.chip('Charge customer ' + UI.fmt.money(j.charge), 'warn') : '') : '', { full: true }) + '</div></div>' +
       (j.note ? '<div class="mt-cap mt16">Note</div><p class="t1c" style="margin:0">' + esc(j.note) + '</p>' : '') +
       (mtCostsOk() ? '<div class="mt-cap mt16">Cost</div>' + (parts.length ? '<div class="tbl-wrap"><table class="tbl mt-cost"><thead><tr><th>Line</th><th>Type</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Amount</th></tr></thead><tbody>' + parts.map(function (l) { return '<tr><td>' + esc(l.what) + (l.partNo ? '<div class="b2">' + esc(l.partNo) + '</div>' : '') + '</td><td>' + esc(l.type) + '</td><td class="r">' + l.qty + '</td><td class="r">' + UI.money(l.price) + '</td><td class="r">' + UI.money(l.qty * l.price) + '</td></tr>'; }).join('') + '</tbody><tfoot><tr><td colspan="4" class="r">Tax</td><td class="r">' + UI.money(j.tax || 0) + '</td></tr><tr><td colspan="4" class="r"><b>Total</b></td><td class="r"><b>' + UI.money(j.total || 0) + '</b></td></tr></tfoot></table></div>' : '<p class="t1c" style="margin:0">' + UI.money(j.total || 0) + ' <span class="b2">(no lines)</span></p>') : '') +
-      '<div class="mt-cap mt16">Invoices and photos</div>' + ((j.files || []).length ? '<div class="mt-files">' + j.files.map(function (x, k) { return '<div class="mt-file">' + (x.dataUrl && /^data:image/.test(x.dataUrl) ? '<img src="' + x.dataUrl + '" alt="">' : i(/pdf/i.test(x.name) ? 'file-type-pdf' : 'photo')) + '<button type="button" class="grow ellip mt-link" data-jd="view" data-k="' + k + '">' + esc(x.name) + '<small>' + UI.fmt.size(x.size) + '</small></button>' + (can('maintenance.manage_files') ? UI.iconBtn('trash', 'Delete ' + x.name, { size: 'sm', attrs: { 'data-jd': 'rmfile', 'data-k': k } }) : '') + '</div>'; }).join('') + '</div>' : '<p class="b2">No files yet.</p>') +
+      '<div class="mt-cap mt16">Invoices and photos</div>' + ((j.files || []).length ? '<div class="mt-files">' + j.files.map(function (x, k) { return '<div class="mt-file">' + (x.dataUrl && /^data:image/.test(x.dataUrl) ? '<img src="' + x.dataUrl + '" alt="">' : i(/pdf/i.test(x.name) ? 'file-type-pdf' : 'photo')) + '<button type="button" class="grow ellip mt-link" data-jd="view" data-k="' + k + '">' + esc(x.name) + '<small>' + esc((x.kind || 'Invoice') + (x.caption ? ' · ' + x.caption : '')) + ' · ' + UI.fmt.size(x.size) + '</small></button>' + UI.chip(x.kind || 'Invoice', /Photo/.test(x.kind || '') ? 'info' : 'grey', { sm: true }) + (can('maintenance.manage_files') ? UI.iconBtn('trash', 'Delete ' + x.name, { size: 'sm', attrs: { 'data-jd': 'rmfile', 'data-k': k } }) : '') + '</div>'; }).join('') + '</div>' : '<p class="b2">No files yet.</p>') +
       (can('maintenance.manage_files') ? '<div class="mt-dz2 mt8"></div>' : '');
   }, foot: [{ label: 'Close', kind: 'g' }] });
   var pend = [];
-  var mountDz = function () { var z = dr.body.querySelector('.mt-dz2'); if (!z || z.firstChild) return; UI.dropzone(z, { accept: 'image/*,.pdf', multiple: true, camera: true, label: 'Upload invoices or photos', onFiles: function (fs) { Promise.all(fs.map(function (x) { return mtReadFile(x).catch(function (e) { UI.toast(e.message, { tone: 'warn' }); return null; }); })).then(function (rs) { pend = rs.filter(Boolean); if (!pend.length) return; var jj = byId(D().jobs, id); DB.update('jobs', jj, { files: jj.files.concat(pend) }, { text: DB.actor() + ' uploaded ' + plural(pend.length, 'file') + ' to ' + jj.title + ' of ' + carById(jj.car).plate, where: 'Maintenance record' }); UI.toast('Uploaded ' + plural(pend.length, 'file')); }); } }); };
+  var mountDz = function () { var z = dr.body.querySelector('.mt-dz2'); if (!z || z.firstChild) return; UI.dropzone(z, { accept: 'image/*,.pdf', multiple: true, camera: true, label: 'Upload invoices or photos', onFiles: function (fs) { Promise.all(fs.map(function (x) { return mtReadFile(x).catch(function (e) { UI.toast(e.message, { tone: 'warn' }); return null; }); })).then(function (rs) { pend = rs.filter(Boolean).map(function (x) { x.kind = /^image/.test(x.type || '') ? 'Photo after' : 'Invoice'; return x; }); if (!pend.length) return; var jj = byId(D().jobs, id); DB.update('jobs', jj, { files: jj.files.concat(pend) }, { text: DB.actor() + ' uploaded ' + plural(pend.length, 'file') + ' to ' + jj.title + ' of ' + carById(jj.car).plate, where: 'Maintenance record' }); UI.toast('Uploaded ' + plural(pend.length, 'file')); }); } }); };
   mountDz();
   new MutationObserver(mountDz).observe(dr.body, { childList: true });
   dr.body.addEventListener('click', function (ev) {
@@ -645,16 +687,19 @@ function mtJobDrawer(id, onClose) {
   return dr;
 }
 function mtJobInDialog(j) {
-  var f = { block: true, back: '' };
-  var dl = UI.dialog({ title: 'Car goes in the workshop', text: carById(j.car).plate + ' · ' + j.title, width: 'sm', body: UI.switch({ key: 'block', label: 'Block this car for rentals while it is there', checked: true }) + UI.input({ key: 'back', label: 'Expected back', type: 'date', value: '' }) + '<div class="mt-clashbox"></div>',
+  var f = { block: true, back: '', force: false };
+  var clashes = function () { return f.block ? mtClashes(j.car, NOW(), f.back ? new Date(mtDate(f.back).getTime() + DAY) : null).filter(function (x) { return x.code !== j.booking; }) : []; };
+  var dl = UI.dialog({ title: 'Car goes in the workshop', text: carById(j.car).plate + ' · ' + j.title, width: 'sm', body: UI.switch({ key: 'block', label: 'Block this car for rentals while it is there', checked: true }) + UI.dateField({ key: 'back', label: 'Expected back', value: '' }) + '<div class="mt-clashbox"></div>',
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Put in workshop', icon: 'tool', onClick: function () {
       var c = carById(j.car);
+      if (clashes().length && !f.force) { UI.toast('Some rentals clash. Move them first' + (can('maintenance.manage_downtime') ? ', or press "Put the car in the workshop anyway".' : '.'), { tone: 'warn', ms: 6000 }); return false; }
       DB.update('jobs', j, { status: 'In the workshop', inAt: NOW(), backAt: mtDate(f.back), block: f.block }, { text: DB.actor() + ' put ' + c.plate + ' in the workshop for ' + j.title, where: 'Maintenance record' });
       if (f.block) DB.add('downtime', { car: c.id, reason: j.type === 'Accident repair' ? 'Accident' : 'Service', from: NOW(), to: mtDate(f.back), job: j.id, note: j.title, back: false }, { silent: true });
       mtSyncWorkshop(c.id); UI.toast(c.plate + ' is in the workshop');
     } }] });
-  var paintC = function () { dl.body.querySelector('.mt-clashbox').innerHTML = f.block ? mtClashHtml(mtClashes(j.car, NOW(), f.back ? new Date(mtDate(f.back).getTime() + DAY) : null)) : ''; };
-  mtBind(dl.body, f, paintC); paintC();
+  var paintC = function () { dl.body.querySelector('.mt-clashbox').innerHTML = f.block ? mtClashHtml(clashes(), { forced: f.force }) : ''; };
+  mtBind(dl.body, f, function () { f.force = false; paintC(); }); paintC();
+  dl.body.addEventListener('click', function (ev) { if (ev.target.closest('[data-force]')) { f.force = !f.force; paintC(); } });
 }
 
 /* ---------------- car health card ---------------- */
@@ -693,6 +738,7 @@ function mtCarHealth(carId, onClose) {
           (can('maintenance.manage_documents') ? UI.btn(p ? 'Renew' : 'Add', { kind: 'tonal', size: 'sm', attrs: { 'data-ch': p ? 'renew' : 'add', 'data-id': p ? p.id : k } }) : '') + '</div>';
       }).join('') +
       '<div class="mt-cap mt24">Latest jobs</div>' + (d.jobs.filter(function (j) { return j.car === c.id; }).slice(0, 6).map(function (j) { return '<button type="button" class="mt-hrow mt-hbtn" data-ch="job" data-id="' + j.id + '"><div class="grow"><div class="t1c">' + esc(j.title) + '</div><div class="b2">' + [UI.fmt.date(j.date), mtVendorName(j.vendor), j.odo ? mtKm(j.odo) : ''].filter(Boolean).map(esc).join(' · ') + '</div></div>' + (costs ? UI.money(j.total || 0) : '') + UI.status('job', j.status) + '</button>'; }).join('') || '<p class="b2">No jobs yet.</p>') +
+      mtOdoHistory(c, d) +
       '<div class="mt-cap mt24">Car details</div><div class="mt-hstats">' + st('VIN / chassis', esc(c.vin || c.chassis || '-')) + st('Engine number', esc(c.engine || '-')) + st('Bought on', c.boughtOn ? UI.fmt.date(c.boughtOn) : '-') + (costs ? st('Bought for', c.boughtFor ? UI.fmt.money(c.boughtFor) : '-') : '') + '</div>';
   }, foot: [{ label: 'Open the car', kind: 'o', icon: 'car', close: false, onClick: function () { API.openCar(carId); return false; } }, { label: 'Close', kind: 'g' }] });
   dr.body.addEventListener('click', function (ev) {
@@ -712,15 +758,25 @@ function mtCarHealth(carId, onClose) {
   });
   return dr;
 }
+/* the latest odometer readings with where each came from; a doubtful one is marked Not trusted */
+function mtOdoHistory(c, d) {
+  var list = (d || D()).odometer.filter(function (o) { return o.car === c.id; }).sort(function (a, b) { return b.at - a.at; });
+  if (!list.length) return '<div class="mt-cap mt24">Odometer readings</div><p class="b2">No readings yet.</p>';
+  var bad = list.filter(function (o) { return o.doubt; }).length;
+  return '<div class="mt-cap mt24">Odometer readings</div>' + (bad ? '<p class="b2">' + i('alert-triangle') + ' ' + plural(bad, 'reading') + ' not trusted: shown, but left out of the car\'s odometer and the cost per km.</p>' : '') +
+    '<div class="mt-odol">' + list.slice(0, 8).map(function (o) {
+      return '<div class="mt-odo' + (o.doubt ? ' bad' : '') + '"><div class="mt-odo-t"><b class="num">' + mtKm(o.km) + '</b><span class="grow"></span>' + UI.chip(MT_ODO_SRC[o.source] || 'Typed in', o.source === 'service' ? 'pri' : o.source === 'manual' ? 'grey' : 'info', { sm: true }) + (o.doubt ? UI.chip('Not trusted', 'bad', { sm: true, icon: 'alert-triangle' }) : '') + '</div><div class="b2">' + UI.fmt.date(o.at) + (o.by ? ' · ' + esc(o.by) : '') + '</div>' + (o.doubt ? '<div class="b2 mt-odo-why">' + esc(o.doubt) + '</div>' : '') + '</div>';
+    }).join('') + '</div>' + (list.length > 8 ? '<p class="b2">Showing the latest 8 of ' + list.length + ' readings.</p>' : '');
+}
 function mtOdometerDialog(carId) {
   var c = carById(carId), f = { km: null, at: mtIso(mtToday()) };
-  UI.dialog({ title: 'Update odometer', text: c.plate + ' · ' + carName(c), width: 'sm', body: UI.input({ key: 'km', label: 'Km on the odometer now', type: 'number', min: 0, required: true, placeholder: String(c.odo + 120) }) + UI.input({ key: 'at', label: 'Read on', type: 'date', value: f.at, max: f.at }) + '<p class="b2">Last reading: ' + mtKm(c.odo) + ' on ' + UI.fmt.date(c.odoAt) + '</p>',
+  UI.dialog({ title: 'Update odometer', text: c.plate + ' · ' + carName(c), width: 'sm', body: UI.input({ key: 'km', label: 'Km on the odometer now', type: 'number', min: 0, required: true, placeholder: String(c.odo + 120) }) + UI.dateField({ key: 'at', label: 'Read on', value: f.at, max: f.at }) + '<p class="b2">Last reading: ' + mtKm(c.odo) + ' on ' + UI.fmt.date(c.odoAt) + '</p>',
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Save', icon: 'check', onClick: function (dl) {
       var v = UI.form(dl.body); if (!v.km || v.km <= 0) { UI.toast('Type the km on the odometer', { tone: 'warn' }); return false; }
       if (v.km < c.odo) { UI.toast('That is less than the last reading (' + mtKm(c.odo) + '). Check the number.', { tone: 'warn' }); return false; }
       var at = mtDate(v.at) || mtToday();
       DB.update('cars', c, { odo: v.km, odoAt: at }, { text: DB.actor() + ' updated the odometer of ' + c.plate + ' to ' + mtKm(v.km), where: 'Car' });
-      D().odometer.push({ car: c.id, km: v.km, at: at, by: DB.actor() }); UI.toast('Odometer saved: ' + mtKm(v.km));
+      D().odometer.push({ car: c.id, km: v.km, at: at, by: DB.actor(), source: 'manual' }); UI.toast('Odometer saved: ' + mtKm(v.km));
     } }] });
 }
 function mtRemindersDialog(carId) {
@@ -766,9 +822,9 @@ function mtPaperForm(o) {
   var start = JSON.stringify(f);
   var title = edit ? 'Edit paper' : old ? 'Renew ' + kind.toLowerCase().replace('puspakom', 'PUSPAKOM') : 'Add a paper';
   function html() {
-    return '<div class="mt-form">' + UI.select({ key: 'car', label: 'Car', required: true, options: mtCarOpts(true), value: f.car, placeholder: 'Choose a car', full: true }) +
+    return '<div class="mt-form"><div class="full mt-pcar"></div>' +
       UI.choice({ key: 'kind', label: 'Type', value: f.kind, options: LISTS.paperTypes, full: true }) + (f.kind === 'Other' ? UI.input({ key: 'name', label: 'What is it?', required: true, value: f.name, full: true, placeholder: 'For example Permit to enter a port' }) : '') +
-      UI.input({ key: 'until', label: 'Valid until', type: 'date', required: f.kind !== 'Car grant', value: f.until, help: f.kind === 'Car grant' ? 'A grant does not expire. Leave empty.' : '' }) + UI.input({ key: 'issued', label: 'Issued on (optional)', type: 'date', value: f.issued }) +
+      UI.dateField({ key: 'until', label: 'Valid until', chips: false, required: f.kind !== 'Car grant', value: f.until, help: f.kind === 'Car grant' ? 'A grant does not expire. Leave empty.' : '' }) + UI.dateField({ key: 'issued', label: 'Issued on (optional)', chips: false, value: f.issued }) +
       UI.input({ key: 'provider', label: f.kind === 'Insurance' ? 'Insurer (optional)' : 'Issued by (optional)', value: f.provider }) + (mtCostsOk() ? UI.input({ key: 'cost', label: 'What it cost', type: 'number', prefix: 'RM', min: 0, step: '0.01', value: f.cost }) : '') +
       UI.input({ key: 'ref', label: f.kind === 'Insurance' ? 'Policy number' : 'Reference number', value: f.ref }) + UI.input({ key: 'warnDays', label: 'Warn me this many days before', type: 'number', min: 0, value: f.warnDays }) +
       UI.textarea({ key: 'note', label: 'Note', rows: 2, value: f.note }) + '<div class="inp full"><label>File (photo or PDF)</label>' + (f.file ? '<div class="mt-file">' + i('file') + '<span class="grow ellip">' + esc(f.file.name) + '<small>' + UI.fmt.size(f.file.size) + '</small></span>' + UI.iconBtn('x', 'Remove file', { size: 'sm', attrs: { 'data-pf': 'rmfile' } }) + '</div>' : '<div class="mt-pdz"></div>') + '</div></div>';
@@ -778,9 +834,11 @@ function mtPaperForm(o) {
   var box = dr.body.querySelector('.mt-pf');
   function paint() {
     box.innerHTML = html();
+    /* the same searchable car picker as the other fleet forms: type '3326' or 'VMA3326'; sold cars only when already chosen */
+    mtCarPick(box.querySelector('.mt-pcar'), { value: f.car, badges: false, onChange: function (id) { f.car = id || ''; } });
     var z = box.querySelector('.mt-pdz'); if (z) UI.dropzone(z, { accept: 'image/*,.pdf', camera: true, label: 'Add the photo or PDF', onFiles: function (fs) { mtReadFile(fs[0]).then(function (r) { f.file = r; paint(); }, function (e) { UI.toast(e.message, { tone: 'warn' }); }); } });
   }
-  mtBind(box, f, function (k, ev) { if (ev.type === 'change' && (k === 'kind' || k === 'car')) paint(); });
+  mtBind(box, f, function (k, ev) { if (ev.type === 'change' && k === 'kind') paint(); });
   box.addEventListener('click', function (ev) { if (ev.target.closest('[data-pf="rmfile"]')) { f.file = null; paint(); } });
   function save() {
     if (!f.car) { UI.toast('Choose the car', { tone: 'warn' }); return false; }
@@ -801,19 +859,25 @@ function mtPaperForm(o) {
 function mtBlockDialog(o) {
   o = o || {};
   if (!can('maintenance.manage_downtime')) { UI.toast('You cannot block cars. Ask the owner for access.', { tone: 'warn' }); return; }
-  var f = { car: o.car || '', reason: 'Service', from: mtIso(mtToday()), to: '', note: '' };
-  var dl = UI.dialog({ title: 'Block a car for the workshop', width: 'md', body: '<p class="ui-ctext">While a car is blocked it cannot be booked and does not show as free in the Availability Checker or the calendar.</p><div class="mt-form">' + UI.select({ key: 'car', label: 'Car', required: true, options: mtCarOpts(), value: f.car, placeholder: 'Choose a car', full: true }) +
-    UI.choice({ key: 'reason', label: 'Why?', value: 'Service', options: LISTS.downtimeReasons, full: true }) + UI.input({ key: 'from', label: 'Goes in', type: 'date', required: true, value: f.from }) + UI.input({ key: 'to', label: 'Expected back (optional)', type: 'date' }) + UI.textarea({ key: 'note', label: 'Note', rows: 2 }) + '</div><div class="mt-clashbox mt8"></div>',
+  var f = { car: o.car || '', reason: 'Service', from: mtIso(mtToday()), to: '', note: '', force: false };
+  var clashes = function () { return f.car && f.from ? mtClashes(f.car, mtDate(f.from), f.to ? new Date(mtDate(f.to).getTime() + DAY) : null) : []; };
+  var dl = UI.dialog({ title: 'Block a car for the workshop', width: 'md', body: '<p class="ui-ctext">While a car is blocked it cannot be booked and does not show as free in the Availability Checker or the calendar.</p><div class="mt-form"><div class="mt-carpk full"></div>' +
+    UI.choice({ key: 'reason', label: 'Why?', value: 'Service', options: LISTS.downtimeReasons, full: true }) + UI.dateField({ key: 'from', label: 'Goes in', required: true, value: f.from }) + UI.dateField({ key: 'to', label: 'Expected back (optional)', value: '', min: f.from }) + UI.textarea({ key: 'note', label: 'Note', rows: 2 }) + '</div><div class="mt-clashbox mt8"></div>',
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Block the car', icon: 'lock', onClick: function () {
       if (!f.car) { UI.toast('Choose the car', { tone: 'warn' }); return false; }
       if (!f.from) { UI.toast('Pick when it goes in', { tone: 'warn' }); return false; }
       if (f.to && f.to < f.from) { UI.toast('Expected back must be after it goes in', { tone: 'warn' }); return false; }
+      var cl = clashes();
+      if (cl.length && !f.force) { UI.toast('Some rentals clash with these dates. Move them first, or press "Put the car in the workshop anyway".', { tone: 'warn', ms: 6000 }); return false; }
       var c = carById(f.car);
-      DB.add('downtime', { car: f.car, reason: f.reason, from: mtDate(f.from), to: f.to ? new Date(mtDate(f.to).getTime() + 17 * 36e5) : null, job: null, note: f.note, back: false }, { text: DB.actor() + ' blocked ' + c.plate + ' for the workshop (' + f.reason + ')', where: 'Maintenance record' });
+      DB.add('downtime', { car: f.car, reason: f.reason, from: mtDate(f.from), to: f.to ? new Date(mtDate(f.to).getTime() + 17 * 36e5) : null, job: null, note: f.note, back: false }, { text: DB.actor() + ' blocked ' + c.plate + ' for the workshop (' + f.reason + ')' + (cl.length ? ' anyway, with ' + plural(cl.length, 'rental') + ' clashing: ' + cl.map(function (x) { return x.code; }).join(', ') : ''), where: 'Maintenance record' });
       mtSyncWorkshop(f.car); UI.toast(c.plate + ' is blocked from ' + UI.fmt.date(mtDate(f.from)));
     } }] });
-  var paintC = function () { dl.body.querySelector('.mt-clashbox').innerHTML = f.car && f.from ? mtClashHtml(mtClashes(f.car, mtDate(f.from), f.to ? new Date(mtDate(f.to).getTime() + DAY) : null)) : ''; };
-  mtBind(dl.body, f, function (k, ev) { if (ev.type === 'change') paintC(); }); paintC();
+  var pk = mtCarPick(dl.body.querySelector('.mt-carpk'), { value: f.car });
+  var dates = function () { var a = f.from ? mtDate(f.from) : null; pk.setDates(a, a ? (f.to ? new Date(mtDate(f.to).getTime() + DAY) : new Date(a.getTime() + DAY)) : null); };
+  var paintC = function () { dl.body.querySelector('.mt-clashbox').innerHTML = f.car && f.from ? mtClashHtml(clashes(), { forced: f.force }) : ''; };
+  mtBind(dl.body, f, function (k, ev) { if (ev.type === 'change') { if (k !== 'note' && k !== 'reason') f.force = false; if (k === 'from' || k === 'to') dates(); paintC(); } }); dates(); paintC();
+  dl.body.addEventListener('click', function (ev) { if (ev.target.closest('[data-force]')) { f.force = !f.force; paintC(); } });
 }
 
 /* other pages open these */

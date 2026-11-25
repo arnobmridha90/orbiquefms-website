@@ -1,0 +1,39 @@
+/* availability screens (M1). Shared classes live in base.css. */
+.av-form { padding: 10px 12px; }
+.av-row { display: grid; grid-template-columns: auto minmax(0, 1.35fr) minmax(0, 1fr); gap: 6px; align-items: center; }
+.av-lbl { font-size: 13px; font-weight: 650; color: #454C59; min-width: 34px; }
+.av-row .inp { min-width: 0; height: 42px; padding: 0 8px; }
+.av-lens { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin: 8px 0 4px; }
+.av-lens .fchip { min-width: 0; height: 40px; padding: 0 2px; justify-content: center; white-space: nowrap; }
+.av-lens .av-h12 { font-weight: 700; }
+.av-toline { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 4px 2px; background: none; border: 0; text-align: left; font: inherit; font-size: 14px; color: var(--muted); line-height: 1.35; cursor: pointer; }
+.av-toline b { color: var(--text); font-weight: 650; }
+.av-toline .grow { flex: 1; min-width: 0; }
+.av-toline svg { width: 16px; height: 16px; flex: none; color: var(--muted); }
+.av-torow { margin-top: 2px; }
+.av-form .err-text { margin: 6px 0 2px; }
+.av-search { margin-bottom: 4px; }
+.av-sec { margin-top: 14px; }
+.av-sec h2 { color: inherit; }
+.av-hint { margin: -2px 2px 8px; }
+.av-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.av-card { padding: 11px 13px; }
+.av-card.check { border-color: #F0D9A8; }
+.av-card.booked { opacity: .92; }
+.av-top { display: flex; align-items: center; gap: 10px; }
+.av-top .grow { flex: 1; min-width: 0; }
+.av-pic { width: 56px; height: 28px; flex: none; }
+.av-pic svg { width: 100%; height: 100%; }
+.av-plate { font-weight: 800; font-size: 16.5px; letter-spacing: .02em; }
+.av-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.av-price { text-align: center; flex: none; min-width: 92px; }
+.av-price b { display: block; font-size: 15px; }
+.av-price small { display: block; font-size: 11.5px; color: var(--muted); }
+.av-note { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; font-weight: 600; padding: 6px 9px; border-radius: 9px; }
+.av-note svg { width: 15px; height: 15px; flex: none; }
+.av-note.amber { background: var(--t-amber-bg); color: var(--t-amber); }
+.av-note.red { background: var(--t-red-bg); color: var(--t-red); }
+.av-act { margin-top: 10px; display: flex; justify-content: flex-end; }
+.av-act .btn { width: 100%; height: 42px; }
+.av-showbooked { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 8px; padding: 10px 14px; min-height: 56px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); }
+.av-showbooked small { display: block; font-size: 12.5px; color: var(--muted); font-weight: 500; }

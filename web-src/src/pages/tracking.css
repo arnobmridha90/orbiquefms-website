@@ -25,7 +25,7 @@
 .tr-pin .tr-arrow{fill:#fff}
 .tr-pin text{font-size:13px;font-weight:600;fill:var(--text);paint-order:stroke;stroke:var(--paper);stroke-width:4px;stroke-linejoin:round}
 .tr-pin.sel .tr-dot{stroke:var(--text)}
-.tr-pin:focus-visible .tr-dot{stroke:var(--primary);stroke-width:4}
+.tr-pin:focus-visible .tr-dot{stroke:var(--focus);stroke-width:4}
 .tr-scale line{stroke:var(--text2);stroke-width:3}
 .tr-scale text,.tr-north text{font-size:12px;fill:var(--text2)}
 .tr-north path{fill:var(--text2)}
@@ -49,7 +49,7 @@
 .tr-popa{display:flex;justify-content:flex-end}
 .pg-tracking .tr-pick{padding:16px;margin-bottom:18px}
 .pg-tracking .tr-pickf{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.pg-tracking .tr-pickf .inp{width:200px}
+.pg-tracking .tr-pickf .inp{width:220px}
 .pg-tracking .tr-pickf .inp:first-child{width:280px}
 .pg-tracking #tr-herr:not(:empty){margin-top:12px}
 .pg-tracking .tr-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
@@ -62,7 +62,7 @@
 .pg-tracking .tr-acc{margin-bottom:18px;overflow:hidden}
 .pg-tracking .tr-acts{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
 .pg-tracking .tr-errt{color:var(--error-text);margin-top:2px}
-.tr-link{height:34px;border:1px solid var(--input-border);border-radius:6px;background:var(--paper);color:var(--text);font:inherit;padding:0 8px;max-width:100%}
+.tr-link{min-height:38px;min-width:150px;justify-content:space-between;gap:8px;max-width:100%}
 .tr-help{margin-bottom:14px}
 .tr-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
 .tr-form .full{grid-column:1 / -1}
@@ -80,3 +80,9 @@
   .tr-pin .tr-ring{r:22px}
   .tr-scale text,.tr-north text{font-size:26px}
 }
+/* who has the car now */
+.pg-tracking .tr-who{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-size:13px;color:var(--text2);min-width:0}
+.pg-tracking .tr-who > i{font-size:15px;color:var(--text3);flex:none}
+.pg-tracking .tr-who b{color:var(--text);font-weight:600}
+.pg-tracking .tr-who .inv-link{min-height:32px}
+.pg-tracking .tr-mc .tr-who{margin:2px 0}

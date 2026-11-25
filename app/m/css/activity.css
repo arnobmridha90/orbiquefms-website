@@ -1,0 +1,37 @@
+/* activity screens (M9). Shared classes live in base.css. Inbox styles live here too. */
+.act-filters .two { grid-template-columns: 1fr 1fr; }
+.act-filters .field { margin-bottom: 8px; }
+.act-filters select.inp { background-image: linear-gradient(45deg, transparent 50%, #697080 50%), linear-gradient(135deg, #697080 50%, transparent 50%); background-position: calc(100% - 18px) 20px, calc(100% - 13px) 20px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
+.act-clear { height: 36px; margin-bottom: 6px; }
+.act-list { margin-top: 6px; }
+.act-day { padding: 8px 14px 6px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; background: #FAFBFC; border-top: 1px solid var(--line); }
+.act-day:first-child { border-top: 0; }
+.act-row + .act-row .act-main { border-top: 1px solid var(--line); }
+.act-row .act-main { border-top: 0; align-items: flex-start; }
+.act-day + .act-row .act-main { border-top: 1px solid var(--line); }
+.act-t { font-size: 14.5px; font-weight: 600; line-height: 1.3; }
+.act-main .t2 { white-space: normal; }
+.act-main .av { margin-top: 1px; }
+.act-sys { background: var(--info-bg); color: var(--muted); }
+.act-sys svg { width: 16px; height: 16px; }
+.act-n { min-width: 22px; height: 22px; border-radius: 11px; background: var(--tint); color: var(--brand-ink); font-size: 12px; font-weight: 750; display: grid; place-items: center; flex: none; margin-top: 4px; }
+.act-main .chev { margin-top: 4px; transition: transform .2s; }
+.act-row.open .act-main .chev { transform: rotate(180deg); }
+.act-changes { padding: 2px 14px 12px 56px; display: grid; gap: 8px; }
+.act-ch { display: grid; gap: 2px; font-size: 13.5px; background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+.act-k { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.act-v { overflow-wrap: anywhere; }
+.act-v s { color: var(--faint); }
+.act-arrow { display: inline; }
+.act-arrow svg { display: inline-block; width: 13px; height: 13px; vertical-align: -2px; color: var(--muted); }
+.act-go { justify-self: start; }
+.act-more { margin-top: 12px; }
+.act-note { margin: 10px 4px 0; }
+
+/* ---- Inbox ---- */
+.ib-bar { display: flex; align-items: center; gap: 6px; margin: 2px 2px 8px; flex-wrap: wrap; }
+.ib-bar .grow { flex: 1; }
+.ib-btn { min-height: 36px; padding: 0 8px; font-size: 13.5px; font-weight: 650; color: var(--brand-ink); }
+.ib-list .notif { transition: transform .2s, background .2s; position: relative; min-height: 64px; }
+.ib-list .notif.ib-swiping { background: var(--t-green-bg); }
+.ib-hint { margin: 10px 4px 0; text-align: center; }

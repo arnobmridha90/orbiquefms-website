@@ -1,0 +1,111 @@
+/* customers screens (M6). Shared classes live in base.css. */
+.cu-search { position: relative; margin-bottom: 8px; }
+.cu-clear { width: 40px; height: 40px; margin-right: -10px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.cu-clear svg { width: 16px; height: 16px; }
+.cu-chips { margin-bottom: 4px; }
+.cu-count { font-size: 12.5px; font-weight: 650; color: var(--muted); margin: 6px 2px 8px; }
+.cu-row { display: flex; align-items: center; gap: 11px; padding: 10px 6px 10px 12px; min-height: 64px; border-top: 1px solid var(--line); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cu-row:first-child { border-top: 0; }
+.cu-row:active { background: #F7F8FA; }
+.cu-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cu-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-sub2 { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.cu-n { margin-right: 2px; }
+.cu-n.many { font-weight: 750; color: var(--text); }
+.cu-ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: var(--brand-ink); flex: none; }
+.cu-ic svg { width: 21px; height: 21px; }
+.cu-ic:active { background: rgba(0,0,0,.06); }
+.cu-ic.wa { color: #1FA855; }
+.cu-ic.sm { width: 40px; height: 40px; color: var(--muted); }
+.cu-ic.sm.on { color: var(--brand-ink); }
+.cu-ic.red { color: var(--t-red); }
+.cu-more { width: 100%; margin-top: 12px; }
+
+/* customer page */
+.cu-banner { margin-top: 4px; }
+.cu-banner .grow { flex: 1; min-width: 0; }
+.cu-bl { margin-top: 3px; }
+.cu-stats { margin-top: 5px; font-weight: 650; font-size: 13px; }
+.cu-hero { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.cu-hero .grow { flex: 1; min-width: 0; }
+.cu-av { width: 48px; height: 48px; font-size: 17px; }
+.cu-hname { font-weight: 750; font-size: 17px; overflow-wrap: anywhere; }
+.cu-hflags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.cu-call { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.cu-call .btn { width: 100%; }
+.cu-wa { background: #1FA855; color: #fff; }
+.cu-card { padding: 4px 14px 14px; }
+.cu-kv { margin-top: 10px; }
+.cu-kv .wide { grid-column: 1 / -1; }
+.cu-kv a { color: var(--brand-ink); }
+.cu-emer { display: flex; align-items: center; gap: 8px; margin-top: 10px; background: var(--bg); border-radius: var(--r-sm); padding: 6px 4px 6px 11px; }
+.cu-emer .grow { flex: 1; min-width: 0; }
+.cu-emer .k { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.cu-emer .v { font-weight: 640; font-size: 14px; margin-top: 2px; }
+.cu-emer .v small { display: block; font-weight: 500; color: var(--muted); font-size: 12.5px; }
+.cu-none { padding: 14px; color: var(--muted); font-size: 14px; }
+.cu-blk { padding-top: 12px; }
+.cu-blrow { display: flex; gap: 11px; align-items: flex-start; }
+.cu-blrow .grow { flex: 1; min-width: 0; }
+.cu-blic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: var(--t-grey-bg); color: var(--t-grey); flex: none; }
+.cu-blic.red { background: var(--t-red-bg); color: var(--t-red); }
+.cu-blic svg { width: 19px; height: 19px; }
+.cu-blbtn { width: 100%; margin-top: 12px; }
+
+.cu-note { display: flex; gap: 6px; padding: 11px 6px 11px 14px; border-top: 1px solid var(--line); }
+.cu-note:first-child { border-top: 0; }
+.cu-note.pinned { background: #FBFCFE; }
+.cu-nmain { flex: 1; min-width: 0; }
+.cu-nhead { display: flex; align-items: center; gap: 8px; }
+.cu-pin { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 650; color: var(--brand-ink); }
+.cu-pin svg { width: 13px; height: 13px; }
+.cu-ntext { margin-top: 5px; font-size: 14.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cu-nby { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.cu-nby a { color: var(--brand-ink); font-weight: 650; }
+.cu-nact { display: flex; flex-direction: column; flex: none; }
+
+.cu-thumbs { padding-top: 10px; }
+.cu-thumb { width: 92px; height: 74px; }
+.cu-thumb span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10.5px; font-weight: 650; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.6)); padding: 10px 5px 3px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cu-card > .small.muted { padding-top: 12px; }
+.cu-miss { margin-top: 8px; }
+.cu-docbtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.cu-docbtns .btn { flex: 1; min-width: 130px; }
+.cu-zoom { flex: 1; display: grid; place-items: center; background: #111; border-radius: 12px; overflow: hidden; min-height: 240px; }
+.cu-zoom img { max-width: 100%; max-height: 70vh; display: block; }
+.cu-zfoot { display: grid; gap: 4px; }
+.cu-sample { width: 100%; margin-top: 6px; font-size: 14px; }
+.cu-slots .row svg:first-child { color: var(--brand-ink); }
+
+.cu-bk .c2-t1 { display: flex; align-items: center; gap: 6px; }
+.cu-code { font-weight: 720; }
+.cu-chev { color: var(--faint); flex: none; }
+.cu-chev svg { width: 18px; height: 18px; }
+.cu-all { width: 100%; }
+.cu-again { width: 100%; margin-top: 14px; }
+
+/* sheets */
+.cu-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cu-sub-h { font-size: 13px; font-weight: 720; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 6px 0 8px; }
+.cu-flags { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 14px; }
+.cu-flag { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 11px 6px 10px; min-height: 92px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; text-align: center; }
+.cu-flag svg { width: 22px; height: 22px; }
+.cu-flag b { font-size: 14.5px; }
+.cu-flag small { font-size: 11.5px; color: var(--muted); line-height: 1.25; }
+.cu-flag.t-grey svg { color: var(--t-grey); } .cu-flag.t-blue svg { color: var(--t-blue); } .cu-flag.t-amber svg { color: var(--t-amber); }
+.cu-flag.on.t-grey { border-color: var(--t-grey); background: var(--t-grey-bg); box-shadow: 0 0 0 2px var(--t-grey-bg); }
+.cu-flag.on.t-blue { border-color: var(--t-blue); background: var(--t-blue-bg); box-shadow: 0 0 0 2px var(--t-blue-bg); }
+.cu-flag.on.t-amber { border-color: var(--t-amber); background: var(--t-amber-bg); box-shadow: 0 0 0 2px var(--t-amber-bg); }
+.cu-ta { height: 96px; }
+.cu-phr { margin-top: -4px; margin-bottom: 10px; }
+.cu-phr .fchip svg { width: 14px; height: 14px; margin-right: 2px; }
+.cu-pinrow { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.cu-pinrow .grow { flex: 1; min-width: 0; }
+.cu-pinrow small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+.field .err:empty { display: none; }
+.cu-bk .c2-t2:last-child { white-space: normal; }
+.cu-bkh { font-size: 13px; font-weight: 700; margin: 12px 2px 6px; color: var(--muted); text-transform: none; }
+.cu-plhit { display: flex; align-items: center; gap: 4px; }
+.cu-plhit svg { width: 14px; height: 14px; flex-shrink: 0; }
+.bl-uplist { margin-top: 8px; }

@@ -12,6 +12,13 @@ var SET_SECTIONS = [
   { id: 'brand', label: 'Brand colours', icon: 'palette', group: 'For everyone', need: 'billing.settings' },
   { id: 'rules', label: 'Rules and amounts', icon: 'list-check', group: 'For everyone', need: 'billing.settings' },
   { id: 'locations', label: 'Our locations', icon: 'map-pin', group: 'For everyone', need: 'bookings.manage_locations' },
+  { id: 'places', label: 'Other places', icon: 'plane', group: 'For everyone', need: 'bookings.manage_locations' },
+  { id: 'fees', label: 'Handover fees', icon: 'coins', group: 'For everyone', need: 'expenses.manage_categories' },
+  { id: 'bank', label: 'Bank details', icon: 'building-bank', group: 'For everyone', need: 'billing.settings' },
+  { id: 'card', label: 'Card fee', icon: 'credit-card', group: 'For everyone', need: 'billing.settings' },
+  { id: 'fleet', label: 'Fleet', icon: 'car', group: 'For everyone', need: 'billing.settings' },
+  { id: 'assistant', label: 'Booking assistant rules', icon: 'brand-whatsapp', group: 'For everyone', need: 'leads.settings' },
+  { id: 'staffmsg', label: 'Staff messages', icon: 'message-2', group: 'For everyone', need: 'tasks.edit' },
   { id: 'menu', label: 'Menu layout', icon: 'menu-2', group: 'For everyone', need: 'users.manage_menu' },
   { id: 'dash', label: 'Dashboard layout', icon: 'layout-dashboard', group: 'For everyone', need: 'users.manage_menu' },
   { id: 'ic', label: 'IC check accounts', icon: 'id', group: 'For everyone', need: 'ic_check.view' }
@@ -29,7 +36,7 @@ function setGuide(b, d) {
   var list = [
     { id: 'company', t: 'Fill in your company details', d: 'Name, registration number, address, phone and email. They print on invoices, receipts and the agreement.', ok: !!(b.legal && b.reg && b.address && b.phone && b.email), act: ['Company profile', function (ctx) { setGoSec(ctx, 'company'); }] },
     { id: 'logo', t: 'Add your logo and colours', d: 'Every page, the booking form, the documents and the website use them.', ok: !!(b.logoImg || b.mark), act: ['Brand colours', function (ctx) { setGoSec(ctx, 'brand'); }] },
-    { id: 'bank', t: 'Add your bank details', d: 'Customers see them on invoices so they can pay by transfer.', ok: !!(d.company && d.company.bank && d.company.bank.accNo), act: ['Company details', function (ctx) { ctx.go('invoices', { action: 'company' }); }] },
+    { id: 'bank', t: 'Add your bank details', d: 'Customers see them on invoices so they can pay by transfer.', ok: !!(d.company && d.company.bank && d.company.bank.accNo), act: ['Bank details', function (ctx) { setGoSec(ctx, 'bank'); }] },
     { id: 'rules', t: 'Check the rules and amounts', d: 'Fines, the usual deposit and the hours in the rental terms the customer signs.', ok: !!d.settings.rulesChecked, act: ['Rules and amounts', function (ctx) { setGoSec(ctx, 'rules'); }] },
     { id: 'locations', t: 'Add where customers pick up and drop off', d: 'Each place becomes a choice in the booking form.', ok: b.locations.length > 0, act: ['Our locations', function (ctx) { setGoSec(ctx, 'locations'); }] },
     { id: 'cars', t: 'Add your cars', d: 'With plates, rates and deposits, and the road tax and insurance dates.', ok: d.cars.length > 0, act: ['Cars', function (ctx) { ctx.go('cars'); }] },
@@ -41,12 +48,23 @@ function setGuide(b, d) {
   list.forEach(function (x) { x.done = x.ok || !!done[x.id]; x.byHand = !x.ok && !!done[x.id]; });
   return list;
 }
-function setGoSec(ctx, id) { ctx.state.sec = id; ctx.setParams({ section: id }); ctx.refresh(); window.scrollTo(0, 0); }
+/* moving to another section: unsaved changes on the open one ask "Leave without saving?" first; leaving throws the draft
+   away, so the form is built again from the saved settings next time (a stale value never looks saved) */
+function setGoSec(ctx, id) {
+  var st = ctx.state;
+  if (id === st.sec) return;
+  var go2 = function () { setDropDrafts(st); st.sec = id; var nv = document.querySelector('.set-nav'); st.navX = nv ? nv.scrollLeft : 0; ctx.setParams({ section: id }); ctx.refresh(); window.scrollTo(0, 0); };
+  if (st.secDirty && st.secDirty()) { UI.confirm({ title: 'Leave without saving?', text: 'The changes on this section are not saved yet. If you leave now, they are lost.', ok: 'Discard', cancel: 'Keep editing', danger: true }).then(function (y) { if (y) go2(); }); return; }
+  go2();
+}
+function setDropDrafts(st) { st.rDraft = null; st.drafts = {}; st.secDirty = null; }
 
 PAGES['settings'] = {
   title: 'Settings',
   render: function (root, ctx) {
     var st = ctx.state, b = ctx.brand, d = ctx.data, u = ctx.me;
+    /* a fresh visit (not a redraw): drafts left from an earlier visit are thrown away */
+    if (st.visit !== (S.visit || 0)) { setDropDrafts(st); st.visit = S.visit || 0; }
     var secs = SET_SECTIONS.filter(function (s) { return !s.need || ctx.can(s.need); });
     var want = ctx.params.section || (S.set && S.set !== 'company' ? { locations: 'locations', start: 'startpage', brand: 'brand', rules: 'rules' }[S.set] : null) || st.sec;
     if (S.set && S.set !== 'company') S.set = 'company';
@@ -56,9 +74,18 @@ PAGES['settings'] = {
     root.innerHTML = '<div class="pg-h"><div><h1>Settings</h1><p>Your own choices are listed first. Other people keep their own. The cards under "For everyone" change the dashboard for every team member.</p></div></div>' +
       '<div class="set-wrap"><nav class="set-nav" aria-label="Settings sections">' + nav + '</nav><div class="set-main" id="set-main"></div></div>';
     UI.on(root, 'click', '[data-set]', function (ev, el) { setGoSec(ctx, el.getAttribute('data-set')); });
+    /* the section strip (a sideways row on phones) keeps its place and brings the open section into view */
+    var navEl = root.querySelector('.set-nav'), curEl = navEl.querySelector('[aria-current]');
+    if (navEl.scrollWidth > navEl.clientWidth + 1) {
+      navEl.scrollLeft = st.navX || 0;
+      var cl = curEl ? curEl.getBoundingClientRect().left - navEl.getBoundingClientRect().left + navEl.scrollLeft : 0;
+      if (curEl && (cl < navEl.scrollLeft || cl + curEl.offsetWidth > navEl.scrollLeft + navEl.clientWidth)) navEl.scrollLeft = Math.max(0, cl - (navEl.clientWidth - curEl.offsetWidth) / 2);
+    }
     var main = root.querySelector('#set-main');
-    var draw = function () { var fresh = main.cloneNode(false); main.replaceWith(fresh); main = fresh; (SET_DRAW[st.sec] || SET_DRAW.startpage)(main, ctx, draw); };
+    var draw = function () { st.secDirty = null; var fresh = main.cloneNode(false); main.replaceWith(fresh); main = fresh; (SET_DRAW[st.sec] || SET_DRAW.startpage)(main, ctx, draw); };
     draw();
+    /* other pages, the address and closing the tab ask too; leaving Settings throws the drafts away */
+    UI.pageDirty = function () { if (!root.isConnected || S.page !== 'settings') return false; return !!(st.secDirty && st.secDirty()); };
   },
   onData: function (root, ctx) { if (ctx.state.sec === 'start') ctx.refresh(); },
   search: [
@@ -66,7 +93,14 @@ PAGES['settings'] = {
     { label: 'Company profile', icon: 'building', keywords: 'name address registration', run: function (ctx) { setGoSec(ctx, 'company'); } },
     { label: 'Brand colours and logo', icon: 'palette', keywords: 'colors logo theme', run: function (ctx) { setGoSec(ctx, 'brand'); } },
     { label: 'Rules and amounts', icon: 'list-check', keywords: 'fines deposit', run: function (ctx) { setGoSec(ctx, 'rules'); } },
-    { label: 'Our locations', icon: 'map-pin', keywords: 'pick-up drop-off', run: function (ctx) { setGoSec(ctx, 'locations'); } },
+    { label: 'Our locations', icon: 'map-pin', keywords: 'pick-up drop-off agents', run: function (ctx) { setGoSec(ctx, 'locations'); } },
+    { label: 'Other places (airport, station)', icon: 'plane', keywords: 'airport jetty delivery fee', run: function (ctx) { setGoSec(ctx, 'places'); } },
+    { label: 'Handover fees', icon: 'coins', keywords: 'agent fee delivery return companion rate', run: function (ctx) { setGoSec(ctx, 'fees'); } },
+    { label: 'Bank details', icon: 'building-bank', keywords: 'account duitnow transfer', run: function (ctx) { setGoSec(ctx, 'bank'); } },
+    { label: 'Card fee', icon: 'credit-card', keywords: 'card charge percent', run: function (ctx) { setGoSec(ctx, 'card'); } },
+    { label: 'Fleet settings', icon: 'car', keywords: 'summons admin fee speed tracker reminder papers', run: function (ctx) { setGoSec(ctx, 'fleet'); } },
+    { label: 'Booking assistant rules', icon: 'brand-whatsapp', keywords: 'hours turnaround hold delivery tiers', run: function (ctx) { setGoSec(ctx, 'assistant'); } },
+    { label: 'Staff messages', icon: 'message-2', keywords: 'nightly schedule reminder whatsapp', run: function (ctx) { setGoSec(ctx, 'staffmsg'); } },
     { label: 'Menu layout', icon: 'menu-2', keywords: 'sidebar groups', run: function (ctx) { setGoSec(ctx, 'menu'); } },
     { label: 'Dashboard layout', icon: 'layout-dashboard', keywords: 'sections order', run: function (ctx) { setGoSec(ctx, 'dash'); } },
     { label: 'IC check accounts', icon: 'id', keywords: 'ic check login', run: function (ctx) { setGoSec(ctx, 'ic'); } }
@@ -163,6 +197,7 @@ SET_DRAW.rules = function (el, ctx, redraw) {
   var cur = {}; SET_RULES.forEach(function (r) { cur[r[0]] = val(r[0]); });
   st.rDraft = st.rDraft && st.rBrand === b.id ? st.rDraft : Object.assign({}, cur); st.rBrand = b.id;
   var dirty = !setSame(st.rDraft, cur);
+  st.secDirty = function () { return !!st.rDraft && !setSame(st.rDraft, cur); };
   el.innerHTML = setCard('Rules and amounts', 'The must know rules, the 22 rental terms and the agreement read these. Change a number and the booking form shows it straight away.',
     '<div class="grid g2 set-form">' + SET_RULES.map(function (r) { return UI.input({ key: r[0], label: r[1], type: 'number', min: 0, value: st.rDraft[r[0]], prefix: r[2] === 'RM' ? 'RM' : '', help: r[2] === 'RM' ? '' : r[2] }); }).join('') + '</div>' +
     (d.settings.rulesChecked ? '<p class="b2 mt16">' + i('circle-check') + ' Checked and saved ' + UI.fmt.ago(d.settings.rulesChecked) + '.</p>' : ''),
@@ -182,20 +217,22 @@ SET_DRAW.rules = function (el, ctx, redraw) {
 /* ---------- Our locations ---------- */
 SET_DRAW.locations = function (el, ctx, redraw) {
   var st = ctx.state, b = ctx.brand;
-  el.innerHTML = setCard('Our locations', 'Where customers pick up and drop off cars. Each one becomes a choice in the booking form.',
+  b.locations.forEach(function (l, k) { if (!l.id) l.id = setNewLocId(b); if (!l.agents) l.agents = []; });
+  el.innerHTML = setCard('Our locations', 'Where customers pick up and drop off cars. Each one becomes a choice in the booking form, and its agents get the pick-up and return tasks there (Tasks, Auto-assign).',
     (b.locations.length ? '' : UI.empty({ icon: 'map-pin', title: 'No locations yet', text: 'Add the first place below.' })) +
     b.locations.map(function (l, k) {
       if (st.locRen === k) return '<div class="set-loc"><div class="inp grow"><input data-ren-v value="' + esc(l.n) + '" aria-label="New name" maxlength="80"></div>' + UI.btn('Save', { size: 'sm', attrs: { 'data-ren-save': k } }) + UI.btn('Cancel', { kind: 't', size: 'sm', attrs: { 'data-ren-cancel': '1' } }) + '</div>';
-      return '<div class="set-loc"><span class="set-loc-n">' + i('map-pin') + esc(l.n) + '</span>' + UI.check({ key: 'p' + k, label: 'Pick-up', checked: l.p, attrs: { 'data-loc': k + '|p' } }) + UI.check({ key: 'd' + k, label: 'Drop-off', checked: l.d, attrs: { 'data-loc': k + '|d' } }) + '<span class="row gap4">' + UI.btn('Rename', { kind: 't', size: 'sm', icon: 'edit', attrs: { 'data-ren': k } }) + UI.btn('Remove', { kind: 'err', size: 'sm', attrs: { 'data-locdel': k } }) + '</span></div>';
+      return '<div class="set-loc"><span class="set-loc-n">' + i('map-pin') + esc(l.n) + '</span>' + UI.check({ key: 'p' + k, label: 'Pick-up', checked: l.p, attrs: { 'data-loc': k + '|p' } }) + UI.check({ key: 'd' + k, label: 'Drop-off', checked: l.d, attrs: { 'data-loc': k + '|d' } }) + '<span class="row gap4">' + UI.btn('Rename', { kind: 't', size: 'sm', icon: 'edit', attrs: { 'data-ren': k } }) + UI.btn('Remove', { kind: 'err', size: 'sm', attrs: { 'data-locdel': k } }) + '</span><div class="set-loc-ag" data-locag="' + k + '"></div></div>';
     }).join('') +
     '<div class="set-loc set-loc-new"><div class="inp grow"><label for="set-newloc">New location</label><input id="set-newloc" placeholder="e.g. Midtown Mega Mall" maxlength="80"></div>' + UI.check({ key: 'np', label: 'Pick-up', checked: true }) + UI.check({ key: 'nd', label: 'Drop-off', checked: true }) + UI.btn('Add location', { icon: 'plus', size: 'sm', attrs: { 'data-locadd': '1' } }) + '</div>');
-  el.querySelectorAll('[data-loc]').forEach(function (x) { x.addEventListener('change', function () { var p = x.getAttribute('data-loc').split('|'), l = b.locations[+p[0]]; l[p[1]] = x.checked; setLog(me().name + ' changed location ' + l.n, [{ f: p[1] === 'p' ? 'Pick-up' : 'Drop-off', from: x.checked ? 'Off' : 'On', to: x.checked ? 'On' : 'Off' }]); UI.toast('Saved.'); }); });
+  el.querySelectorAll('[data-locag]').forEach(function (x) { var l = b.locations[+x.getAttribute('data-locag')]; UI.staffPicker(x, { key: 'ag-' + l.id, label: 'Agents', source: 'employees', multi: true, values: (l.agents || []).slice(), me: false, placeholder: 'No agents yet', help: 'They usually hand cars over here.', onChange: function (ids) { var from = (l.agents || []).map(function (id) { var e = employeeById(id); return e ? e.name : id; }).join(', '); l.agents = ids.slice(); setLog(me().name + ' changed the agents of ' + l.n, [{ f: 'Agents', from: from, to: ids.map(function (id) { var e = employeeById(id); return e ? e.name : id; }).join(', ') }]); UI.toast('Agents of ' + l.n + ' saved.'); } }); });
+  el.querySelectorAll('[data-loc]').forEach(function (x) { x.addEventListener('change', function () { var p = x.getAttribute('data-loc').split('|'), l = b.locations[+p[0]]; l[p[1]] = x.checked; syncFeeKinds(ctx.data, b); setLog(me().name + ' changed location ' + l.n, [{ f: p[1] === 'p' ? 'Pick-up' : 'Drop-off', from: x.checked ? 'Off' : 'On', to: x.checked ? 'On' : 'Off' }]); UI.toast('Saved.'); }); });
   el.querySelectorAll('[data-ren]').forEach(function (x) { x.addEventListener('click', function () { st.locRen = +x.getAttribute('data-ren'); redraw(); var f = el.querySelector('[data-ren-v]'); if (f) { f.focus(); f.select(); } }); });
   var rc = el.querySelector('[data-ren-cancel]'); if (rc) rc.addEventListener('click', function () { st.locRen = null; redraw(); });
-  var rs = el.querySelector('[data-ren-save]'); if (rs) { var doRen = function () { var k = +rs.getAttribute('data-ren-save'), v = el.querySelector('[data-ren-v]').value.trim(); if (!v) { UI.toast('Type the name of the place.', { tone: 'warn' }); return; } var old = b.locations[k].n; b.locations[k].n = v; st.locRen = null; setLog(me().name + ' renamed location ' + old, [{ f: 'Name', from: old, to: v }]); redraw(); UI.toast('Renamed.'); }; rs.addEventListener('click', doRen); el.querySelector('[data-ren-v]').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') doRen(); if (ev.key === 'Escape') { ev.stopPropagation(); st.locRen = null; redraw(); } }); }
+  var rs = el.querySelector('[data-ren-save]'); if (rs) { var doRen = function () { var k = +rs.getAttribute('data-ren-save'), v = el.querySelector('[data-ren-v]').value.trim(); if (!v) { UI.toast('Type the name of the place.', { tone: 'warn' }); return; } var old = b.locations[k].n; b.locations[k].n = v; syncFeeKinds(ctx.data, b); st.locRen = null; setLog(me().name + ' renamed location ' + old, [{ f: 'Name', from: old, to: v }]); redraw(); UI.toast('Renamed.'); }; rs.addEventListener('click', doRen); el.querySelector('[data-ren-v]').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') doRen(); if (ev.key === 'Escape') { ev.stopPropagation(); st.locRen = null; redraw(); } }); }
   el.querySelectorAll('[data-locdel]').forEach(function (x) { x.addEventListener('click', function () {
     var k = +x.getAttribute('data-locdel'), l = b.locations[k];
-    UI.confirm({ title: 'Remove ' + l.n + '?', text: 'The booking form stops offering it. Bookings that already use it keep it.', ok: 'Remove', danger: true }).then(function (y) { if (!y) return; b.locations.splice(k, 1); setLog(me().name + ' removed location ' + l.n); redraw(); UI.toast(l.n + ' removed.', { action: { label: 'Undo', run: function () { b.locations.splice(k, 0, l); redraw(); } } }); });
+    UI.confirm({ title: 'Remove ' + l.n + '?', text: 'The booking form stops offering it. Bookings that already use it keep it.', ok: 'Remove', danger: true }).then(function (y) { if (!y) return; b.locations.splice(k, 1); syncFeeKinds(ctx.data, b); setLog(me().name + ' removed location ' + l.n); redraw(); UI.toast(l.n + ' removed.', { action: { label: 'Undo', run: function () { b.locations.splice(k, 0, l); syncFeeKinds(ctx.data, b); redraw(); } } }); });
   }); });
   var add = function () {
     var f = el.querySelector('#set-newloc'), v = f.value.trim();
@@ -203,7 +240,7 @@ SET_DRAW.locations = function (el, ctx, redraw) {
     if (b.locations.some(function (l) { return l.n.toLowerCase() === v.toLowerCase(); })) { UI.toast(v + ' is already on the list.', { tone: 'warn' }); return; }
     var p = el.querySelector('[data-key="np"]').checked, dd = el.querySelector('[data-key="nd"]').checked;
     if (!p && !dd) { UI.toast('Tick Pick-up, Drop-off or both.', { tone: 'warn' }); return; }
-    b.locations.push({ n: v, p: p, d: dd }); setLog(me().name + ' added location ' + v); redraw(); UI.toast('Location added.');
+    b.locations.push({ id: setNewLocId(b), n: v, p: p, d: dd, agents: [] }); syncFeeKinds(ctx.data, b); setLog(me().name + ' added location ' + v); redraw(); UI.toast('Location added.');
   };
   el.querySelector('[data-locadd]').addEventListener('click', add);
   el.querySelector('#set-newloc').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') add(); });
@@ -287,4 +324,242 @@ SET_DRAW.ic = function (el, ctx, redraw) {
   el.querySelectorAll('[data-ic-on]').forEach(function (x) { x.addEventListener('change', function () { var s = site(x, 'data-ic-on'); s.on = x.checked; DB.log('Changed', 'Settings', s.id, me().name + (s.on ? ' switched on ' : ' switched off ') + s.name, [{ f: 'Use when checking an IC', from: s.on ? 'Off' : 'On', to: s.on ? 'On' : 'Off' }]); UI.toast(s.on ? 'Switched on.' : 'Switched off.'); }); });
   el.querySelectorAll('[data-ic-words]').forEach(function (x) { x.addEventListener('click', function () { var s = site(x, 'data-ic-words'); s.words = el.querySelector('[data-key="words-' + s.id + '"]').value.split(',').map(function (w) { return w.trim(); }).filter(Boolean).join(', '); DB.log('Changed', 'Settings', s.id, me().name + ' changed the warning words for ' + s.name); redraw(); UI.toast('Words saved.'); }); });
   el.querySelectorAll('[data-ic-test]').forEach(function (x) { x.addEventListener('click', function () { var s = site(x, 'data-ic-test'); s.lastChecked = NOW(); UI.dialog({ title: 'Test: ' + s.name, width: 'sm', body: s.wired ? UI.alert('Signed in to the site. The login works.', 'ok') : UI.alert('Not set up: the site\'s search page is not wired up yet, so the sample cannot sign in. The saved login is kept.', 'warn'), buttons: [{ label: 'Close' }] }); redraw(); }); });
+};
+
+/* ===================================================================
+   W4 parity cards: other places, handover fees, bank details, card fee, fleet, booking assistant rules, staff messages.
+   Every value lives in the company settings (D().company, B().places) and every page reads it from there.
+   =================================================================== */
+function setNewLocId(b) { var n = 1; while ((b.locations || []).some(function (l) { return l.id === 'loc-' + n; })) n++; return 'loc-' + n; }
+/* a number box read from UI.form: '' when left empty (UI.form gives null), so the checks can ask for it */
+function setNB(v) { return v == null || v === '' || isNaN(+v) ? '' : +v; }
+function setNum(v, dp) { var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); if (isNaN(n)) return null; var f = Math.pow(10, dp == null ? 2 : dp); return Math.round(n * f) / f; }
+function setTimes(step) { var out = []; for (var m = 0; m < 1440; m += step || 30) { var d = new Date(2026, 0, 1, Math.floor(m / 60), m % 60); out.push([String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'), tm(d)]); } return out; }
+/* a card whose fields save together: o = {title, desc, body(draft) -> html, read(form, draft), check(draft) -> msg, save(draft) -> changes [], after(el, draft)} */
+function setFormCard(el, ctx, redraw, key, cur, o) {
+  var st = ctx.state; st.drafts = st.drafts || {};
+  var dk = key + '|' + ctx.brand.id;
+  if (!st.drafts[dk]) st.drafts[dk] = JSON.parse(JSON.stringify(cur));
+  var draft = st.drafts[dk], dirty = function () { return !!st.drafts[dk] && !setSame(draft, cur); };
+  st.secDirty = dirty;
+  el.innerHTML = setCard(o.title, o.desc, o.body(draft) + '<p class="ui-err set-err" hidden></p>',
+    (o.footNote ? '<span class="b2 grow">' + o.footNote + '</span>' : '<span class="b2 grow set-st">' + (dirty() ? 'You have changes that are not saved yet.' : 'Saved.') + '</span>') + UI.btn('Discard', { kind: 'o', disabled: !dirty(), attrs: { 'data-fc-disc': '1' } }) + UI.btn('Save', { icon: 'device-floppy', disabled: !dirty(), attrs: { 'data-fc-save': '1' } }));
+  var sync = function () { o.read(UI.form(el.querySelector('.card-b')), draft); var dd = dirty(); el.querySelector('[data-fc-save]').disabled = !dd; el.querySelector('[data-fc-disc]').disabled = !dd; var s = el.querySelector('.set-st'); if (s) s.textContent = dd ? 'You have changes that are not saved yet.' : 'Saved.'; };
+  el.addEventListener('input', function (ev) { if (ev.target.closest('.card-b')) sync(); });
+  el.addEventListener('change', function (ev) { if (ev.target.closest('.card-b')) sync(); });
+  el.querySelector('[data-fc-disc]').addEventListener('click', function () { delete st.drafts[dk]; redraw(); });
+  el.querySelector('[data-fc-save]').addEventListener('click', function () {
+    sync(); var er = el.querySelector('.set-err'), msg = o.check ? o.check(draft) : '';
+    if (msg) { er.textContent = msg; er.hidden = false; return; }
+    var changes = o.save(draft) || []; delete st.drafts[dk];
+    setLog(me().name + ' changed ' + o.title.toLowerCase(), changes); redraw(); UI.toast(o.saved || o.title + ' saved.');
+  });
+  if (o.after) o.after(el, draft, sync);
+  return { draft: draft, sync: sync };
+}
+function setDiff(label, a, b) { return String(a) === String(b) ? [] : [{ f: label, from: a == null ? '' : String(a), to: b == null ? '' : String(b) }]; }
+
+/* ---------- Other places (airport, station, ferry terminal...) ---------- */
+SET_DRAW.places = function (el, ctx, redraw) {
+  var b = ctx.brand, cur = (b.places || []).map(function (p) { return { id: p.id, name: p.name, deliveryFee: p.deliveryFee, returnFee: p.returnFee }; });
+  var used = function (p) { return ctx.data.bookings.filter(function (x) { return x.startPlace === p.id || x.endPlace === p.id; }).length; };
+  var fc = setFormCard(el, ctx, redraw, 'places', cur, {
+    title: 'Other places', desc: 'Places that are not your own office, such as the airport, a train station or a ferry terminal. Each one becomes a pick-up and return choice in the booking form, with its own delivery and return fee, and its own handover fee kind and task type.',
+    body: function (dr) {
+      return (dr.length ? '<div class="set-places"><div class="set-pl set-pl-h b2"><span>Name</span><span>Delivery fee</span><span>Return fee</span><span></span></div>' + dr.map(function (p, k) {
+        return '<div class="set-pl">' + UI.input({ key: 'pn' + k, label: '', value: p.name, placeholder: 'e.g. Airport', attrs: { 'aria-label': 'Name of place ' + (k + 1) } }) + UI.input({ key: 'pd' + k, label: 'Delivery fee', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: p.deliveryFee, attrs: { 'aria-label': 'Delivery fee', 'data-money': '1' } }) + UI.input({ key: 'pr' + k, label: 'Return fee', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: p.returnFee, attrs: { 'aria-label': 'Return fee', 'data-money': '1' } }) + UI.iconBtn('trash', 'Remove ' + (p.name || 'this place'), { attrs: { 'data-pl-del': k } }) + '</div>';
+      }).join('') + '</div>' : UI.empty({ icon: 'plane-off', title: 'No other places yet', text: 'Add the airport or a station if you deliver there.' })) +
+        '<div class="mt8">' + UI.btn('Add a place', { kind: 'o', icon: 'plus', size: 'sm', attrs: { 'data-pl-add': '1' } }) + '</div>';
+    },
+    read: function (f, dr) { dr.forEach(function (p, k) { if (('pn' + k) in f) { p.name = String(f['pn' + k] || ''); p.deliveryFee = setNB(f['pd' + k]); p.returnFee = setNB(f['pr' + k]); } }); },
+    check: function (dr) {
+      if (dr.some(function (p) { return !p.name.trim(); })) return 'Give every place a name.';
+      var names = dr.map(function (p) { return p.name.trim().toLowerCase(); }); if (names.some(function (n, k) { return names.indexOf(n) !== k; })) return 'Two places have the same name.';
+      if (dr.some(function (p) { return p.deliveryFee === '' || p.returnFee === '' || p.deliveryFee < 0 || p.returnFee < 0; })) return 'Type a delivery and a return fee for every place (0 is fine).';
+      return '';
+    },
+    save: function (dr) {
+      var ch = [], old = b.places || [];
+      dr.forEach(function (p) { var o = byId(old, p.id); if (!o) ch.push({ f: 'Place added', from: '', to: p.name }); else { ch = ch.concat(setDiff(o.name + ': name', o.name, p.name.trim()), setDiff(o.name + ': delivery fee', o.deliveryFee, p.deliveryFee), setDiff(o.name + ': return fee', o.returnFee, p.returnFee)); } });
+      old.forEach(function (o) { if (!dr.some(function (p) { return p.id === o.id; })) ch.push({ f: 'Place removed', from: o.name, to: '' }); });
+      b.places = dr.map(function (p) { return { id: p.id, name: p.name.trim(), deliveryFee: setNum(p.deliveryFee), returnFee: setNum(p.returnFee) }; });
+      syncFeeKinds(ctx.data, b); return ch;
+    },
+    saved: 'Places saved. The booking form, handover fees and task types follow them now.',
+    after: function (el2, dr, sync) {
+      el2.querySelectorAll('[data-money]').forEach(function (x) { x.addEventListener('blur', function () { var n = setNum(x.value); if (n != null) { x.value = n.toFixed(2); sync(); } }); });
+      el2.addEventListener('click', function (ev) {
+        var x;
+        if (ev.target.closest('[data-pl-add]')) { sync(); var n = 1; while (dr.some(function (p) { return p.id === 'pl-' + n; }) || (b.places || []).some(function (p) { return p.id === 'pl-' + n; })) n++; dr.push({ id: 'pl-' + n, name: '', deliveryFee: 0, returnFee: 0 }); redraw(); setTimeout(function () { var f = el.parentNode && document.querySelector('[data-key="pn' + (dr.length - 1) + '"]'); if (f) f.focus(); }, 30); }
+        else if ((x = ev.target.closest('[data-pl-del]'))) { sync(); var k = +x.getAttribute('data-pl-del'), p = dr[k], n2 = used(p); var go = function () { dr.splice(k, 1); redraw(); }; if (n2) UI.confirm({ title: 'Remove ' + (p.name || 'this place') + '?', text: plural(n2, 'booking') + ' use it. They keep it; new bookings cannot choose it once you save.', ok: 'Remove', danger: true }).then(function (y) { if (y) go(); }); else go(); }
+      });
+    }
+  });
+  return fc;
+};
+
+/* ---------- Handover fees ---------- */
+var SET_FEE_GROUPS = [['delivery', 'Delivery and pick-up'], ['return', 'Return and drop-off'], ['companion', 'Companion (a second person on the trip)'], ['other', 'Other trips']];
+SET_DRAW.fees = function (el, ctx, redraw) {
+  var d = ctx.data, st = ctx.state; st.feeOpen = st.feeOpen || {};
+  var kinds = d.expenseCats.filter(function (c) { return c.agentFee && !c.hidden; });
+  var rates = function (c) { return (d.agentFeeRates || []).filter(function (r) { return r.cat === c.id; }); };
+  var row = function (c) {
+    var rs = rates(c), open = st.feeOpen[c.id];
+    return '<div class="set-fee" data-fee="' + c.id + '"><div class="set-fee-h"><div class="grow"><b class="t1c">' + esc(c.name) + '</b>' + (c.fixedAmount == null || c.fixedAmount === '' ? ' ' + UI.chip('No amount yet', 'warn') : '') + '</div>' +
+      '<div class="set-fee-amt">' + UI.input({ key: 'amt-' + c.id, label: '', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: c.fixedAmount == null ? '' : Number(c.fixedAmount).toFixed(2), placeholder: 'Amount', attrs: { 'aria-label': 'Amount for everyone: ' + c.name, 'data-fee-amt': c.id } }) + UI.btn('Save', { size: 'sm', disabled: true, attrs: { 'data-fee-save': c.id } }) + '</div></div>' +
+      '<div class="row wrap gap6 set-fee-rates">' + rs.map(function (r) { return '<span class="chip pri set-rate">' + esc(staffName(r.user, d)) + ': ' + UI.fmt.money(r.amount) + '<button type="button" class="set-x" data-rate-del="' + r.id + '" aria-label="Remove the rate of ' + esc(staffName(r.user, d)) + '">' + i('x') + '</button></span>'; }).join('') +
+      (open ? '' : UI.btn('Different rate for...', { kind: 't', size: 'sm', icon: 'user-plus', attrs: { 'data-rate-open': c.id } })) + '</div>' +
+      (open ? '<div class="set-rate-add"><div class="set-rate-who" data-rate-who="' + c.id + '"></div>' + UI.input({ key: 'ramt-' + c.id, label: 'Amount', type: 'number', min: 0, step: '0.01', prefix: 'RM', attrs: { 'data-rate-amt': c.id } }) + UI.btn('Add', { icon: 'plus', size: 'sm', attrs: { 'data-rate-add': c.id } }) + UI.btn('Cancel', { kind: 't', size: 'sm', attrs: { 'data-rate-cancel': c.id } }) + '</div>' : '') + '</div>';
+  };
+  el.innerHTML = setCard('Handover fees', 'What staff get for each delivery, pick-up, return and companion trip. The kinds follow Our locations and Other places by themselves. Staff choose them when they record their handover fee on Expenses, and they show as their income.',
+    UI.alert('A fee with no amount cannot be chosen yet. Changing an amount does not change saved entries.', 'pri') +
+    SET_FEE_GROUPS.map(function (g) { var ks = kinds.filter(function (c) { return (c.feeGroup || 'other') === g[0]; }); return ks.length ? '<div class="set-tg">' + esc(g[1]) + '</div><div class="set-fees">' + ks.map(row).join('') + '</div>' : ''; }).join(''));
+  el.querySelectorAll('[data-rate-who]').forEach(function (x) { var c = byId(d.expenseCats, x.getAttribute('data-rate-who')); UI.staffPicker(x, { key: 'rwho-' + c.id, label: 'Person', exclude: rates(c).map(function (r) { return r.user; }) }); });
+  var tidy = function (x) { var n = setNum(x.value); if (n != null && n >= 0) x.value = n.toFixed(2); };
+  el.addEventListener('input', function (ev) { var id = ev.target.getAttribute('data-fee-amt'); if (!id) return; var c = byId(d.expenseCats, id), v = ev.target.value === '' ? null : setNum(ev.target.value); el.querySelector('[data-fee-save="' + id + '"]').disabled = v === (c.fixedAmount == null || c.fixedAmount === '' ? null : +c.fixedAmount); });
+  el.addEventListener('focusout', function (ev) { if (ev.target.matches('[data-fee-amt],[data-rate-amt]')) tidy(ev.target); });
+  el.addEventListener('keydown', function (ev) { var id = ev.target.getAttribute('data-fee-amt'); if (id && ev.key === 'Enter') { tidy(ev.target); el.querySelector('[data-fee-save="' + id + '"]').click(); } });
+  el.addEventListener('click', function (ev) {
+    var x, id;
+    if ((x = ev.target.closest('[data-fee-save]')) && !x.disabled) {
+      id = x.getAttribute('data-fee-save'); var c = byId(d.expenseCats, id), f = el.querySelector('[data-fee-amt="' + id + '"]'); tidy(f);
+      var v = f.value === '' ? null : setNum(f.value); if (v != null && v < 0) { UI.toast('The amount cannot be below zero.', { tone: 'warn' }); return; }
+      DB.update('expenseCats', c, { fixedAmount: v }, { where: 'Settings', text: me().name + ' changed the handover fee "' + c.name + '"', changes: [{ f: c.name, from: c.fixedAmount == null ? 'No amount' : UI.fmt.money(c.fixedAmount), to: v == null ? 'No amount' : UI.fmt.money(v) }] });
+      UI.toast(v == null ? c.name + ' has no amount now, so it cannot be chosen.' : c.name + ': ' + UI.fmt.money(v) + ' for everyone.'); redraw();
+    } else if ((x = ev.target.closest('[data-rate-open]'))) { st.feeOpen[x.getAttribute('data-rate-open')] = 1; redraw(); }
+    else if ((x = ev.target.closest('[data-rate-cancel]'))) { delete st.feeOpen[x.getAttribute('data-rate-cancel')]; redraw(); }
+    else if ((x = ev.target.closest('[data-rate-del]'))) {
+      var r = byId(d.agentFeeRates, x.getAttribute('data-rate-del')), c2 = byId(d.expenseCats, r.cat);
+      DB.remove('agentFeeRates', r, { where: 'Settings', text: me().name + ' removed the own rate of ' + staffName(r.user, d) + ' for "' + c2.name + '"' }); redraw();
+      UI.toast(staffName(r.user, d) + ' now gets the amount for everyone.', { action: { label: 'Undo', run: function () { DB.add('agentFeeRates', r, { where: 'Settings', text: me().name + ' put back the own rate of ' + staffName(r.user, d) }); redraw(); } } });
+    } else if ((x = ev.target.closest('[data-rate-add]'))) {
+      id = x.getAttribute('data-rate-add'); var c3 = byId(d.expenseCats, id), who = (el.querySelector('[data-key="rwho-' + id + '"]') || {}).value, af = el.querySelector('[data-rate-amt="' + id + '"]'); tidy(af);
+      var amt = setNum(af.value);
+      if (!who) { UI.toast('Choose the person.', { tone: 'warn' }); return; }
+      if (amt == null || amt < 0) { UI.toast('Type their amount.', { tone: 'warn' }); af.focus(); return; }
+      DB.add('agentFeeRates', { id: 'afr-' + Date.now().toString(36), cat: id, user: who, amount: amt }, { where: 'Settings', text: me().name + ' gave ' + staffName(who, d) + ' their own rate of ' + UI.fmt.money(amt) + ' for "' + c3.name + '"' });
+      delete st.feeOpen[id]; redraw(); UI.toast(staffName(who, d) + ': ' + UI.fmt.money(amt) + ' for ' + c3.name + '.');
+    }
+  });
+};
+
+/* ---------- Bank details ---------- */
+SET_DRAW.bank = function (el, ctx, redraw) {
+  var co = ctx.data.company, bk = co.bank || (co.bank = {});
+  var cur = { bank: bk.bank || bk.name || '', accName: bk.accName || '', accNo: bk.accNo || '', duitnow: bk.duitnow || '', note: bk.note || '' };
+  setFormCard(el, ctx, redraw, 'bank', cur, {
+    title: 'Bank details', desc: 'Where customers pay by transfer. Invoices, the deposit statement and the summons message print them.',
+    body: function (dr) {
+      return '<div class="grid g2 set-form">' + UI.input({ key: 'bank', label: 'Bank', value: dr.bank, placeholder: 'e.g. Bank Contoh Berhad' }) + UI.input({ key: 'accName', label: 'Account name', value: dr.accName }) + UI.input({ key: 'accNo', label: 'Account number', value: dr.accNo, attrs: { inputmode: 'numeric' } }) + UI.input({ key: 'duitnow', label: 'DuitNow ID (optional)', value: dr.duitnow, help: 'A phone number, IC or business registration number.' }) + UI.input({ key: 'note', label: 'Note under the details', value: dr.note, full: true }) + '</div>' +
+        '<div class="set-pvbox"><div class="h6">How it prints</div><div class="b2">' + (dr.bank && dr.accNo ? 'Pay to <b>' + esc(dr.accName || '-') + '</b>, ' + esc(dr.bank) + ', account ' + esc(dr.accNo) + (dr.duitnow ? ', DuitNow ' + esc(dr.duitnow) : '') + '.<br>' + esc(dr.note) : '<span class="faint">Fill in the bank and the account number to show the bank details.</span>') + '</div></div>';
+    },
+    read: function (f, dr) { ['bank', 'accName', 'accNo', 'duitnow', 'note'].forEach(function (k) { dr[k] = String(f[k] || ''); }); var pv = el.querySelector('.set-pvbox .b2'); if (pv) pv.innerHTML = dr.bank && dr.accNo ? 'Pay to <b>' + esc(dr.accName || '-') + '</b>, ' + esc(dr.bank) + ', account ' + esc(dr.accNo) + (dr.duitnow ? ', DuitNow ' + esc(dr.duitnow) : '') + '.<br>' + esc(dr.note) : '<span class="faint">Fill in the bank and the account number to show the bank details.</span>'; },
+    check: function (dr) { if ((dr.bank || dr.accNo) && !(dr.bank.trim() && dr.accNo.trim() && dr.accName.trim())) return 'Fill in the bank, the account name and the account number together.'; return ''; },
+    save: function (dr) { var ch = [].concat(setDiff('Bank', cur.bank, dr.bank), setDiff('Account name', cur.accName, dr.accName), setDiff('Account number', cur.accNo, dr.accNo), setDiff('DuitNow', cur.duitnow, dr.duitnow), setDiff('Note', cur.note, dr.note)); co.bank = Object.assign(bk, { bank: dr.bank.trim(), name: dr.bank.trim(), accName: dr.accName.trim(), accNo: dr.accNo.trim(), duitnow: dr.duitnow.trim(), note: dr.note.trim() }); return ch; },
+    saved: 'Bank details saved. Invoices and messages use them now.'
+  });
+};
+
+/* ---------- Card fee ---------- */
+SET_DRAW.card = function (el, ctx, redraw) {
+  var co = ctx.data.company, cf = co.cardFee || (co.cardFee = { localPct: 0, foreignPct: 0, fixed: 0 });
+  var cur = { localPct: cf.localPct, foreignPct: cf.foreignPct, fixed: cf.fixed };
+  var ex = function (dr) { var a = 100, l = a - a * (+dr.localPct || 0) / 100 - (+dr.fixed || 0), f = a - a * (+dr.foreignPct || 0) / 100 - (+dr.fixed || 0); return 'A card payment of ' + UI.fmt.money(a) + ' leaves ' + UI.fmt.money(l) + ' with a local card and ' + UI.fmt.money(f) + ' with a foreign card.'; };
+  setFormCard(el, ctx, redraw, 'card', cur, {
+    title: 'Card fee', desc: 'What the card terminal keeps from each card payment. Payments by card show the money after the charge, and reports count that amount.',
+    body: function (dr) { return '<div class="grid g3 set-form">' + UI.input({ key: 'localPct', label: 'Local card', type: 'number', min: 0, max: 20, step: '0.1', value: dr.localPct, help: '% of the amount' }) + UI.input({ key: 'foreignPct', label: 'Foreign card', type: 'number', min: 0, max: 20, step: '0.1', value: dr.foreignPct, help: '% of the amount' }) + UI.input({ key: 'fixed', label: 'Fixed charge', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: dr.fixed, help: 'On every card payment' }) + '</div><p class="b2 set-ex">' + ex(dr) + '</p>'; },
+    read: function (f, dr) { dr.localPct = setNB(f.localPct); dr.foreignPct = setNB(f.foreignPct); dr.fixed = setNB(f.fixed); var p = el.querySelector('.set-ex'); if (p) p.textContent = ex(dr); },
+    check: function (dr) { if ([dr.localPct, dr.foreignPct, dr.fixed].some(function (v) { return v === '' || isNaN(v) || v < 0; })) return 'Type a number for each (0 is fine).'; if (dr.localPct > 20 || dr.foreignPct > 20) return 'A card fee above 20% does not look right.'; return ''; },
+    save: function (dr) { var ch = [].concat(setDiff('Local card %', cf.localPct, dr.localPct), setDiff('Foreign card %', cf.foreignPct, dr.foreignPct), setDiff('Fixed charge', cf.fixed, dr.fixed)); co.cardFee = { localPct: +dr.localPct, foreignPct: +dr.foreignPct, fixed: setNum(dr.fixed) }; return ch; },
+    after: function (el2) { el2.querySelectorAll('[data-key="fixed"]').forEach(function (x) { x.addEventListener('blur', function () { var n = setNum(x.value); if (n != null) x.value = n.toFixed(2); }); }); }
+  });
+};
+
+/* ---------- Fleet ---------- */
+SET_DRAW.fleet = function (el, ctx, redraw) {
+  var co = ctx.data.company, fl = co.fleet || (co.fleet = { warnDays: {} });
+  var cur = { summonsAdminFee: co.summonsAdminFee, overspeed: fl.overspeed, historyDays: fl.historyDays, recipients: (fl.reminderRecipients || []).slice(), time: fl.reminderTime || '09:00', warn: Object.assign({}, fl.warnDays || {}), platforms: (co.trackerPlatforms || []).slice(), cams: (co.dashcamPlatforms || []).slice() };
+  var platHtml = function (dr, list, title, ph) { return '<div class="set-tg">' + title + '</div><div class="row wrap gap6">' + dr[list].map(function (p, k) { return '<span class="chip grey">' + esc(p) + '<button type="button" class="set-x" data-plat-del="' + k + '" data-plat-list="' + list + '" aria-label="Remove ' + esc(p) + '">' + i('x') + '</button></span>'; }).join('') + '</div><div class="row gap8 mt8"><div class="inp grow" style="max-width:280px"><input data-plat-new="' + list + '" placeholder="' + ph + '" aria-label="' + ph + '" maxlength="40"></div>' + UI.btn('Add', { kind: 'o', size: 'sm', attrs: { 'data-plat-add': list } }) + '</div>'; };
+  var papers = Object.keys(cur.warn);
+  setFormCard(el, ctx, redraw, 'fleet', cur, {
+    title: 'Fleet', desc: 'Summons, speed alarms, tracking history and the paper reminders (road tax, insurance and the rest).',
+    body: function (dr) {
+      return '<div class="set-tg">Summons and tracking</div><div class="grid g3 set-form">' + UI.input({ key: 'summonsAdminFee', label: 'Summons admin fee', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: dr.summonsAdminFee, help: 'Added to a summons the customer pays.' }) +
+        UI.input({ key: 'overspeed', label: 'Over-speed alarm above', type: 'number', min: 40, max: 250, value: dr.overspeed, help: 'km/h' }) + UI.input({ key: 'historyDays', label: 'Keep tracking history for', type: 'number', min: 1, max: 365, value: dr.historyDays, help: 'days' }) + '</div>' +
+        '<div class="set-tg">Paper reminders</div><div class="grid g2 set-form"><div class="set-rcp"></div>' + UI.select({ key: 'time', label: 'Send the reminders at', value: dr.time, options: setTimes(30) }) + '</div>' +
+        '<p class="b2">Warn this many days before a paper runs out (0 = no warning):</p><div class="grid g3 set-form">' + papers.map(function (k) { return UI.input({ key: 'w-' + k, label: k, type: 'number', min: 0, max: 365, value: dr.warn[k], help: 'days before' }); }).join('') + '</div>' +
+        platHtml(dr, 'platforms', 'Tracker platforms', 'Add a tracker platform') + platHtml(dr, 'cams', 'Dashcam platforms', 'Add a dashcam platform');
+    },
+    read: function (f, dr) {
+      ['summonsAdminFee', 'overspeed', 'historyDays'].forEach(function (k) { if (k in f) dr[k] = setNB(f[k]); });
+      if (f.time) dr.time = f.time; if ('rcp' in f) dr.recipients = String(f.rcp || '').split(',').filter(Boolean);
+      papers.forEach(function (k) { if (('w-' + k) in f) dr.warn[k] = setNB(f['w-' + k]); });
+    },
+    check: function (dr) {
+      if ([dr.summonsAdminFee, dr.overspeed, dr.historyDays].some(function (v) { return v === '' || isNaN(v) || v < 0; })) return 'Type the admin fee, the speed and the days.';
+      if (dr.overspeed < 40) return 'An over-speed alarm below 40 km/h would ring all day.';
+      if (dr.historyDays < 1 || dr.historyDays > 365) return 'Keep the tracking history for 1 to 365 days.';
+      if (papers.some(function (k) { return dr.warn[k] === '' || dr.warn[k] < 0; })) return 'Type the days for every paper (0 is fine).';
+      if (!dr.recipients.length) return 'Choose at least one person to get the paper reminders.';
+      return '';
+    },
+    save: function (dr) {
+      var ch = [].concat(setDiff('Summons admin fee', co.summonsAdminFee, dr.summonsAdminFee), setDiff('Over-speed', fl.overspeed, dr.overspeed), setDiff('Tracking history days', fl.historyDays, dr.historyDays), setDiff('Reminder time', fl.reminderTime, dr.time), setDiff('Reminder recipients', (fl.reminderRecipients || []).map(function (u) { return staffName(u); }).join(', '), dr.recipients.map(function (u) { return staffName(u); }).join(', ')), setDiff('Tracker platforms', (co.trackerPlatforms || []).join(', '), dr.platforms.join(', ')), setDiff('Dashcam platforms', (co.dashcamPlatforms || []).join(', '), dr.cams.join(', ')));
+      papers.forEach(function (k) { ch = ch.concat(setDiff(k + ' warning days', (fl.warnDays || {})[k], dr.warn[k])); });
+      co.summonsAdminFee = setNum(dr.summonsAdminFee); fl.overspeed = +dr.overspeed; fl.historyDays = +dr.historyDays; fl.reminderTime = dr.time; fl.reminderRecipients = dr.recipients.slice(); fl.warnDays = Object.assign({}, dr.warn); co.trackerPlatforms = dr.platforms.slice(); co.dashcamPlatforms = dr.cams.slice();
+      return ch;
+    },
+    saved: 'Fleet settings saved.',
+    after: function (el2, dr, sync) {
+      UI.staffPicker(el2.querySelector('.set-rcp'), { key: 'rcp', label: 'Who gets the paper reminders', multi: true, values: dr.recipients.slice(), onChange: function () { sync(); } });
+      el2.querySelectorAll('[data-key="summonsAdminFee"]').forEach(function (x) { x.addEventListener('blur', function () { var n = setNum(x.value); if (n != null) x.value = n.toFixed(2); }); });
+      var addP = function (list) { var f = el2.querySelector('[data-plat-new="' + list + '"]'), v = f.value.trim(); if (!v) { f.focus(); return; } if (dr[list].some(function (p) { return p.toLowerCase() === v.toLowerCase(); })) { UI.toast(v + ' is already on the list.', { tone: 'warn' }); return; } sync(); dr[list].push(v); redraw(); };
+      el2.addEventListener('click', function (ev) { var x; if ((x = ev.target.closest('[data-plat-add]'))) addP(x.getAttribute('data-plat-add')); else if ((x = ev.target.closest('[data-plat-del]'))) { sync(); dr[x.getAttribute('data-plat-list')].splice(+x.getAttribute('data-plat-del'), 1); redraw(); } });
+      el2.querySelectorAll('[data-plat-new]').forEach(function (f) { f.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') addP(f.getAttribute('data-plat-new')); }); });
+    }
+  });
+};
+
+/* ---------- Booking assistant rules ---------- */
+SET_DRAW.assistant = function (el, ctx, redraw) {
+  var co = ctx.data.company, a = co.assistant || (co.assistant = { hours: { from: '08:00', to: '22:00' }, deliveryTiers: [] });
+  var cur = { from: a.hours.from, to: a.hours.to, turnaroundH: turnaroundH(), airportTurnaroundH: a.airportTurnaroundH, holdMin: a.holdMin, minNoticeH: a.minNoticeH, stayOutDays: a.stayOutDays, tiers: (a.deliveryTiers || []).map(function (t) { return { upToKm: t.upToKm, fee: t.fee }; }) };
+  setFormCard(el, ctx, redraw, 'assistant', cur, {
+    title: 'Booking assistant rules', desc: 'What the WhatsApp booking assistant offers customers. It only offers cars that are free with these gaps, and works out delivery fees from these distances.',
+    body: function (dr) {
+      return '<div class="grid g2 set-form">' + UI.select({ key: 'from', label: 'Hand over cars from', value: dr.from, options: setTimes(30) }) + UI.select({ key: 'to', label: 'Until', value: dr.to, options: setTimes(30) }) +
+        UI.input({ key: 'turnaroundH', label: 'Gap between two rentals', type: 'number', min: 0, max: 24, step: '0.5', value: dr.turnaroundH, help: 'hours, to clean and check the car. Availability, the car picker and new bookings use it too.' }) + UI.input({ key: 'airportTurnaroundH', label: 'Gap after a return at another place', type: 'number', min: 0, max: 24, step: '0.5', value: dr.airportTurnaroundH, help: 'hours, when the car comes back at the airport or a station' }) +
+        UI.input({ key: 'holdMin', label: 'Hold a chosen car for', type: 'number', min: 5, max: 240, value: dr.holdMin, help: 'minutes, then it is offered to others again' }) + UI.input({ key: 'minNoticeH', label: 'Earliest pick-up from now', type: 'number', min: 0, max: 72, value: dr.minNoticeH, help: 'hours' }) +
+        UI.input({ key: 'stayOutDays', label: 'Stay out of chats for', type: 'number', min: 0, max: 90, value: dr.stayOutDays, help: 'days after a customer\'s booking ends (staff answer them)' }) + '</div>' +
+        '<div class="set-tg">Delivery fees by distance</div><p class="b2">From the customer\'s location pin. Further than the last line, or a typed address: staff quote the fee.</p>' +
+        '<div class="set-tiers">' + dr.tiers.map(function (t, k) { return '<div class="set-tier"><span class="b2">Up to</span>' + UI.input({ key: 'tk' + k, label: '', type: 'number', min: 1, value: t.upToKm, attrs: { 'aria-label': 'Up to km, line ' + (k + 1) } }) + '<span class="b2">km</span>' + UI.input({ key: 'tf' + k, label: '', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: t.fee, attrs: { 'aria-label': 'Fee, line ' + (k + 1) } }) + UI.iconBtn('trash', 'Remove this line', { attrs: { 'data-tier-del': k } }) + '</div>'; }).join('') + '</div>' +
+        UI.btn('Add a distance', { kind: 'o', size: 'sm', icon: 'plus', attrs: { 'data-tier-add': '1' } });
+    },
+    read: function (f, dr) { ['from', 'to'].forEach(function (k) { if (f[k]) dr[k] = f[k]; }); ['turnaroundH', 'airportTurnaroundH', 'holdMin', 'minNoticeH', 'stayOutDays'].forEach(function (k) { if (k in f) dr[k] = setNB(f[k]); }); dr.tiers.forEach(function (t, k) { if (('tk' + k) in f) { t.upToKm = setNB(f['tk' + k]); t.fee = setNB(f['tf' + k]); } }); },
+    check: function (dr) {
+      if (['turnaroundH', 'airportTurnaroundH', 'holdMin', 'minNoticeH', 'stayOutDays'].some(function (k) { return dr[k] === '' || isNaN(dr[k]) || dr[k] < 0; })) return 'Type a number in every box (0 is fine).';
+      if (dr.from >= dr.to) return 'The hours must end after they start.';
+      if (dr.holdMin < 5) return 'Hold a car for at least 5 minutes.';
+      if (dr.tiers.some(function (t) { return t.upToKm === '' || t.fee === '' || t.upToKm <= 0 || t.fee < 0; })) return 'Fill in the distance and the fee on every line.';
+      var km = dr.tiers.map(function (t) { return t.upToKm; }); if (km.some(function (v, k) { return km.indexOf(v) !== k; })) return 'Two lines have the same distance.';
+      return '';
+    },
+    save: function (dr) {
+      var ch = [].concat(setDiff('Hours from', a.hours.from, dr.from), setDiff('Hours to', a.hours.to, dr.to), setDiff('Gap between rentals', turnaroundH(), dr.turnaroundH), setDiff('Gap after a return at another place', a.airportTurnaroundH, dr.airportTurnaroundH), setDiff('Hold minutes', a.holdMin, dr.holdMin), setDiff('Earliest pick-up', a.minNoticeH, dr.minNoticeH), setDiff('Stay out days', a.stayOutDays, dr.stayOutDays), setDiff('Delivery fees', (a.deliveryTiers || []).map(function (t) { return t.upToKm + ' km ' + t.fee; }).join(', '), dr.tiers.map(function (t) { return t.upToKm + ' km ' + t.fee; }).join(', ')));
+      co.turnaroundH = +dr.turnaroundH;
+      co.assistant = { hours: { from: dr.from, to: dr.to }, airportTurnaroundH: +dr.airportTurnaroundH, holdMin: +dr.holdMin, minNoticeH: +dr.minNoticeH, stayOutDays: +dr.stayOutDays, deliveryTiers: dr.tiers.map(function (t) { return { upToKm: +t.upToKm, fee: setNum(t.fee) }; }).sort(function (x, y) { return x.upToKm - y.upToKm; }) };
+      return ch;
+    },
+    saved: 'Rules saved. The assistant uses them from its next message.',
+    after: function (el2, dr, sync) {
+      el2.addEventListener('click', function (ev) { var x; if (ev.target.closest('[data-tier-add]')) { sync(); var last = dr.tiers[dr.tiers.length - 1]; dr.tiers.push({ upToKm: last ? (+last.upToKm || 0) + 20 : 10, fee: last ? (+last.fee || 0) + 20 : 20 }); redraw(); } else if ((x = ev.target.closest('[data-tier-del]'))) { sync(); dr.tiers.splice(+x.getAttribute('data-tier-del'), 1); redraw(); } });
+    }
+  });
+};
+
+/* ---------- Staff messages (the card itself lives with Schedules: scStaffMsgCard) ---------- */
+SET_DRAW.staffmsg = function (el, ctx, redraw) {
+  if (typeof scStaffMsgCard === 'function') scStaffMsgCard(el, redraw);
+  else el.innerHTML = setCard('Staff messages', '', UI.empty({ icon: 'message-2', title: 'Not available', text: 'Open Handovers & Schedules.' }));
 };

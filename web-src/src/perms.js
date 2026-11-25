@@ -954,4 +954,42 @@ var PERM_SECTIONS = [
 ]
 }
 ];
+/* ---- parity additions (reference access catalogue) ----
+   Each section may carry requires: [codes] -- switching the section on is only useful with those codes too
+   (the Team page warns and offers "Switch it on too"). permRequires(sectionId) and permMissing(set, sectionId) read it. */
+(function () {
+  var sec = function (id) { return PERM_SECTIONS.filter(function (s) { return s.id === id; })[0]; };
+  var addCode = function (id, code, after) { var s = sec(id); if (!s || s.codes.some(function (c) { return c[0] === code[0]; })) return; var k = after ? s.codes.map(function (c) { return c[0]; }).indexOf(after) : -1; if (k >= 0) s.codes.splice(k + 1, 0, code); else s.codes.push(code); };
+  addCode('bookings', ['bookings.billing', 'Invoice and receipts in bookings', "The receipt button on each booking: see the booking's invoice and receipts, record payments and upload payment slips. Works without the Invoices and receipts page.", 1], 'bookings.see_amounts');
+  addCode('expenses', ['expenses.staff_reports_all', "See every staff member's report", "On Staff income and expenses, see everyone's income, expenses and cash in hand. Without it a person sees only their own.", 1], 'expenses.view_all');
+  addCode('reports', ['reports.choose_cars', 'Choose the cars counted', "Switch a car off so its figures are left out of the reports' and the Dashboard's main figures and shown apart under Cars not counted.", 0]);
+  addCode('summons', ['summons.waive', 'Waive summons', 'Mark a summons as waived, with a reason.', 0]);
+  if (!sec('leads')) {
+    var at = PERM_SECTIONS.indexOf(sec('customers')) + 1;
+    PERM_SECTIONS.splice(at, 0, { id: 'leads', name: 'Booking assistant', menu: '/leads',
+      desc: 'The WhatsApp booking assistant: the customers it talked to (dates, chosen car, price estimate and chat), its answers and its on/off switch.',
+      codes: [['leads.view', 'See this section', 'See the leads and their chats.', 0],
+        ['leads.manage', 'Handle leads', 'Take a lead, close it or let go of the car it holds.', 0],
+        ['leads.settings', 'Set up the assistant', 'Switch the assistant on or off, write its answers, use what it learned from staff chats and link cars to the WhatsApp catalogue.', 0]] });
+  }
+  var REQ = {
+    bookings: ['cars.view', 'damage_packages.view', 'signatures.view'],
+    inspections: ['bookings.view'],
+    tasks: ['employees.view', 'bookings.view'],
+    deposits: ['bookings.view', 'bookings.see_amounts'],
+    billing: ['bookings.view', 'bookings.see_amounts'],
+    maintenance: ['cars.view'],
+    tracking: ['cars.view'],
+    calendar: ['bookings.view', 'cars.view'],
+    reports: ['bookings.view', 'cars.view'],
+    summons: ['bookings.view'],
+    customer_notes: ['customers.view', 'bookings.view'],
+    leads: ['bookings.view', 'cars.view']
+  };
+  PERM_SECTIONS.forEach(function (s) { s.requires = REQ[s.id] || []; });
+})();
+/* the codes a section needs besides its own */
+function permRequires(sectionId) { var s = PERM_SECTIONS.filter(function (x) { return x.id === sectionId; })[0]; return s ? s.requires || [] : []; }
+/* of those, the ones missing from a set of codes ({code: true} or an array) */
+function permMissing(set, sectionId) { var has = Array.isArray(set) ? function (c) { return set.indexOf(c) >= 0; } : function (c) { return !!set[c]; }; return permRequires(sectionId).filter(function (c) { return !has(c); }); }
 var PERM_CODES = []; PERM_SECTIONS.forEach(function (s) { s.money = s.codes.some(function (c) { return c[3]; }); s.codes.forEach(function (c) { PERM_CODES.push(c[0]); }); });

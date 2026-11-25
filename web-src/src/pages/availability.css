@@ -9,7 +9,7 @@
 .pg-availability .av-chip{min-height:38px;padding:6px 14px;border-radius:6px;border:1px solid var(--divider);background:var(--paper);color:var(--text);font:inherit;font-size:14.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .pg-availability .av-chip:hover{background:var(--hover)}
 .pg-availability .av-chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
-.pg-availability .av-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.pg-availability .av-chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .pg-availability .av-sum{display:flex;align-items:center;gap:8px;margin-top:18px;color:var(--text2)}
 .pg-availability .av-sum i{color:var(--primary-text);font-size:18px}
 .pg-availability .av-h{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;color:var(--text);margin:26px 0 12px}
@@ -43,4 +43,24 @@
   .pg-availability .av-pick{padding:18px 16px}
   .pg-availability .av-dates{grid-template-columns:1fr}
   .pg-availability .av-grid{grid-template-columns:1fr}
+}
+
+/* daily rate and the rent for the period on each free or "check" car */
+.pg-availability .av-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:8px 0 2px;font-size:14px}
+.pg-availability .av-price b{font-weight:600;color:var(--text)}
+.pg-availability .av-price span{color:var(--text2)}
+/* phones: the period as one line that opens the fields */
+.pg-availability .av-sumbtn{display:none}
+@media (max-width:640px){
+  .pg-availability .av-pick{padding:6px;margin-bottom:12px}
+  .pg-availability .av-sumbtn{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:8px 10px;border:0;border-radius:8px;background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+  .pg-availability .av-sumbtn > i{font-size:20px;color:var(--primary-text);flex:none}
+  .pg-availability .av-sumbtn .grow{min-width:0;display:flex;flex-direction:column}
+  .pg-availability .av-sumbtn b{font-size:14.5px;font-weight:600}
+  .pg-availability .av-sumbtn small{font-size:12.5px;color:var(--text2)}
+  .pg-availability .av-pick:not(.open) .av-fbody{display:none}
+  .pg-availability .av-pick.open .av-fbody{padding:8px 10px 12px}
+  .pg-availability .av-fbody .av-sum{display:none}
+  .pg-availability .av-h{margin:14px 0 10px}
+  .pg-availability .pg-h p{display:none}
 }
