@@ -34,6 +34,8 @@ DATA_INIT.push(function (d, b) {
   var mk = function (k) {
     var nm = names[k % names.length], ph = '+60 00-' + ri(200, 899) + ' ' + ri(1000, 9999);
     var st = k < 4 ? 'waiting' : k < 7 ? 'taken' : k < 11 ? 'chatting' : 'closed';
+    /* a company with no WhatsApp number linked has no assistant chatting right now */
+    if (st === 'chatting' && b.id === 'padi') st = 'closed';   /* same rule as leadSettings below: Padi has no number linked */
     var start = new Date(base.getFullYear(), base.getMonth(), base.getDate() + ri(1, 12), pick([9, 10, 11, 14, 15, 18]), pick([0, 0, 30]));
     var len = pick([1, 2, 2, 3, 4, 7]), end = new Date(start.getTime() + len * DAY + (R() < .2 ? 3 * 36e5 : 0));
     var noDates = st === 'chatting' && k === 10;
@@ -49,12 +51,12 @@ DATA_INIT.push(function (d, b) {
     var unknown = !!(pk && pk.fee == null) || !!(dp && dp.fee == null);
     var lastAt = new Date(base.getTime() - (st === 'closed' ? ri(2, 9) * DAY : st === 'chatting' ? ri(1, 25) * 6e4 : ri(5, 300) * 6e4));
     var who = (d.users[2] || d.users[0]).name, who2 = (d.users[1] || d.users[0]).name;
-    var held = car && (st === 'waiting' || st === 'chatting') && k % 2 === 0 ? new Date(base.getTime() + ri(4, hold - 2) * 6e4) : null;
+    var held = car && b.id !== 'padi' && (st === 'waiting' || st === 'chatting') && k % 2 === 0 ? new Date(base.getTime() + ri(4, hold - 2) * 6e4) : null;
     var reasons = ['Asked a question', 'Ready to book', 'Typed "staff"', 'Delivery fee to quote'];
     var qs = ['Can I pay the deposit by card when I collect?', 'Is a child seat available for this car?', 'Can I take the car to another state?', 'Do you deliver to my hotel? I sent the address.'];
     var l = { id: 'lead-' + (k + 1), name: nm, phone: ph, lastAt: lastAt, created: new Date(lastAt.getTime() - ri(10, 90) * 6e4), start: noDates ? null : start, end: noDates ? null : end, car: car ? car.id : null, heldUntil: held,
       pick: pk, drop: dp, rent: rent, deposit: car ? car.deposit || b.deposit || 200 : null, feesUnknown: unknown, total: car ? rent + ldFee(pk) + ldFee(dp) : null,
-      status: st, takenBy: st === 'taken' ? (k === 5 ? who2 : who) : st === 'closed' && k % 2 ? who : '', reason: st === 'waiting' ? reasons[k % 4] : st === 'taken' ? 'Staff wrote from the app' : st === 'closed' ? pick(['No reply for 3 days', 'Booked', 'Closed by staff']) : '',
+      status: st, takenBy: st === 'taken' ? (k === 5 ? who2 : who) : st === 'closed' && k % 2 ? who : '', reason: st === 'waiting' ? (unknown ? reasons[3] : reasons[k % 3]) : st === 'taken' ? 'Staff wrote from the app' : st === 'closed' ? pick(['No reply for 3 days', 'Booked', 'Closed by staff']) : '',
       question: st === 'waiting' && (k % 4 === 0 || k % 4 === 3) ? qs[k % 4] : '', msgs: [], booking: null };
     var t = l.created.getTime(), m = function (dir, text, gap) { t += (gap || ri(1, 4)) * 6e4; l.msgs.push({ dir: dir, text: text, at: new Date(Math.min(t, lastAt.getTime())) }); };
     m('customer', pick(['Hi, is there a car available?', 'Hello, I want to rent a car', 'Hi, how much for a car this weekend?', 'Salam, nak sewa kereta']), 0);
@@ -190,8 +192,9 @@ function ldLinkNumber(onDone) {
 
 /* ---------- Answers ---------- */
 function ldAnswers() {
-  var d = D(), edit = null, q = '';
-  var dl = UI.dialog({ title: 'Assistant answers', width: 'lg', body: function (el) {
+  var d = D(), edit = null, q = '', orig = '';
+  var snap = function () { return JSON.stringify({ q: edit.q, kw: edit.kw, a: edit.a, on: edit.on, media: edit.media }); };
+  var dl = UI.dialog({ title: 'Assistant answers', width: 'lg', dirty: function () { if (!edit || !dl.body.querySelector('[data-key="q"]')) return false; read(); return snap() !== orig; }, body: function (el) {
     var list = d.leadAnswers.filter(function (x) { return !q || UI.wordsMatch(x.q + ' ' + x.kw.join(' ') + ' ' + x.a, q); });
     if (edit) {
       var x = edit;
@@ -232,8 +235,8 @@ function ldAnswers() {
   dl.el.addEventListener('click', function (ev) {
     var x = ev.target.closest('[data-am]'); if (!x) return;
     var a = x.getAttribute('data-am'), v = x.getAttribute('data-v');
-    if (a === 'new') { edit = { q: '', kw: [], a: '', on: true, media: [] }; foot(); dl.refresh(); }
-    else if (a === 'edit') { var src = byId(d.leadAnswers, v); edit = { id: src.id, q: src.q, kw: src.kw.slice(), a: src.a, on: src.on, media: src.media.map(function (m) { return Object.assign({}, m); }) }; foot(); dl.refresh(); }
+    if (a === 'new') { edit = { q: '', kw: [], a: '', on: true, media: [] }; orig = snap(); foot(); dl.refresh(); }
+    else if (a === 'edit') { var src = byId(d.leadAnswers, v); edit = { id: src.id, q: src.q, kw: src.kw.slice(), a: src.a, on: src.on, media: src.media.map(function (m) { return Object.assign({}, m); }) }; orig = snap(); foot(); dl.refresh(); }
     else if (a === 'rmm') { read(); edit.media.splice(+v, 1); dl.refresh(); }
     else if (a === 'del') { var it = byId(d.leadAnswers, v); UI.confirm({ title: 'Delete the answer "' + it.q + '"?', text: 'The assistant stops using it. This cannot be undone.', ok: 'Delete', danger: true }).then(function (y) { if (!y) return; DB.remove('leadAnswers', it, { where: 'Lead', text: me().name + ' deleted the assistant answer "' + it.q + '"' }); UI.toast('Answer deleted'); dl.refresh(); }); }
   });
@@ -328,23 +331,26 @@ PAGES['leads'] = {
     var placeCell = function (l) { return l.pick ? '<div class="b2 t1c">' + esc(l.pick.label) + '</div><div class="b2">' + esc(l.drop ? l.drop.label : '') + '</div>' : '<span class="faint">-</span>'; };
     var est = function (l) { return (l.total != null ? UI.money(l.total) : '<span class="faint">-</span>') + (l.feesUnknown ? '<div class="ld-q">+ delivery to quote</div>' : ''); };
     var stat = function (l) { return UI.chip(ldStatusLabel(l.status), ldTone(l.status)) + '<div class="b2">' + esc(l.takenBy || l.reason || '') + '</div>'; };
+    /* one object the table keeps, so its empty text can follow the search box */
+    var emptyO = { icon: 'brand-whatsapp' }, setEmpty = function () { emptyO.title = st.q ? 'No leads match' : 'No leads here yet'; emptyO.text = st.q ? 'Try another name, phone or car.' : 'New chats show up here by themselves.'; };
+    setEmpty();
     var tbl = UI.table(root.querySelector('#ld-t'), {
       columns: [{ key: 'name', label: 'Customer', render: cust }, { key: 'start', label: 'Dates', render: function (l) { return '<span class="b2 ld-dates">' + esc(ldDates(l)) + '</span>'; } }, { key: 'car', label: 'Car', render: carCell },
         { key: 'pick', label: 'Pick-up and return', render: placeCell }, { key: 'total', label: 'Estimate', money: true, render: est }, { key: 'status', label: 'Status', render: stat }],
       rows: rows(), rowKey: 'id', density: 'compact', pageSize: 25, pageSizes: [10, 25, 50], minWidth: 980,
       onRowClick: function (l) { ctx.setParams({ lead: l.id }, true); ldDrawer(l.id); },
       card: function (l) { return '<div class="ld-card"><div class="row gap8"><div class="grow">' + cust(l) + '</div>' + UI.chip(ldStatusLabel(l.status), ldTone(l.status)) + '</div><div class="b2">' + esc(ldDates(l)) + '</div><div class="row wrap gap8">' + carCell(l) + '<span class="grow"></span><span class="ld-est">' + est(l) + '</span></div>' + (l.pick ? '<div class="b2">' + esc(l.pick.label) + (l.drop ? ', ' + esc(l.drop.label) : '') + '</div>' : '') + (l.takenBy || l.reason ? '<div class="b2 faint">' + esc(l.takenBy ? 'Taken by ' + l.takenBy : l.reason) + '</div>' : '') + '</div>'; },
-      empty: { icon: 'brand-whatsapp', title: 'No leads here yet', text: st.q ? 'Try another name, phone or car.' : 'New chats show up here by themselves.' }
+      empty: emptyO
     });
     var updEl = root.querySelector('.ld-upd'), stamp = function () { updEl.textContent = 'Updated ' + tm(NOW()) + ', refreshes every 30 seconds'; };
     drawSet(); drawTabs(); stamp();
-    var tq; UI.on(root, 'input', '[data-ld-q]', function (ev, el) { clearTimeout(tq); tq = setTimeout(function () { st.q = el.value; tbl.setRows(rows()); }, 120); });
+    var tq; UI.on(root, 'input', '[data-ld-q]', function (ev, el) { clearTimeout(tq); tq = setTimeout(function () { st.q = el.value; setEmpty(); tbl.setRows(rows()); }, 120); });
     UI.on(root, 'click', '[data-lp]', function (ev, el) { var a = el.getAttribute('data-lp'); if (a === 'answers') ldAnswers(); else if (a === 'learned') ldSuggestions(function () { ctx.refresh(); }); else ldCatalogue(); });
     ctx.on('data', function (pl) { if (!document.contains(root) || !pl) return; if (pl.coll === 'leads' || pl.coll === 'leadSettings') { drawTabs(); tbl.setRows(rows(), true); if (pl.coll === 'leadSettings') drawSet(); } });
     if (st.timer) clearInterval(st.timer);
     st.timer = setInterval(function () { if (!document.contains(root)) { clearInterval(st.timer); st.timer = null; return; } if (D() !== d) return; var n = st.ticks = (st.ticks || 0) + 1; if (n % 2 === 0 && !UI.top()) ldTick(d); drawTabs(); tbl.setRows(rows(), true); stamp(); }, 30000);
     if (p.lead && !UI.top()) setTimeout(function () { ldDrawer(p.lead); }, 0);
-    if (p.dlg && !UI.top()) setTimeout(function () { if (!canSet) return; if (p.dlg === 'answers') ldAnswers(); else if (p.dlg === 'learned') ldSuggestions(); else if (p.dlg === 'catalogue') ldCatalogue(); }, 0);
+    if (p.dlg && !UI.top()) setTimeout(function () { ctx.setParams({ dlg: null }, true); if (!canSet) return; if (p.dlg === 'answers') ldAnswers(); else if (p.dlg === 'learned') ldSuggestions(function () { ctx.refresh(); }); else if (p.dlg === 'catalogue') ldCatalogue(); }, 0);
   },
   onData: function () { /* handled with ctx.on('data') */ },
   search: [{ label: 'Leads waiting for staff', icon: 'brand-whatsapp', run: function () { go('leads', { tab: 'waiting' }); } }, { label: 'Assistant answers', icon: 'message-question', run: function () { go('leads', { dlg: 'answers' }); } }]

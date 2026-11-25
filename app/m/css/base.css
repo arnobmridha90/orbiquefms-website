@@ -346,7 +346,7 @@ button.card2:active, a.card2:active { background: #F7F8FA; }
 .sheet-head .grow { flex: 1; min-width: 0; }
 .sheet-head .lead { margin-bottom: 4px; }
 .sheet-head .iconbtn { margin: -6px -8px 0 0; }
-.sheet-foot { position: sticky; bottom: calc(-16px - var(--safe-b)); margin: 14px -16px calc(-16px - var(--safe-b)); padding: 10px 16px calc(12px + var(--safe-b)); background: rgba(255,255,255,.97); border-top: 1px solid var(--line); z-index: 2; }
+.sheet-foot { position: sticky; bottom: calc(-16px - var(--safe-b)); margin: 14px -16px calc(-16px - var(--safe-b)); padding: 10px 16px calc(12px + var(--safe-b)); background: #fff; border-top: 1px solid var(--line); z-index: 2; }
 .sheet-foot.stack { display: grid; gap: 4px; border-top: 0; }
 .sheet.full { top: 0; max-height: none; height: 100vh; height: 100dvh; border-radius: 0; padding-top: calc(var(--safe-t) + 6px); display: flex; flex-direction: column; }
 .sheet.full .grab { display: none; }
@@ -366,6 +366,9 @@ button.card2:active, a.card2:active { background: #F7F8FA; }
 .field .err, .err-text { color: var(--t-red); font-size: 12.5px; font-weight: 600; margin-top: 4px; display: block; }
 .inp.bad { border-color: var(--t-red); }
 .hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; display: block; }
+/* a hint or error span placed straight inside a label.field must not take the label's dark bold style */
+.field > span.hint { font-size: 12.5px; font-weight: 400; color: var(--muted); margin: 4px 0 0; }
+.field > span.err, .field > span.err-text { font-size: 12.5px; font-weight: 600; color: var(--t-red); margin: 4px 0 0; }
 .rmfield { position: relative; }
 .rmfield::before { content: "RM"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; font-weight: 650; color: var(--muted); pointer-events: none; }
 .rmfield .inp { padding-left: 42px; font-variant-numeric: tabular-nums; }
@@ -382,3 +385,12 @@ button.card2:active, a.card2:active { background: #F7F8FA; }
 .carfield .pk-sub { display: block; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .carfield .pk-sub .money { color: var(--text); font-weight: 650; }
 input[type=search]::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+/* date and time fields: the label on top always reads "19 Oct 2026" or "3:00 PM"; the native input underneath opens the picker (core dtfEnhance) */
+.dtf { position: relative; display: block; flex: 1 1 0; min-width: 0; }
+.dtf[hidden] { display: none; }
+.dtf > .dtf-i { width: 100%; color: transparent; -webkit-text-fill-color: transparent; }
+.dtf > .dtf-i::-webkit-datetime-edit { color: transparent; }
+.dtf > .dtf-l { position: absolute; left: 1px; top: 1px; bottom: 1px; right: 34px; display: flex; align-items: center; padding-left: 12px; font-size: 16px; color: var(--text); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtf > .dtf-l.ph { color: var(--muted); }
+.dtf > .dtf-i:disabled + .dtf-l { color: var(--muted); }
+.dtf > .dtf-i::-webkit-calendar-picker-indicator { opacity: .55; }

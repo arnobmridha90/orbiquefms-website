@@ -145,13 +145,14 @@ var UI = (function () {
       '<input id="' + id + '" type="' + (o.type || 'text') + '" data-key="' + e(o.key || '') + '" value="' + e(v) + '"' + (o.placeholder ? ' placeholder="' + e(o.placeholder) + '"' : '') + (o.required ? ' required' : '') + (o.readonly ? ' readonly' : '') + (o.disabled ? ' disabled' : '') + (o.min != null ? ' min="' + o.min + '"' : '') + (o.max != null ? ' max="' + o.max + '"' : '') + (o.step ? ' step="' + o.step + '"' : '') + (o.maxlength ? ' maxlength="' + o.maxlength + '"' : '') + U.attrs(o.attrs) + '>' +
       (o.prefix ? '</div>' : '') + tail(o) + '</div>';
   };
-  /* options: ['A', 'B'] or [['a', 'Label A'], ...] or [{value, label, group}] */
+  /* options: ['A', 'B'] or [['a', 'Label A'], ...] or [{value, label, group, disabled, title}] */
   U.options = function (opts, value) {
     var html = '', grp = null;
     (opts || []).forEach(function (op) {
       var v = Array.isArray(op) ? op[0] : typeof op === 'object' ? op.value : op, l = Array.isArray(op) ? op[1] : typeof op === 'object' ? op.label : op, g = typeof op === 'object' && !Array.isArray(op) ? op.group : null;
       if (g !== grp) { if (grp) html += '</optgroup>'; if (g) html += '<optgroup label="' + e(g) + '">'; grp = g; }
-      html += '<option value="' + e(v) + '"' + (String(v) === String(value == null ? '' : value) ? ' selected' : '') + '>' + e(l) + '</option>';
+      var dis = typeof op === 'object' && !Array.isArray(op) && op.disabled, tt = typeof op === 'object' && !Array.isArray(op) && op.title;
+      html += '<option value="' + e(v) + '"' + (String(v) === String(value == null ? '' : value) ? ' selected' : '') + (dis ? ' disabled' : '') + (tt ? ' title="' + e(tt) + '"' : '') + '>' + e(l) + '</option>';
     });
     return html + (grp ? '</optgroup>' : '');
   };
@@ -164,7 +165,8 @@ var UI = (function () {
 
   /* ---------------- table ----------------
      UI.table(el, {columns, rows, rowKey, density, sticky, maxHeight, onRowClick, selectable, onSelect, pageSize, pageSizes,
-                   sort, card, empty, minWidth, footer, rowClass, noun, bulk}) -> {setRows, selected, clear, refresh, el} */
+                   sort, card, empty, minWidth, footer, rowClass, noun, bulk, selLabel}) -> {setRows, selected, clear, refresh, el}
+     selLabel: 'selected' gives "2 selected", or a function (n) -> text; default "2 bookings ticked" (with noun) or "2 ticked". */
   U.table = function (el, o) {
     var st = { sort: o.sort || null, page: o.page || 1, size: o.pageSize || 10, sel: o.selected ? o.selected : {}, rows: o.rows || [] };
     var cols = o.columns.filter(function (c) { return !c.hidden; });
@@ -194,7 +196,8 @@ var UI = (function () {
       }).join('');
       var emptyHtml = U.empty(o.empty || { icon: 'database-off', title: 'Nothing here yet', text: 'Try clearing the search or the filters.' });
       var other = selKeys.filter(function (k) { return pageKeys.indexOf(k) < 0; }).length;
-      var bar = o.selectable && selKeys.length ? '<div class="ui-selbar"><b>' + selKeys.length + ' ' + e(o.noun ? (selKeys.length === 1 ? o.noun : o.noun + 's') : 'ticked') + (o.noun ? ' ticked' : '') + '</b>' + (other ? '<span class="b2">(' + other + ' on other pages)</span>' : '') + '<button type="button" class="btn t sm" data-ui-clear>Clear</button><span class="grow"></span>' + (o.bulk ? o.bulk(selKeys) : '') + '</div>' : '';
+      var selText = typeof o.selLabel === 'function' ? o.selLabel(selKeys.length) : o.selLabel ? selKeys.length + ' ' + o.selLabel : selKeys.length + ' ' + (o.noun ? (selKeys.length === 1 ? o.noun : o.noun + 's') + ' ticked' : 'ticked');
+      var bar = o.selectable && selKeys.length ? '<div class="ui-selbar"><b>' + e(selText) + '</b>' + (other ? '<span class="b2">(' + other + ' on other pages)</span>' : '') + '<button type="button" class="btn t sm" data-ui-clear>Clear</button><span class="grow"></span>' + (o.bulk ? o.bulk(selKeys) : '') + '</div>' : '';
       var cards = o.card ? '<div class="ui-cards">' + (shown.length ? shown.map(function (r, k) { var key = keyOf(r); return '<div class="ui-card' + (o.onRowClick ? ' click' : '') + (st.sel[key] ? ' on' : '') + '" data-k="' + e(key) + '"' + (o.onRowClick ? ' tabindex="0" role="button"' : '') + '>' + (o.selectable ? '<label class="cb ui-card-ck" data-stop><input type="checkbox" data-ui-row="' + e(key) + '" aria-label="Tick"' + (st.sel[key] ? ' checked' : '') + '><span class="box">' + i('check') + '</span></label>' : '') + o.card(r, k) + '</div>'; }).join('') : emptyHtml) + '</div>' : '';
       var pager = '';
       if (paged && rows.length > Math.min.apply(0, o.pageSizes || [10])) {
@@ -295,7 +298,7 @@ var UI = (function () {
   function footHtml(foot) {
     if (!foot) return '';
     if (typeof foot === 'string') return foot;
-    return foot.map(function (b, k) { return b.spacer ? '<span class="grow"></span>' : '<button type="button" class="btn ' + (b.kind || (k === foot.length - 1 ? 'c' : 'o')) + '" data-ui-fb="' + k + '"' + (b.disabled ? ' disabled' : '') + (b.title ? ' title="' + e(b.title) + '"' : '') + '>' + (b.icon ? i(b.icon) : '') + e(b.label) + '</button>'; }).join('');
+    return foot.map(function (b, k) { return b.spacer ? '<span class="grow"></span>' : '<button type="button" class="btn ' + (b.kind || (k === foot.length - 1 ? 'c' : 'o')) + (b.cls ? ' ' + b.cls : '') + '" data-ui-fb="' + k + '"' + (b.disabled ? ' disabled' : '') + (b.title ? ' title="' + e(b.title) + '"' : '') + '>' + (b.icon ? i(b.icon) : '') + e(b.label) + '</button>'; }).join('');
   }
   function makeLayer(kind, o) {
     var prev = document.activeElement, wrap = document.createElement('div');
@@ -316,7 +319,7 @@ var UI = (function () {
     ctrl.busy = function (on, label) { footEl.querySelectorAll('button').forEach(function (b) { b.disabled = !!on; }); if (on && label) { var last = footEl.querySelector('button:last-child'); if (last) last.textContent = label; } if (!on) ctrl.setFoot(o.foot); };
     ctrl.close = function (force) {
       if (ctrl.closed) return Promise.resolve(true);
-      var go = function () { ctrl.closed = true; stack.splice(stack.indexOf(ctrl), 1); wrap.classList.add('out'); setTimeout(function () { wrap.remove(); }, 160); lockScroll(); if (offData) offData(); if (o.onClose) o.onClose(ctrl); if (prev && prev.focus && document.contains(prev)) try { prev.focus({ preventScroll: true }); } catch (err) { /* ignore */ } return true; };
+      var go = function () { ctrl.closed = true; stack.splice(stack.indexOf(ctrl), 1); wrap.classList.add('out'); setTimeout(function () { wrap.remove(); }, 160); lockScroll(); toastsAfterClose(ctrl); if (offData) offData(); if (o.onClose) o.onClose(ctrl); if (prev && prev.focus && document.contains(prev)) try { prev.focus({ preventScroll: true }); } catch (err) { /* ignore */ } return true; };
       if (!force && o.dirty && o.dirty(ctrl)) return U.confirm({ title: o.dirtyTitle || 'Discard your changes?', text: 'What you typed here is not saved yet.', ok: 'Discard', cancel: 'Keep editing', danger: true }).then(function (y) { return y ? go() : false; });
       return Promise.resolve(go());
     };
@@ -333,7 +336,9 @@ var UI = (function () {
     var offData = o.live ? on('data', function () { if (!ctrl.closed) ctrl.refresh(); }) : null;
     layer().appendChild(wrap);
     ctrl.modal = true; stack.push(ctrl); lockScroll();
+    ctrl.isDirty = function () { try { return !ctrl.closed && !!(o.dirty && o.dirty(ctrl)); } catch (err) { return false; } };
     ctrl.setBody(o.body);
+    setTimeout(placeToasts, 0);
     setTimeout(function () { if (!panel.contains(document.activeElement)) focusFirst(panel); }, 30);
     return ctrl;
   }
@@ -354,7 +359,20 @@ var UI = (function () {
       if (o.danger) d.el.classList.add('danger');
     });
   };
-  U.closeAll = function () { stack.slice().reverse().forEach(function (s) { s.close(true); }); U.closePops(); };
+  U.closeAll = function () { closingAll = true; try { stack.slice().reverse().forEach(function (s) { s.close(true); }); } finally { closingAll = false; } U.closePops(); };
+  var closingAll = false;
+  /* true when an open drawer or dialog has changes that are not saved (its dirty() says so) */
+  U.isDirty = function () { return stack.some(function (s) { return s.isDirty && s.isDirty(); }); };
+  /* UI.leave(run): before a page change. With unsaved changes it asks first; run() only happens when the person agrees
+     (or nothing is unsaved). Returns a promise of true (went) / false (stayed). */
+  var leaving = null;
+  U.leave = function (run, o) {
+    o = o || {};
+    if (!U.isDirty()) { run(); return Promise.resolve(true); }
+    if (leaving) return leaving;
+    leaving = U.confirm({ title: 'Leave without saving?', text: o.text || 'What you typed here is not saved yet. If you leave now, it is lost.', ok: 'Leave', cancel: 'Keep editing', danger: true }).then(function (y) { leaving = null; if (y) run(); else if (o.onStay) o.onStay(); return !!y; });
+    return leaving;
+  };
   U.top = function () { return stack[stack.length - 1] || null; };
 
   /* ---------------- popovers and menus ---------------- */
@@ -406,15 +424,37 @@ var UI = (function () {
     o = o || {};
     var box = document.getElementById('ui-toasts'); if (!box) { box = document.createElement('div'); box.id = 'ui-toasts'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
     var t = document.createElement('div'), tone = o.tone || 'ok';
-    t.className = 'ui-toast ' + tone;
+    t.className = 'ui-toast ' + tone; t._at = Date.now(); t._layer = U.top();
     t.innerHTML = i({ ok: 'circle-check', warn: 'alert-triangle', bad: 'alert-circle', info: 'info-circle' }[tone] || 'circle-check') + '<span class="grow">' + e(msg) + '</span>' + (o.action ? '<button type="button" class="ui-tact">' + e(o.action.label) + '</button>' : '') + '<button type="button" class="ui-tx" aria-label="Close">' + i('x') + '</button>';
-    var kill = function () { t.classList.add('out'); setTimeout(function () { t.remove(); }, 200); };
+    var kill = function () { clearTimeout(timer); t.classList.add('out'); setTimeout(function () { t.remove(); }, 200); };
+    t._kill = kill;
     t.addEventListener('click', function (ev) { if (ev.target.closest('.ui-tact')) { o.action.run(); kill(); } else if (ev.target.closest('.ui-tx')) kill(); });
     box.appendChild(t);
     while (box.children.length > 4) box.firstChild.remove();
     var timer = setTimeout(kill, o.ms || (o.action ? 6000 : 3800));
-    t.addEventListener('mouseenter', function () { clearTimeout(timer); }); t.addEventListener('mouseleave', function () { timer = setTimeout(kill, 1800); });
+    /* hovering keeps a toast up, but only with a real mouse: on a touch screen a tap must not pin it over the buttons */
+    if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) { t.addEventListener('mouseenter', function () { clearTimeout(timer); }); t.addEventListener('mouseleave', function () { timer = setTimeout(kill, 1800); }); }
+    placeToasts();
     return { close: kill };
+  };
+  /* on a phone the toasts sit at the bottom: lift them above the footer buttons of the open drawer or dialog */
+  function placeToasts() {
+    var box = document.getElementById('ui-toasts'); if (!box) return;
+    var phone = window.matchMedia && window.matchMedia('(max-width: 760px)').matches, top = U.top(), lift = 0;
+    if (phone && top && top.el) { var f = top.el.querySelector('.ui-drw-f,.ui-dlg-f'); if (f && f.style.display !== 'none' && f.offsetHeight) { var r = f.getBoundingClientRect(); if (r.top > window.innerHeight * .45) lift = Math.max(0, window.innerHeight - r.top) + 8; } }
+    box.style.bottom = phone && lift ? lift + 'px' : '';
+  }
+  U.placeToasts = placeToasts;
+  /* a dialog's own messages ("Type a name first") go when it closes; a message shown as it closes ("Saved") stays */
+  function toastsAfterClose(ctrl) {
+    var box = document.getElementById('ui-toasts');
+    if (box) [].slice.call(box.children).forEach(function (t) { if (t._layer === ctrl && Date.now() - (t._at || 0) > (closingAll ? 300 : 900) && t._kill) t._kill(); });
+    setTimeout(placeToasts, 0);
+  }
+  /* UI.clearToasts(olderThanMs): on a page change, drop messages that belong to the page you left */
+  U.clearToasts = function (older) {
+    var box = document.getElementById('ui-toasts'); if (!box) return;
+    [].slice.call(box.children).forEach(function (t) { if (Date.now() - (t._at || 0) > (older == null ? 1200 : older) && t._kill) t._kill(); });
   };
 
   /* ---------------- copy to clipboard ---------------- */
@@ -607,7 +647,8 @@ var UI = (function () {
   /* UI.combo(el, {key, label, required, help, error, placeholder, value | values (multi), multi, items: [] | function (state) -> [],
        item: {value, label, sub, badge: {text, tone} | html, icon, html (whole row), kw (extra search words), group, disabled, hint},
        search: function (item, q) -> false | true | number (higher shows first), recentKey, title, emptyText, clearable,
-       toggles: [{key, label, value}] (switches under the list; their values reach items(state) as state.toggles[key]),
+       toggles: [{key, label, value, narrows}] (switches under the list; their values reach items(state) as state.toggles[key];
+         narrows: true for a switch that hides rows when on, such as "Only bookings with money due"),
        onChange: function (value, item, ctrl), disabled})
      -> {el, value(), item(), set(value, silent), open(q), close(), refresh(), setItems(items), state} */
   U.combo = function (el, o) {
@@ -615,6 +656,7 @@ var UI = (function () {
     var id = fid(o), st = { value: o.multi ? (o.values || o.value || []).slice() : (o.value == null ? '' : o.value), toggles: {}, open: false, active: 0, list: [] };
     (o.toggles || []).forEach(function (t) { st.toggles[t.key] = !!t.value; });
     var allItems = function () { return (typeof o.items === 'function' ? o.items(st) : o.items) || []; };
+    var relaxed = function (t) { return !t.narrows; };   /* the switch position that shows the most rows */
     var findItem = function (v) { var l = allItems(); for (var k = 0; k < l.length; k++) if (String(l[k].value) === String(v)) return l[k]; return null; };
     var pop = null, dlg = null;
     function fieldHtml() {
@@ -665,10 +707,11 @@ var UI = (function () {
       if (st.active >= st.list.length) st.active = Math.max(0, st.list.length - 1);
       var g = null, html = '';
       st.list.forEach(function (it, k) { if (it.group && it.group !== g) { g = it.group; html += '<div class="ui-cbx-g" role="presentation">' + e(g) + '</div>'; } html += rowHtml(it, k); });
-      var lb = box.querySelector('.ui-cbx-l'), hidden = 0, offT = (o.toggles || []).filter(function (t) { return !st.toggles[t.key]; });
-      if (!st.list.length && q && offT.length) { var keep = Object.assign({}, st.toggles); offT.forEach(function (t) { st.toggles[t.key] = true; }); hidden = compute(q).length; st.toggles = keep; }
+      var lb = box.querySelector('.ui-cbx-l'), hidden = 0, offT = (o.toggles || []).filter(function (t) { return !!st.toggles[t.key] !== relaxed(t); });
+      if (!st.list.length && offT.length) { var keep = Object.assign({}, st.toggles); offT.forEach(function (t) { st.toggles[t.key] = relaxed(t); }); hidden = compute(q).length; st.toggles = keep; }
+      var tgWords = offT.map(function (t) { return '"' + t.label + '" is ' + (t.narrows ? 'on' : 'off'); }).join(' and ');
       lb.innerHTML = st.list.length ? html : '<div class="ui-cbx-none">' + i('mood-empty') + '<b>' + e(q ? 'Nothing matches "' + q + '"' : (o.emptyText || 'Nothing to choose yet')) + '</b>' +
-        (hidden ? '<span class="b2">' + hidden + (hidden === 1 ? ' match is' : ' matches are') + ' hidden: ' + e(offT.map(function (t) { return t.label.charAt(0).toLowerCase() + t.label.slice(1); }).join(', ')) + ' is off.</span><button type="button" class="btn tonal sm" data-cbx-tgon>Show ' + (hidden === 1 ? 'it' : 'them') + '</button>' : q ? '<span class="b2">' + e(o.noMatchHelp || 'Check the spelling, or type fewer words.') + '</span>' : '') + '</div>';
+        (hidden ? '<span class="b2">' + hidden + (hidden === 1 ? (q ? ' match is' : ' is') : (q ? ' matches are' : ' are')) + ' hidden, because ' + e(tgWords) + '.</span><button type="button" class="btn tonal sm" data-cbx-tgon>Show ' + (hidden === 1 ? 'it' : 'them') + '</button>' : q ? '<span class="b2">' + e(o.noMatchHelp || 'Check the spelling, or type fewer words.') + '</span>' : '') + '</div>';
       box.querySelector('.ui-cbx-n').textContent = q ? st.list.length + (st.list.length === 1 ? ' match' : ' matches') : st.list.filter(function (x) { return x.group !== 'Recent'; }).length + ' to choose from';
       inp.setAttribute('aria-activedescendant', st.list.length ? id + '-o' + st.active : '');
       var a = lb.querySelector('.act'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' });
@@ -704,7 +747,7 @@ var UI = (function () {
         var x;
         if ((x = ev.target.closest('[data-cbx-k]'))) { st.active = +x.getAttribute('data-cbx-k'); pick(st.list[st.active]); return; }
         if (ev.target.closest('[data-cbx-done]')) { close(); return; }
-        if (ev.target.closest('[data-cbx-tgon]')) { (o.toggles || []).forEach(function (t) { st.toggles[t.key] = true; }); box.querySelectorAll('[data-cbx-tg]').forEach(function (x) { x.checked = true; }); st.active = 0; drawList(); try { inp.focus({ preventScroll: true }); } catch (err) { /* ignore */ } return; }
+        if (ev.target.closest('[data-cbx-tgon]')) { (o.toggles || []).forEach(function (t) { st.toggles[t.key] = relaxed(t); if (t.onChange) t.onChange(st.toggles[t.key]); }); box.querySelectorAll('[data-cbx-tg]').forEach(function (x) { x.checked = !!st.toggles[x.getAttribute('data-cbx-tg')]; }); st.active = 0; drawList(); try { inp.focus({ preventScroll: true }); } catch (err) { /* ignore */ } return; }
       });
       box.addEventListener('change', function (ev) { var t = ev.target.getAttribute && ev.target.getAttribute('data-cbx-tg'); if (t) { st.toggles[t] = ev.target.checked; st.active = 0; drawList(); var tg = (o.toggles || []).filter(function (z) { return z.key === t; })[0]; if (tg && tg.onChange) tg.onChange(ev.target.checked); } });
       box.addEventListener('mousedown', function (ev) { if (ev.target.closest('[data-cbx-k]')) ev.preventDefault(); });
@@ -878,7 +921,7 @@ var UI = (function () {
     return '<div class="inp ui-dtf' + (o.compact ? ' compact' : '') + (o.error ? ' bad' : '') + (o.full ? ' full' : '') + '" data-ui-dtf="' + (withTime ? 'dt' : 'd') + '"' + (o.style ? ' style="' + o.style + '"' : '') + '>' + lab(o, id) +
       '<div class="ui-dtf-row"><span class="ui-dtf-d"><span class="ui-dtf-show' + (d ? '' : ' ph') + '" aria-hidden="true">' + i('calendar') + '<span data-ui-dtf-txt data-ph="' + e(o.placeholder || 'Choose a day') + '">' + e(d ? U.fmt.date(d) : (o.placeholder || 'Choose a day')) + '</span></span>' +
       '<input type="date" id="' + id + '" class="ui-dtf-native" data-ui-dtf-native value="' + (d ? U.isoDate(d) : '') + '"' + (o.min ? ' min="' + e(String(o.min instanceof Date ? U.isoDate(o.min) : o.min).slice(0, 10)) + '"' : '') + (o.max ? ' max="' + e(String(o.max instanceof Date ? U.isoDate(o.max) : o.max).slice(0, 10)) + '"' : '') + (o.required ? ' required' : '') + (o.disabled ? ' disabled' : '') + (o.label ? '' : ' aria-label="' + e(o.aria || o.placeholder || 'Date') + '"') + '></span>' + time + '</div>' +
-      (chips.length && !o.disabled ? '<div class="ui-dtf-chips">' + chips.map(function (c, k) { return '<button type="button" class="ui-fchip" data-ui-dtf-chip="' + k + '"' + (c.days != null ? ' data-days="' + c.days + '"' : '') + '>' + e(c.label) + '</button>'; }).join('') + '</div>' : '') +
+      (chips.length && !o.disabled ? '<div class="ui-dtf-chips">' + chips.map(function (c, k) { return '<button type="button" class="ui-fchip" data-ui-dtf-chip="' + k + '"' + (c.days != null ? ' data-days="' + c.days + '"' : '') + (c.run ? ' data-run="' + regChipRun(c.run) + '"' : '') + '>' + e(c.label) + '</button>'; }).join('') + '</div>' : '') +
       '<input type="hidden" data-key="' + e(o.key || '') + '" value="' + iso + '"' + U.attrs(o.attrs) + '>' + tail(o) + '</div>';
   }
   U.dateField = function (o) { return dtfHtml(o || {}, false); };
@@ -899,7 +942,8 @@ var UI = (function () {
     h.value = d ? (withTime ? U.isoDateTime(d) : U.isoDate(d)) : '';
     if (!silent) { h.dispatchEvent(new Event('input', { bubbles: true })); h.dispatchEvent(new Event('change', { bubbles: true })); }
   };
-  var dtfChipRun = {};
+  var dtfChipRun = {}, dtfChipN = 0;
+  function regChipRun(fn) { var k = 'r' + (++dtfChipN); dtfChipRun[k] = fn; if (dtfChipN % 200 === 0) { /* keep the list small: drop runs whose buttons are gone */ Object.keys(dtfChipRun).forEach(function (x) { if (x !== k && !document.querySelector('[data-run="' + x + '"]')) delete dtfChipRun[x]; }); } return k; }
   document.addEventListener('change', function (ev) {
     var t = ev.target; if (!t.matches) return;
     if (t.matches('[data-ui-dtf-native]') || t.matches('[data-ui-dtf-time]')) {
@@ -915,8 +959,9 @@ var UI = (function () {
     if ((x = t.closest && t.closest('[data-ui-dtf-native]'))) { try { if (x.showPicker) x.showPicker(); } catch (err) { /* the browser opens its own picker */ } return; }
     if ((x = t.closest && t.closest('[data-ui-dtf-chip]'))) {
       var r = dtfRoot(x), cur = U.dateFieldValue(r), n = NOW(), base = new Date(n.getFullYear(), n.getMonth(), n.getDate()), days = x.getAttribute('data-days');
-      var d = days != null ? new Date(base.getTime() + (+days) * DAY) : null;
-      if (d && r.getAttribute('data-ui-dtf') === 'dt') d.setHours(cur ? cur.getHours() : 10, cur ? cur.getMinutes() : 0, 0, 0);
+      var runK = x.getAttribute('data-run'), d = null;
+      if (runK && dtfChipRun[runK]) { var got = dtfChipRun[runK](cur, r); d = got instanceof Date ? new Date(got.getTime()) : got ? U.parseDate(got) : null; }
+      else { d = days != null ? new Date(base.getTime() + (+days) * DAY) : null; if (d && r.getAttribute('data-ui-dtf') === 'dt') d.setHours(cur ? cur.getHours() : 10, cur ? cur.getMinutes() : 0, 0, 0); }
       if (d) U.setDateField(r, d);
     }
   });

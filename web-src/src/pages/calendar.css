@@ -34,7 +34,7 @@
 .pg-calendar .cl-hd.hr b{width:auto;height:auto;border-radius:4px;padding:2px 6px;font-size:13px}
 .pg-calendar .cl-car{position:sticky;left:0;z-index:6;background:var(--paper);display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--divider);border-right:1px solid var(--divider);cursor:pointer;min-width:0}
 .pg-calendar .cl-car:hover{background:var(--hover)}
-.pg-calendar .cl-car:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.pg-calendar .cl-car:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 .pg-calendar .cl-ph{width:52px;flex:none;border-radius:5px;background:var(--hover)}
 .pg-calendar .cl-ci{display:flex;flex-direction:column;min-width:0;line-height:1.25}
 .pg-calendar .cl-ci b{font-size:14px;color:var(--text);letter-spacing:.04em}

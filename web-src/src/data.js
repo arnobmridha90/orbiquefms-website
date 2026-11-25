@@ -147,9 +147,11 @@ function buildData(B, seed) {
   });
   /* bookings: walk every car through the weeks before and after today */
   var raw = [];
-  cars.forEach(function (car) {
+  cars.forEach(function (car, ci) {
     var t = new Date(TODAY.getTime() - 46 * DAY); t.setHours(10, 0, 0, 0);
-    while (t < new Date(TODAY.getTime() + 13 * DAY)) {
+    /* Bara's last car is sold (see the cars' extra fields): its rentals stop well before today */
+    var sold = B.id === 'bara' && ci === cars.length - 1, stopAt = new Date(TODAY.getTime() + (sold ? -36 : 13) * DAY);
+    while (t < stopAt) {
       var gap = R() < .45 ? 0 : ri(1, 3), start = new Date(t.getTime() + gap * DAY); start.setHours(pick([9, 10, 10, 11, 14, 16, 18]), 0, 0, 0);
       var dur = pick([1, 1, 2, 2, 2, 3, 3, 4, 5, 7]), end = new Date(start.getTime() + dur * DAY);
       if (car.status === 'workshop' && end > new Date(TODAY.getTime() - 3 * DAY) && start < new Date(TODAY.getTime() + 4 * DAY)) { t = new Date(TODAY.getTime() + 4 * DAY); continue; }
@@ -347,7 +349,8 @@ function extendData(B, d, seed) {
     summonsAdminFee: B.id === 'padi' ? 15 : B.id === 'bara' ? 25 : 20,
     fleet: { overspeed: B.id === 'bara' ? 120 : 110, historyDays: 30, reminderRecipients: [], reminderTime: '09:00',
       warnDays: { 'Road tax': 30, 'Insurance': 30, 'PUSPAKOM': 14, 'Rental permit': 30, 'Car grant': 0, 'Other': 14 } },
-    trackerPlatforms: ['Tracksolid Pro', 'Sample GPS Cloud', 'Dashcam app', 'Other'],
+    trackerPlatforms: ['Tracksolid Pro', 'Sample GPS Cloud', 'Other'],
+    dashcamPlatforms: ['Dashcam app', 'Sample Cam Cloud', 'Other'],   /* the dashcam field on a car suggests these (Settings > Fleet) */
     assistant: { hours: { from: '08:00', to: '22:00' }, turnaroundH: 2, airportTurnaroundH: 4, holdMin: 30, minNoticeH: 3,
       deliveryTiers: [{ upToKm: 10, fee: 20 }, { upToKm: 25, fee: 40 }, { upToKm: 50, fee: 70 }], stayOutDays: 30 },
     turnaroundH: 3,                             /* availability: warn when the car comes back less than this before the next start */
@@ -503,6 +506,9 @@ function extendData(B, d, seed) {
   if (vp) { vp.void = { at: new Date(vp.at.getTime() + 2 * 36e5), by: d.users[0].name, reason: 'Recorded twice by mistake' }; d.receipts.forEach(function (r) { if (r.payment === vp.id) { r.status = 'Void'; r.voidReason = 'The payment was voided'; } }); }
 
   /* ---------- deposits waiting or returned ---------- */
+  /* one deposit that has waited more than a week, so "Waiting 7 days or more" has something to show */
+  var oldWait = d.bookings.filter(function (x) { return x.status === 'Completed' && x.pay === 'Deposit Refunded' && x.dep > 0 && TODAY - x.end > 8 * DAY && TODAY - x.end < 20 * DAY; })[0];
+  if (oldWait) { oldWait.status = 'Car Returned'; oldWait.pay = 'Refund Pending'; }
   d.deposits = d.bookings.filter(function (x) { return x.pay === 'Refund Pending' || (x.pay === 'Deposit Refunded' && x.status !== 'Cancelled' && TODAY - x.end < 90 * DAY && x.dep > 0); }).map(function (x, k) {
     var ded = [];
     if (k % 4 === 1) ded.push({ kind: 'Fuel', amount: 25, note: 'Fuel gauge one bar lower than at pick-up' });
@@ -547,6 +553,8 @@ function extendData(B, d, seed) {
       voided: { at: new Date(vb.at.getTime() + 2 * 36e5), by: d.users[0].id, reason: 'Recorded twice by mistake' }, by: vb.staff, payments: [] });
   }
   d.bankIns.sort(function (a, b) { return b.at - a.at; });
+  /* every seeded bank-in has a slip picture: a made-up machine slip drawn from its own figures when someone looks at it */
+  d.bankIns.forEach(function (bi) { if (bi.slip && !bi.slip.dataUrl) Object.defineProperty(bi.slip, 'dataUrl', { enumerable: true, configurable: true, get: function () { return typeof invBankInSvg === 'function' ? invBankInSvg(bi) : ''; }, set: function (v) { Object.defineProperty(bi.slip, 'dataUrl', { value: v, writable: true, enumerable: true, configurable: true }); } }); bi.slip.sample = true; if (!bi.slip.type) bi.slip.type = 'image/svg+xml'; });
   /* nobody may hand back more cash than they hold: such cash refunds become bank transfers */
   d.users.forEach(function (u) {
     var cashRef = d.deposits.filter(function (z) { return z.refund && z.refund.method === 'Cash' && z.refund.by === u.name; });
@@ -827,8 +835,10 @@ function handovers(d) {
   var out = [];
   d.bookings.forEach(function (x) {
     if (x.status === 'Cancelled') return;
-    out.push({ id: 'ho-' + x.code + '-s', kind: 'Delivery', booking: x.code, at: x.start, label: x.startOpt === 'Pick-up from our location' ? 'Pick-up at our location - ' + x.pickup : x.startOpt, note: x.delNote, agents: x.agentIds || [] });
-    out.push({ id: 'ho-' + x.code + '-e', kind: 'Return', booking: x.code, at: x.end, label: x.endOpt === 'Drop-off at our location' ? 'Drop-off at our location - ' + x.drop : x.endOpt, note: x.retNote, agents: x.agentIds || [] });
+    /* a delivery to one of the company's places (Settings > Other places) is labelled by that place's current name */
+    var ps = x.startPlace ? placeById(x.startPlace) : placeOfOpt(x.startOpt), pe = x.endPlace ? placeById(x.endPlace) : placeOfOpt(x.endOpt);
+    out.push({ id: 'ho-' + x.code + '-s', kind: 'Delivery', booking: x.code, at: x.start, place: ps ? ps.name : null, label: x.startOpt === 'Pick-up from our location' ? 'Pick-up at our location - ' + x.pickup : ps ? 'Delivery to ' + ps.name : x.startOpt, note: x.delNote, agents: x.agentIds || [] });
+    out.push({ id: 'ho-' + x.code + '-e', kind: 'Return', booking: x.code, at: x.end, place: pe ? pe.name : null, label: x.endOpt === 'Drop-off at our location' ? 'Drop-off at our location - ' + x.drop : pe ? 'Return from ' + pe.name : x.endOpt, note: x.retNote, agents: x.agentIds || [] });
   });
   return out.sort(function (a, b) { return a.at - b.at; });
 }
@@ -957,7 +967,8 @@ function countedCars(d) { d = d || D(); return d.cars.filter(function (c) { retu
    Under 24 h: exact hours x hourly. Otherwise whole days x daily rate + the exact remaining hours x hourly (no rounding up).
    Rent and payable are rounded to whole RM the way the backend does (half to even: 262.5 -> 262, 263.5 -> 264).
    Damage cover counts days: under 24 h is 1 day, otherwise whole days + 1 for any part day. */
-function roundRM(v) { var x = Math.round(v * 100) / 100, f = Math.floor(x), r = x - f; if (Math.abs(r - .5) < 1e-9) return f % 2 === 0 ? f : f + 1; return Math.round(x); }
+/* whole ringgit; halves round up (RM 262.50 -> RM 263), as the booking plan says */
+function roundRM(v) { var x = Math.round(v * 100) / 100; return Math.floor(x + .5 + 1e-9); }
 function bkCalc(o) {
   var ms = (o.end && o.start) ? o.end - o.start : 0, hrs = Math.max(0, ms / 36e5), full = Math.floor(hrs / 24 + 1e-9), remH = Math.max(0, hrs - full * 24);
   var rate = Number(o.rate) || 0, hourly = Number(o.hourly) || 0;

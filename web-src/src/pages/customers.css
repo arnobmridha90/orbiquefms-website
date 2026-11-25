@@ -151,3 +151,6 @@
   .cu-seg-t b{font-size:20px}
   .cu-seg-t > span{white-space:nowrap}
 }
+
+/* phone: the blacklist button in the drawer header is icon only, so the name has room */
+@media (max-width:760px){.ui-drw-acts .btn.cu-blk{min-width:40px;min-height:40px;padding:0 10px;justify-content:center}.ui-drw-acts .btn.cu-blk>span{display:none}}

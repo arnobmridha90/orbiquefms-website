@@ -94,7 +94,9 @@ var Deposit = (function () {
     var b = bk(bId); if (!b) { say('Booking not found'); return; }
     if (!can('deposits.view')) { say('Ask the owner for Deposits access'); return; }
     sync(bId);
-    var st = { typed: null };
+    /* after "Reopen the refund", a deposit typed by hand starts from the amount typed last time, not the agreed one */
+    var lastVoid = (S.refunds || []).filter(function (x) { return x.booking === bId && x.voided && x.notRecorded && x.received != null; }).pop();
+    var st = { typed: lastVoid && !refundOf(bId) ? +lastVoid.received : null };
     var sh = sheet('<div id="depBody"></div>', null, { full: true, stack: !!opts.stack, cls: 'dep-sheet' });
     var draw = function (focus) {
       if (!sh.isConnected) return;

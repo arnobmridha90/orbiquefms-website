@@ -76,4 +76,3 @@
 .sc-mi b { display: block; font-weight: 650; }
 .sc-mi small { display: block; color: var(--muted); font-size: 12.5px; }
 .sc-card.done .sc-main { padding-bottom: 12px; }
-main.sc .btn:not(.ghost):not(.link) { color: #fff; }

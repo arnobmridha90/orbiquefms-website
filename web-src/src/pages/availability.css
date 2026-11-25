@@ -9,7 +9,7 @@
 .pg-availability .av-chip{min-height:38px;padding:6px 14px;border-radius:6px;border:1px solid var(--divider);background:var(--paper);color:var(--text);font:inherit;font-size:14.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .pg-availability .av-chip:hover{background:var(--hover)}
 .pg-availability .av-chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
-.pg-availability .av-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.pg-availability .av-chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .pg-availability .av-sum{display:flex;align-items:center;gap:8px;margin-top:18px;color:var(--text2)}
 .pg-availability .av-sum i{color:var(--primary-text);font-size:18px}
 .pg-availability .av-h{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;color:var(--text);margin:26px 0 12px}

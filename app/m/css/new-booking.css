@@ -66,7 +66,7 @@
 /* dates */
 .nb-dt { display: grid; grid-template-columns: 1.15fr 1fr; gap: 8px; }
 .nb-dt .inp { min-width: 0; }
-.nb-lens { margin: -2px -14px 12px; padding: 2px 14px 4px; }
+.nb-lens { margin: -2px 0 12px; padding: 2px 0 4px; flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; } /* all five length chips stay in view on a phone, +12 hours wraps when needed */
 
 /* car */
 .nb-busy { border-color: var(--t-red) !important; box-shadow: 0 0 0 3px var(--t-red-bg) !important; }

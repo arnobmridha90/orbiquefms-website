@@ -370,7 +370,7 @@ function tskAutoDialog() {
       }).join('') : '<p class="b2 faint">No rules yet.</p>') + '</div>' +
       (canEdit ? '<div class="tsk-addrule"><div class="h6">Add a rule</div><div class="tsk-addrow">' +
         UI.select({ key: 'ar-kind', label: 'For', value: add.kind, options: [{ value: 'car', label: 'One car' }, { value: 'location', label: 'A location' }].concat(hasEvery ? [] : [{ value: 'every', label: 'Every booking' }]) }) +
-        (add.kind === 'car' ? '<div class="tsk-ar-car"></div>' : add.kind === 'location' ? '<div class="inp"><label for="tsk-arloc">Location</label><select id="tsk-arloc" data-key="ar-loc"><option value="">Choose</option>' + (B().locations || []).map(function (l) { var u = used('location', l.id); return '<option value="' + esc(l.id) + '"' + (u ? ' disabled' : '') + (add.target === l.id ? ' selected' : '') + '>' + esc(l.n) + (u ? ' (has a rule)' : '') + '</option>'; }).join('') + '</select></div>' : '') +
+        (add.kind === 'car' ? '<div class="tsk-ar-car"></div>' : add.kind === 'location' ? UI.select({ id: 'tsk-arloc', key: 'ar-loc', label: 'Location', placeholder: 'Choose', value: add.target || '', options: (B().locations || []).map(function (l) { var u = used('location', l.id); return { value: l.id, label: l.n + (u ? ' (has a rule)' : ''), disabled: !!u }; }) }) : '') +
         '<div class="tsk-ar-new"></div>' + UI.btn('Add', { icon: 'plus', attrs: { 'data-ar-add': '1' } }) + '</div></div>' : '');
     rules.forEach(function (r) {
       UI.staffPicker(el.querySelector('[data-ar-staff="' + r.id + '"]'), { key: 'st-' + r.id, label: '', source: 'employees', multi: true, values: r.staff.slice(), disabled: !canEdit, me: false,
@@ -405,6 +405,7 @@ function tskAutoDialog() {
 /* Make pick-up and return tasks for one booking (#page=tasks&action=handover&booking=KLT-00412) */
 function tskHandoverDialog(code) {
   var x = code ? findBooking(code) : null, items = null;
+  if (code && !x) UI.toast('There is no booking ' + code + '. Choose one below.', { tone: 'warn' });
   var build = function () { if (!x) { items = null; return; } items = tskPlan(x).plan.map(function (p) { return Object.assign({ on: true }, p); }); };
   build();
   var dl = UI.dialog({ title: 'Make pick-up and return tasks', width: 'md', body: function (el) {

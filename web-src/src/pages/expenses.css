@@ -110,6 +110,7 @@
 .exp-ic[aria-pressed="true"]{border-color:var(--primary);background:var(--primary);color:var(--on-primary)}
 .exp-cfh{margin:-8px 0 0}
 .exp-cfb{justify-content:flex-end}
+.exp-cfh{margin:2px 0 0;text-align:right}
 @media (max-width:760px){.pg-expenses .exp-head{flex-direction:column;gap:10px}.pg-expenses .exp-head > .grow{width:100%}}
 
 /* FAB: keep the last rows and the "Where the money went" figures clear of the round button */
@@ -149,7 +150,7 @@
 .exp-lamt{display:flex;align-items:center;flex-wrap:wrap;gap:6px;width:150px;margin-left:auto}
 .exp-lamt span{color:var(--text2);font-size:13.5px}
 .exp-lamt input{flex:1;min-width:0;width:100px;height:40px;border:1px solid var(--input-border);border-radius:8px;padding:0 10px;font:inherit;font-size:15px;text-align:center;background:var(--paper);color:var(--text)}
-.exp-lamt input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.exp-lamt input:focus{outline:none;border-color:var(--focus);box-shadow:0 0 0 1px var(--focus)}
 .exp-lamt.bad input{border-color:var(--error)}
 .exp-lamt small{flex-basis:100%;font-size:11.5px;color:var(--error-text, var(--error))}
 .exp-lmore{display:flex;align-items:center;gap:6px;width:100%;min-height:44px;padding:0 12px;border:0;border-top:1px solid var(--divider);background:transparent;color:var(--primary-text);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;text-align:left}

@@ -116,11 +116,14 @@ function readHash(h) {
 
 /* ---------------- navigation ---------------- */
 /* go('bookings') or go('tasks', {action:'add'}) */
+/* With unsaved changes in an open drawer or dialog it asks first ("Leave without saving?"). */
 function go(page, params) {
   var al = PAGE_ALIASES[page]; if (al) { params = Object.assign({}, al[1] || {}, params || {}); page = al[0]; }
-  UI.closeAll();
-  S.sec = 'dash'; S.page = page; S.params = params || {}; S.drawer = null; S.modal = null; S.nav = false;
-  render(); window.scrollTo(0, 0);
+  return UI.leave(function () {
+    UI.closeAll(); UI.clearToasts();
+    S.sec = 'dash'; S.page = page; S.params = params || {}; S.drawer = null; S.modal = null; S.nav = false;
+    render(); window.scrollTo(0, 0);
+  });
 }
 
 /* ---------------- mounting the page ---------------- */
@@ -332,7 +335,7 @@ UI.userMenu = function (anchor) {
   ].concat(others.map(function (x) { var r = byId(D().roles, x.role); return { label: x.name, hint: x.superAdmin ? 'Owner' : r ? r.name : '', checked: x.id === u.id, onClick: function () { S.user[B().id] = x.id; render(); UI.toast('You now see what ' + x.name + ' may see.', { tone: 'info' }); } }; })).concat([
     { divider: true },
     { label: T('Settings'), icon: 'settings', onClick: function () { go('settings'); } },
-    { label: T('Logout'), icon: 'logout', danger: true, onClick: function () { DB.log('Signed out', 'Team member', u.id, u.name + ' signed out'); UI.closeAll(); S.sec = 'login'; S.drawer = null; render(); window.scrollTo(0, 0); } }
+    { label: T('Logout'), icon: 'logout', danger: true, onClick: function () { UI.leave(function () { DB.log('Signed out', 'Team member', u.id, u.name + ' signed out'); UI.closeAll(); UI.clearToasts(0); S.sec = 'login'; S.drawer = null; render(); window.scrollTo(0, 0); }); } }
   ]), { width: 270 });
 };
 

@@ -93,6 +93,7 @@ var Pay = (function () {
     var ns = o.updateStatus ? nextPaymentStatus(b, items) : null;
     bLog(b, rm(total) + ' received by ' + payMethodText(p).replace(/^Transfer$/, 'transfer').replace(/^Cash/, 'cash').replace(/^Card/, 'card').replace(/^From the/, 'taking it from the') + ': ' + what + (rc ? ' (receipt ' + rc.receipt.no + ')' : '') + (o.fromSlip ? ' from a slip' : ''));
     if (ns) setPaymentStatus(b, ns, 'payment recorded');
+    if (p.method === 'Deposit adjustment' && typeof Deposit !== 'undefined' && Deposit.sync) { try { Deposit.sync((bk(p.depositOf) || b).id); } catch (e) { console.error(e); } }
     save();
     return { pay: p, receipt: rc ? rc.receipt : null, made: rc ? rc.made : false, status: ns };
   }
@@ -106,6 +107,7 @@ var Pay = (function () {
       var ded = (S.deductions || []).filter(function (d) { return d.paymentId === p.id; });
       S.deductions = (S.deductions || []).filter(function (d) { return d.paymentId !== p.id; });
       if (ded.length) { var src = bk(ded[0].booking) || b; said.push(rm(ded[0].amt) + ' is given back to the deposit of ' + src.code); if (src.id !== b.id) bLog(src, rm(ded[0].amt) + ' given back to the deposit (payment on ' + b.code + ' voided)'); }
+      if (typeof Deposit !== 'undefined' && Deposit.sync) { try { if (Deposit.sync(ded.length ? ded[0].booking : (p.depositOf || b.id))) said.push('The deposit is waiting to be returned again'); } catch (e) { console.error(e); } }
     }
     bLog(b, 'Payment of ' + rm(payTotal(p)) + ' voided: ' + reason);
     var st = depositDueAfterVoid(b); if (st) said.push('The booking is back to Deposit Due');

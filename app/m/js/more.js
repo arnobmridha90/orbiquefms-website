@@ -23,7 +23,7 @@ var MORE_GROUPS = function (bd) {
       ['#mymoney', 'cash', can('expenses.staff_reports_all') ? 'Staff money' : 'My money', can('expenses.view') || can('expenses.add')],
       ['#invoices', 'receipt', 'Invoices', can('billing.view')],
       ['#instalments', 'cal', 'Instalments', can('cars.see_instalment')],
-      ['#expenses', 'tag', 'Expenses', can('expenses.view')],
+      ['#expenses', 'tag', 'Expenses', can('expenses.view') || can('expenses.add')],
       ['#reports', 'activity', 'Reports', can('reports.view')]]],
     ['Fleet', [
       ['#cars', 'car', 'Cars', can('cars.view')],
@@ -64,6 +64,8 @@ function resetDemo() {
   confirm({ icon: 'warn', title: 'Reset the demo?', text: 'Your dummy bookings, payments and chats for ' + B().short + ' will be replaced by fresh made-up data.', ok: 'Reset', cancel: 'Keep my data', danger: true }).then(function (ok) { if (ok) doResetDemo(); });
 }
 function doResetDemo() {
+  /* the New booking drafts (one per person) and the handover drafts point at the old data: start clean */
+  try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('fms.nbdraft.' + CO + '.') === 0 || k === 'fms.hodraft.' + CO) localStorage.removeItem(k); }); } catch (e) {}
   var keepMe = S.me; resetViewState(); S = seed(CO); runSeeders(S); if (keepMe && staff(keepMe)) S.me = keepMe; usePrefs(); save(); closeAllSheets(); applyTheme();
   history.replaceState(null, '', location.pathname + location.search + '#home'); render(true); say('Fresh demo data loaded');
 }

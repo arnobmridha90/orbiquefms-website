@@ -28,7 +28,7 @@ function sentText(s) { return s ? 'Last sent: ' + s.ch + ', ' + dShort(s.at) + '
 
 var Docs = (function () {
   function invoiceOf(b) { return (S.invoices || []).filter(function (x) { return x.booking === b.id && !x.voided; })[0] || null; }
-  function receiptOf(b) { return (S.receipts || []).filter(function (x) { return x.booking === b.id && !x.voided; })[0] || null; }
+  function receiptOf(b) { return (S.receipts || []).filter(function (x) { return x.booking === b.id && !x.voided && x.kind !== 'summons'; })[0] || null; }
   function paysOfReceipt(r) { var b = bk(r.booking); if (!b) return []; return (b.payments || []).filter(function (p) { return (r.lines || []).indexOf(p.id) >= 0; }); }
   function receiptTotal(r) { return paysOfReceipt(r).filter(function (p) { return !p.voided; }).reduce(function (s, p) { return s + payTotal(p); }, 0); }
   function noReceipt(b) { var live = (S.receipts || []).filter(function (r) { return r.booking === b.id && !r.voided; }); return activePays(b).filter(function (p) { return !live.some(function (r) { return (r.lines || []).indexOf(p.id) >= 0; }); }); }

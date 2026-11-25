@@ -17,17 +17,17 @@ VIEW_STATE.push(function () { tk = { mode: '', q: '', status: 'open', type: '', 
 /* ---------- task types from company settings ---------- */
 function taskTypes() {
   var s = B(), t = ['General'];
-  (s.locations || []).forEach(function (l) { if (l.pickup) t.push('Delivery from our location - ' + (l.short || l.name)); });
+  (s.locations || []).forEach(function (l) { if (l.pickup) t.push('Delivery from our location, ' + (l.short || l.name)); });
   t.push('Delivery to client');
   (s.places || []).forEach(function (p) { t.push('Delivery to ' + p.name); });
-  (s.locations || []).forEach(function (l) { if (l.dropoff) t.push('Return to our location - ' + (l.short || l.name)); });
+  (s.locations || []).forEach(function (l) { if (l.dropoff) t.push('Return to our location, ' + (l.short || l.name)); });
   t.push('Return from client');
   (s.places || []).forEach(function (p) { t.push('Return from ' + p.name); });
   return t;
 }
 function taskTypeFor(b, end) {
   var k = end === 'ret' ? b.retKind : b.pickKind, id = end === 'ret' ? b.retLoc : b.pickLoc;
-  if (k === 'our') { var l = loc(id); return (end === 'ret' ? 'Return to our location - ' : 'Delivery from our location - ') + (l ? l.short || l.name : ''); }
+  if (k === 'our') { var l = loc(id); return (end === 'ret' ? 'Return to our location, ' : 'Delivery from our location, ') + (l ? l.short || l.name : ''); }
   if (k === 'client') return end === 'ret' ? 'Return from client' : 'Delivery to client';
   if (k === 'place') { var p = place(id); return (end === 'ret' ? 'Return from ' : 'Delivery to ') + (p ? p.name : ''); }
   return 'General';

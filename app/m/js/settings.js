@@ -131,8 +131,8 @@ function stLocation(id) {
 }
 function stHandoverForLoc(l) {
   var hf = S.settings.handoverFees = S.settings.handoverFees || [];
-  if (l.pickup) hf.push({ kind: 'Pick-up from our location - ' + l.short, group: 'delivery', amount: 10, rates: {} });
-  if (l.dropoff) hf.push({ kind: 'Drop-off at our location - ' + l.short, group: 'return', amount: 10, rates: {} });
+  if (l.pickup) hf.push({ kind: 'Pick-up from our location, ' + l.short, group: 'delivery', amount: 10, rates: {} });
+  if (l.dropoff) hf.push({ kind: 'Drop-off at our location, ' + l.short, group: 'return', amount: 10, rates: {} });
 }
 function stPlace(id) {
   var s = S.settings;

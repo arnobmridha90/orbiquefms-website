@@ -136,7 +136,7 @@ var EXP_LAST = null;
 function expSheet(rec, prefill) {
   var edit = !!rec, today = new Date(NOW().getFullYear(), NOW().getMonth(), NOW().getDate()), yest = new Date(today.getTime() - DAY), uid = (me() || {}).id;
   var blank = function () { return { day: today, dayTouched: false, amount: '', cat: '', lines: [], car: '', booking: '', staff: '', method: 'Cash', paidTo: '', note: '', receipt: null, shrink: '', dup: '', rcErr: '', reading: false, readText: '', readTone: '', total: null, q: '', all: false }; };
-  var st = Object.assign(blank(), rec ? { day: rec.day, dayTouched: true, amount: String(rec.amount), cat: rec.cat, car: rec.car || '', booking: rec.booking || '', staff: rec.staff || '', method: rec.method || 'Cash', paidTo: rec.paidTo || '', note: rec.note || '', receipt: rec.receipt } : {});
+  var st = Object.assign(blank(), rec ? { day: rec.day, dayTouched: true, amount: (Number(rec.amount) || 0).toFixed(2), cat: rec.cat, car: rec.car || '', booking: rec.booking || '', staff: rec.staff || '', method: rec.method || 'Cash', paidTo: rec.paidTo || '', note: rec.note || '', receipt: rec.receipt } : {});
   if (!rec && prefill) {
     ['car', 'booking', 'paidTo', 'note', 'staff', 'method'].forEach(function (k) { if (prefill[k]) st[k] = prefill[k]; });
     if (prefill.day) { st.day = prefill.day; st.dayTouched = true; }
@@ -186,9 +186,9 @@ function expSheet(rec, prefill) {
     if (!nb && cs.some(function (c) { return c.needsBooking && !c.noBooking; }) && !st.booking) miss.push('the booking');
     var needCar = cs.filter(function (c) { return c.needsCar; }).map(function (c) { return c.name; });
     if (needCar.length && !st.car && !(b && b.car)) miss.push('the car (' + expList(needCar) + (needCar.length > 1 ? ' need it)' : ' needs it)'));
-    if (nb && cs.some(function (c) { return c.agentFee && !c.noBooking; })) miss.push('a separate entry for the no-booking pick-up/delivery (it cannot go with a booking\'s handover fees)');
     if (paysStaff() && !st.staff) miss.push('who the Payment to staff went to');
     var clashes = [];
+    if (nb && cs.some(function (c) { return c.agentFee && !c.noBooking; })) clashes.push('Pick-up/delivery - other has no booking, so it cannot go in the same entry as a booking\'s handover fee. Untick one of them and save it as a separate entry.');
     if (st.booking && !nb) {
       var seen = {};
       cs.forEach(function (c) {
@@ -340,7 +340,7 @@ function expSheet(rec, prefill) {
         var seed = (img.size || f.size || 1000) + (img.name || '').length * 97, total;
         var open = st.lines.filter(function (l) { return !String(l.amount).trim(); });
         if (st.lines.length && !open.length) total = linesTotal();
-        else total = Math.round((12 + (seed % 17000) / 100 + sum(st.lines.filter(function (l) { return l.fixed; }).map(function (l) { return expAmt(l.amount) || 0; }))) * 10) / 10;
+        else total = Math.round((12 + (seed % 17000) / 100 + linesTotal()) * 10) / 10;
         if (st.pendingAmount && expAmt(st.pendingAmount)) total = expAmt(st.pendingAmount);
         var read = ['RM ' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })];
         st.total = total; fillRemainder();
@@ -480,7 +480,15 @@ function expCategories() {
       UI.switch({ id: 'cf-c', key: 'needsCar', label: 'Must select car', checked: !!f.needsCar, help: 'The entry cannot be saved without a car. A booking\'s car counts.' }) +
       (handover || f.paysStaff ? '' : UI.switch({ id: 'cf-k', key: 'alsoKept', label: 'Also kept on a service record or a paper', checked: !!f.alsoKept, help: 'Shows a reminder to enter the price in one place only, so it is not counted twice.' })) +
       (f.paysStaff ? '<p class="b2">' + i('user-dollar') + ' Payment to staff asks who it went to. It shows on their Staff report as money they hold and is not a cost of a car or booking.</p>' : '') +
-      '<div class="row gap8 exp-cfb">' + UI.btn('Cancel', { kind: 'g', size: 'sm', attrs: { 'data-cfx': '1' } }) + UI.btn(isNew ? 'Add category' : 'Save', { size: 'sm', icon: 'check', attrs: { 'data-cfs': '1' } }) + '</div></div>';
+      '<p class="b2 exp-cfh" data-cfh role="status">' + esc(cfHint(f)) + '</p><div class="row gap8 exp-cfb">' + UI.btn('Cancel', { kind: 'g', size: 'sm', attrs: { 'data-cfx': '1' } }) + UI.btn(isNew ? 'Add category' : 'Save', { size: 'sm', icon: 'check', attrs: { 'data-cfs': '1' } }) + '</div></div>';
+  };
+  /* what is still missing before the category can be saved, as one sentence */
+  var cfHint = function (f) {
+    var nm = String(f.name || '').trim(), at = String(f.fixedAmount == null ? '' : f.fixedAmount).trim(), miss = [];
+    if (!nm) miss.push('type a name');
+    if (at && expAmt(at) == null) miss.push('fix the amount (a number above 0 with at most 2 decimals, or empty)');
+    if (nm && D().expenseCats.some(function (x) { return x.name.toLowerCase() === nm.toLowerCase() && x.id !== f.id; })) miss.push('choose another name (there is already a category called ' + nm + ')');
+    return miss.length ? 'To save, ' + expList(miss) + '.' : 'Ready to save.';
   };
   var daysHtml = function () {
     var wrong = st.days.trim() !== '' && !/^\d+$/.test(st.days.trim()) || st.days.trim() === '0', cur = expEditDays();
@@ -510,7 +518,9 @@ function expCategories() {
   dl.body.addEventListener('input', function (ev) { if (ev.target.getAttribute('data-key') === 'days') { st.days = ev.target.value; var b = dl.body.querySelector('[data-dsave]'), cur2 = expEditDays(), v = st.days.trim(); if (b) b.disabled = (v !== '' && !/^[1-9]\d*$/.test(v)) || v === (cur2 == null ? '' : String(cur2)); } });
   dl.body.addEventListener('change', function (ev) { var k = ev.target.getAttribute('data-key'); if (k === 'days') { var dv = st.days.trim(); if (dv !== '' && !/^[1-9]\d*$/.test(dv)) redraw(); } else if (k === 'locked') { keepForm(); redraw(); } else if (k === 'fixedAmount') keepForm(); });
   dl.body.addEventListener('input', function (ev) {
-    if (ev.target.getAttribute('data-key') !== 'fixedAmount') return;
+    var hk = ev.target.getAttribute('data-key'), hp = dl.body.querySelector('[data-cfh]');
+    if (hp && cur() && (hk === 'name' || hk === 'fixedAmount')) { var tmp = Object.assign({}, cur()); tmp[hk] = ev.target.value; if (hk === 'name') cur().name = ev.target.value; hp.textContent = cfHint(tmp); }
+    if (hk !== 'fixedAmount') return;
     var has = ev.target.value.trim() !== '', lk = dl.body.querySelector('#cf-l'), c = cur(), ho = c && c.agentFee, p = dl.body.querySelector('.exp-cfa p.b2');
     if (lk && !ho) { lk.disabled = !has; if (!has) lk.checked = false; }
     if (p && !ho) p.textContent = !has ? 'Empty: people type the amount each time.' : lk && lk.checked ? 'Every entry uses this amount and it cannot be changed.' : 'The form fills in this amount and people can change it.'; });
@@ -636,8 +646,10 @@ PAGES['expenses'] = {
       rptXlsx('expenses-' + mk + '.xlsx', rptExpBook(rows, expMonthName(m0) + ' (' + UI.fmt.date(m0) + ' to ' + UI.fmt.date(new Date(m1.getTime() - DAY)) + ')', fl || (all ? 'None: every entry of the month' : 'Only the expenses you recorded')));
       DB.log('Exported', 'Expense', '', me().name + ' downloaded the expenses of ' + expMonthName(m0) + ' (Excel)');
     });
-    if (P.action === 'add' && !ctx.state.opened) { ctx.state.opened = true; var pre = {}; ['car', 'booking', 'amount', 'cat', 'staff'].forEach(function (k) { if (P[k]) pre[k] = P[k]; }); setTimeout(function () { ctx.setParams({ action: null, car: null, booking: null, amount: null, cat: null, staff: null }); expSheet(null, pre); }, 30); }
-    if (P.expense && !ctx.state.opened) { ctx.state.opened = true; setTimeout(function () { expOpen(P.expense); }, 30); }
+    /* address actions open once: the parameters are taken off the address straight away (no redraw), so the next visit
+       with the same link opens again and a redraw does not open twice */
+    if (P.action === 'add') { var pre = {}; ['car', 'booking', 'amount', 'cat', 'staff'].forEach(function (k) { if (P[k]) pre[k] = P[k]; }); ctx.setParams({ action: null, car: null, booking: null, amount: null, cat: null, staff: null }); setTimeout(function () { expSheet(null, pre); }, 30); }
+    else if (P.expense) { var xid = P.expense; ctx.setParams({ expense: null }); setTimeout(function () { expOpen(xid); }, 30); }
   }
 };
 API.addExpense = function (prefill) { if (!can('expenses.add') && !can('expenses.add_business')) { UI.toast('You cannot add expenses.', { tone: 'warn' }); return; } expSheet(null, prefill || {}); };

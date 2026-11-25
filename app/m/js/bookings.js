@@ -1,7 +1,7 @@
 /* ---------------- BOOKINGS (M1 builder owns this file) ----------------
    List with quick chips, filters and search; booking detail with next step, two status axes, money, documents,
    customer, deposit, inspection, staff and history; change, extend, cancel and delete sheets.
-   The old simple payment / handover / take-back sheets stay at the bottom as fallbacks for Pay.open and Handover.start. */
+   Payments go through Pay.open (payments.js), handovers and take backs through Handover.start (handover.js). */
 
 /* ---------------- list state ---------------- */
 var bkSearch = '';
@@ -55,6 +55,7 @@ VIEWS.bookings = function (r) {
     '<button type="button" class="bk-clear" id="bkclear" aria-label="Clear search"' + (bkSearch ? '' : ' hidden') + '>' + I('x', 2.2) + '</button></label>' +
     '<button type="button" class="bk-fbtn' + (bkFilterCount() ? ' on' : '') + '" id="bkfbtn" onclick="bkFilterSheet()">' + I('filter') + '<span>Filters</span>' + (bkFilterCount() ? '<b class="bk-badge">' + bkFilterCount() + '</b>' : '') + '</button></div>' +
     '<div class="bk-quick"><a href="#availability">' + I('car') + 'Free cars</a><a href="#calendar">' + I('cal') + 'Calendar</a></div>' +
+    (typeof NB_DRAFT === 'function' && can('bookings.create') ? (function () { try { return NB_DRAFT(); } catch (e) { return ''; } })() : '') +
     '<div class="chiprow" id="bkchips"></div><div id="bkfon"></div>' +
     '<div id="bklist" style="margin-top:8px"></div></main>';
   return { html: html, after: function () {
@@ -128,7 +129,7 @@ function bkFilterSheet() {
       $$('.bk-multi button', sh).forEach(function (btn) { btn.onclick = function () { btn.classList.toggle('on'); }; });
       $('#fcar', sh).onclick = function (e) {
         if (e.target.closest('[data-x]')) { d.car = ''; this.className = 'carfield empty-car'; this.innerHTML = carBtn(); return; }
-        var el = this; Pickers.car({ showBusy: true, selected: d.car, title: 'Bookings of which car?', onPick: function (c) { d.car = c.id; el.className = 'carfield picked-car'; el.innerHTML = carBtn(); } });
+        var el = this; Pickers.car({ showBusy: true, all: true, selected: d.car, title: 'Bookings of which car?', onPick: function (c) { d.car = c.id; el.className = 'carfield picked-car'; el.innerHTML = carBtn(); } });
       };
       $$('.bk-qd button', sh).forEach(function (btn) { btn.onclick = function () {
         var q = btn.dataset.q, t = sod(new Date());
@@ -289,7 +290,16 @@ function bkInspection(b) {
   var custH = cu ? '<div class="bk-insp"><div class="bk-insp-h">' + chip('Done', 'green') + '<b>Customer check</b><span class="muted small">' + esc(when(cu.at)) + '</span></div><div class="small muted">' + (cu.photos || []).length + ' photo' + ((cu.photos || []).length === 1 ? '' : 's') + '</div>' +
       '<div class="thumbs">' + (cu.photos || []).map(function (s, i) { return bkThumb(s, 'Customer ' + (i + 1)); }).join('') + '</div></div>' :
     '<div class="bk-insp"><div class="bk-insp-h">' + chip('Not done', 'grey') + '<b>Customer check</b></div><div class="small muted">Send the customer inspection link above</div></div>';
-  return '<div class="card bk-insps">' + agent + custH + '</div>';
+  var rt = ins.ret, retH = '';
+  if (rt) {
+    var dp = rt.damagePhotos || [];
+    retH = '<div class="bk-insp"><div class="bk-insp-h">' + chip('Done', 'green') + '<b>Return check</b><span class="muted small">' + esc(when(rt.at)) + (rt.by ? ' · ' + esc(who(rt.by)) : '') + '</span></div>' +
+      '<div class="small muted">' + (rt.km ? (+rt.km).toLocaleString('en-US') + ' km' : 'No km') + (rt.trusted === false ? ' (not trusted)' : '') + (ag && ag.km && rt.km > ag.km ? ' · ' + (rt.km - ag.km).toLocaleString('en-US') + ' km driven' : '') + (rt.fuel ? ' · Fuel ' + esc(rt.fuel) : '') + '</div>' +
+      '<div class="small">' + (rt.lateHours ? chip(rt.lateHours + ' hour' + (rt.lateHours === 1 ? '' : 's') + ' late', 'red') + ' ' : '') + (rt.damage ? chip('New damage', 'amber') : chip('No new damage', 'green')) + '</div>' +
+      (rt.damage && rt.damageNote ? '<div class="small bk-dmgnote">' + esc(rt.damageNote) + '</div>' : '') +
+      (dp.length || rt.odometer ? '<div class="thumbs">' + dp.map(function (s, i) { return bkThumb(s, 'Damage ' + (i + 1)); }).join('') + (rt.odometer ? bkThumb(rt.odometer, 'Odometer at return') : '') + '</div>' : '') + '</div>';
+  }
+  return '<div class="card bk-insps">' + agent + retH + custH + '</div>';
 }
 function bkStaff(b) {
   var ppl = (b.assigned || []).map(staff).filter(Boolean);
@@ -490,7 +500,7 @@ function doCancel(id, reason, money, paid) {
   setBookingStatus(b, 'Cancelled', { text: 'Booking cancelled (' + b.cancelReason + mt + ')' });
   if (money) b.cancelMoney = money;
   save(); render(false, true);
-  undoSnack(b.code + ' cancelled', function () { b.cancelReason = prevReason; delete b.cancelMoney; setBookingStatus(b, prev, { text: 'Cancel undone' }); render(false, true); say('Booking is back'); }, 6000);
+  undoSnack(b.code + ' cancelled', function () { if (SHEETS.length) closeAllSheets(); b.cancelReason = prevReason; delete b.cancelMoney; setBookingStatus(b, prev, { text: 'Cancel undone' }); render(false, true); say('Booking is back'); }, 6000);
   if (money === 'refund') later(function () { if (bk(id) && bk(id).bookingStatus === 'Cancelled') Deposit.open(id); }, 400);
 }
 function deleteBk(id) {
@@ -507,66 +517,7 @@ function deleteBk(id) {
       if (matchBookingCode(bkSearch, b)) bkSearch = ''; /* the search pointed at this booking: do not land on an empty list */
       audit('Booking ' + b.code + ' deleted (' + cust(b.cust).name + ', ' + dShort(b.start) + ')', { cust: b.cust, car: b.car, link: '#bookings/all' }); save();
       /* wait until the confirm sheet has taken its history step back, then swap the page without a Back step */
-      setTimeout(function () { replaceHash('#bookings/all'); say(b.code + ' deleted'); }, 180);
+      setTimeout(function () { if (window.__nav > 0) goBack('#bookings/all'); else replaceHash('#bookings/all'); say(b.code + ' deleted'); }, 180);
     });
 }
 
-/* ---------------- simple handover sheets, used by Handover.start until M5 builds the real checklist ---------------- */
-function fuelSeg() { return '<div class="seg" id="fuel">' + ['Full', '3/4', '1/2', '1/4', 'Empty'].map(function (x, i) { return '<button type="button" class="' + (i === 0 ? 'on' : '') + '">' + x + '</button>'; }).join('') + '</div>'; }
-function lastKm(carId) { var r = (S.odometer || []).filter(function (o) { return o.car === carId && o.trusted !== false; }).sort(function (a, b) { return b.km - a.km; })[0]; return r ? r.km : (car(carId) || {}).km || 0; }
-function handover(id) {
-  var b = bk(id), p = calcBooking(b);
-  sheet(sheetHead('Hand over ' + (car(b.car) || {}).plate, cust(b.cust).name + ' at ' + placeText(b, 'pick')) +
-    (!b.submitted ? '<div class="banner amber">' + I('info') + '<div>The customer has not signed the booking form yet.</div></div>' : '') +
-    (p.due > 0 ? '<div class="banner amber">' + I('info') + '<div><b>' + rm(p.due) + '</b> is still due.</div></div>' : '') +
-    '<label class="field"><span>Fuel level</span>' + fuelSeg() + '</label>' +
-    '<label class="field"><span>Mileage (km)</span><input class="inp num" inputmode="numeric" id="km" placeholder="Last reading ' + lastKm(b.car).toLocaleString('en-US') + ' km"></label>' +
-    '<div class="sheet-foot"><button class="btn" onclick="doHandover(\'' + id + '\')">' + I('check', 2.4) + 'Car handed over</button></div>', function () { segPick('#fuel'); });
-}
-function doHandover(id) {
-  var b = bk(id), fuel = ($('#fuel .on') || {}).textContent, km = parseInt(digits($('#km').value), 10);
-  if (!(km > 0)) { say('Type the mileage from the dashboard'); $('#km').focus(); return; }
-  b.inspection = b.inspection || {}; b.inspection.agent = { photos: { handover: [], id: null, licence: null, odometer: null }, km: km, fuel: fuel, note: '', at: new Date().toISOString(), gps: null, by: S.me };
-  S.odometer = S.odometer || []; S.odometer.push({ id: uid(), car: b.car, km: km, at: new Date().toISOString(), source: 'handover', by: S.me, trusted: km >= lastKm(b.car), booking: b.id });
-  var c = car(b.car); if (c && km > (c.km || 0)) c.km = km;
-  setBookingStatus(b, 'Car Delivered', { text: 'Car handed over at ' + placeText(b, 'pick') + ' (' + fuel + ', ' + km.toLocaleString('en-US') + ' km)' });
-  closeSheet(); notify('change', b.code + ' is on the road', '', '#booking/' + b.id, { self: true }); render(false, true);
-}
-function takeBack(id) {
-  var b = bk(id);
-  sheet(sheetHead('Take back ' + (car(b.car) || {}).plate, cust(b.cust).name + ' at ' + placeText(b, 'ret')) +
-    '<label class="field"><span>Fuel level</span>' + fuelSeg() + '</label>' +
-    '<label class="field"><span>Mileage (km)</span><input class="inp num" inputmode="numeric" id="km" placeholder="At handover ' + ((b.inspection && b.inspection.agent && b.inspection.agent.km) || lastKm(b.car)).toLocaleString('en-US') + ' km"></label>' +
-    '<label class="field"><span>Any new damage?</span><div class="seg" id="dmg"><button type="button" class="on">No</button><button type="button">Yes</button></div></label>' +
-    '<div class="sheet-foot"><button class="btn" onclick="doTakeBack(\'' + id + '\')">' + I('check', 2.4) + 'Car returned</button></div>', function () { segPick('#fuel'); segPick('#dmg'); });
-}
-function doTakeBack(id) {
-  var b = bk(id), dmg = ($('#dmg .on') || {}).textContent === 'Yes', fuel = ($('#fuel .on') || {}).textContent, km = parseInt(digits($('#km').value), 10);
-  if (!(km > 0)) { say('Type the mileage from the dashboard'); $('#km').focus(); return; }
-  b.returnKm = km; b.returnFuel = fuel;
-  S.odometer = S.odometer || []; S.odometer.push({ id: uid(), car: b.car, km: km, at: new Date().toISOString(), source: 'return', by: S.me, trusted: km >= lastKm(b.car), booking: b.id });
-  var c = car(b.car); if (c && km > (c.km || 0)) c.km = km;
-  setBookingStatus(b, 'Car Returned', { text: 'Car returned at ' + placeText(b, 'ret') + ' (' + fuel + ', ' + km.toLocaleString('en-US') + ' km' + (dmg ? ', new damage noted' : ', no new damage') + ')' });
-  closeSheet(); notify('change', b.code + ' returned', '', '#booking/' + b.id, { self: true }); render(false, true);
-}
-/* simple payment sheet, used by Pay.open until M3 builds the real one */
-function payment(id) {
-  var b = bk(id), p = calcBooking(b), depDue = Math.max(0, p.deposit - p.depositReceived), rentDue = Math.max(0, p.due - depDue), depFirst = !b.paymentStatus || b.paymentStatus === 'Deposit Due';
-  sheet(sheetHead('Record payment', b.code + ' · ' + cust(b.cust).name) +
-    '<label class="field"><span>What is it for?</span><div class="seg" id="pkind"><button type="button" class="' + (depFirst ? 'on' : '') + '" data-k="Security deposit">Deposit<small>' + rm(depDue) + ' due</small></button><button type="button" class="' + (depFirst ? '' : 'on') + '" data-k="Rental payment">Rent<small>' + rm(rentDue) + ' due</small></button></div></label>' +
-    '<label class="field"><span>Amount</span><div class="rmfield"><input class="inp num" id="pamt" inputmode="decimal" value="' + money2(depFirst ? depDue : rentDue) + '"></div></label>' +
-    '<label class="field"><span>How did they pay?</span><div class="seg" id="pmeth"><button type="button" class="on">Online Transfer</button><button type="button">Cash</button><button type="button">Card</button></div></label>' +
-    '<div class="sheet-foot"><button class="btn" onclick="doPayment(\'' + id + '\')">' + I('check', 2.4) + 'Save payment</button></div>', function () {
-      segPick('#pmeth'); segPick('#pkind', function (t, btn) { $('#pamt').value = money2(btn.dataset.k === 'Security deposit' ? depDue : rentDue); });
-    });
-}
-function doPayment(id) {
-  var b = bk(id), amt = parseMoney($('#pamt').value), kind = $('#pkind .on').dataset.k, meth = $('#pmeth .on').textContent;
-  if (!(amt > 0)) { say('Type the amount, for example 150.00'); return; }
-  var pay = newPayment({ items: [{ kind: kind, amt: amt }], method: meth, by: S.me, cashTo: meth === 'Cash' ? S.me : null });
-  b.payments.push(pay);
-  var ns = nextPaymentStatus(b, pay.items);
-  bLog(b, rm(amt) + ' ' + kind.toLowerCase() + ' received by ' + meth.toLowerCase());
-  if (ns) setPaymentStatus(b, ns, 'payment recorded');
-  save(); closeSheet(); notify('pay', rm(amt) + ' received', '', '#booking/' + b.id, { self: true }); render(false, true);
-}

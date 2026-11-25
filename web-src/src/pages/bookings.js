@@ -437,8 +437,21 @@ function bkOpenBooking(code, prefill) {
     startOpt: optOf(x.startOpt, x.pickup), endOpt: optOf(x.endOpt, x.drop), delNote: x.delNote, retNote: x.retNote, method: x.method, pay: x.pay || '', status: x.status, signature: x.signature || '', filledByAdmin: x.filledByAdmin, submitted: x.submitted }
     : { car: carPre ? carPre.id : '', start: s0, end: e0, rate: carPre ? carPre.rate : 0, hourly: carPre ? carPre.hourly : 0, dep: carPre ? carPre.deposit : 0, disc: 0, pkg: CO().packageDefault || '', covName: '', covDaily: '', covMax: '', deliv: 0, ret: 0, others: 0, startOpt: 'Not chosen', endOpt: 'Not chosen', delNote: '', retNote: '', method: 'Online Transfer', pay: '', status: 'Pending', signature: (d.signatures[0] || {}).id || '', filledByAdmin: true, submitted: false };
   if (v.pkg && v.pkg !== 'manual' && !byId(d.damagePackages, v.pkg)) v.pkg = '';
+  /* a lead (or any caller) can name the pick-up and return: an option value, its label, or just 'Pick-up from our location' */
+  var optPre = function (which, want) {
+    if (!want) return null; var list = handoverOptions(which), w = String(want);
+    var hit = list.filter(function (o) { return o.value === w || o.label === w; })[0] || list.filter(function (o) { return o.value.split('|')[0] === w; })[0] || list.filter(function (o) { return o.label.indexOf(w) === 0; })[0];
+    return hit ? hit.value : null;
+  };
+  if (!x) {
+    var so0 = optPre('start', prefill.startOpt), eo0 = optPre('end', prefill.endOpt), fee0 = function (which, val) { var o = handoverOptions(which).filter(function (z) { return z.value === val; })[0]; return o && o.fee != null ? o.fee : 0; };
+    if (so0) { v.startOpt = so0; v.deliv = fee0('start', so0); }
+    if (eo0) { v.endOpt = eo0; v.ret = fee0('end', eo0); }
+  }
+  var leadId = !x && prefill.lead ? prefill.lead : null;
   var custOf = function (c0) { c0 = c0 || {}; var em = c0.emergency || {}; return { name: c0.name || '', phone: c0.phone || '', email: c0.email || '', address: c0.address || '', nat: c0.nat || 'Malaysian', ic: c0.ic || '', licenceNo: c0.licenceNo || '', licenceExp: c0.licenceExp || null, emName: em.name || '', emPhone: em.phone || '', emRel: em.rel || '' }; };
   var cust = custOf(p);
+  if (!x && !p) { if (prefill.name) cust.name = String(prefill.name); if (prefill.phone) cust.phone = bkTidyPhone(String(prefill.phone)); }
   var check = { files: [], read: null, results: null, valid: null, filled: '', why: '', fill: false, error: '' }, dirty = false, saved = false, offData = null, carCtl = null, custCtl = null, avail = { key: '', res: { free: true } }, prevEnd = v.end;
   var onPage = S.page === 'bookings' && CUR && CUR.ctx;
   var refLocked = function () { var f = dr && dr.body ? form() : {}; var e = f.end ? UI.parseDate(f.end) : v.end; return !canPickRefunded({ end: e, pay: x ? x.pay : '' }); };
@@ -543,7 +556,7 @@ function bkOpenBooking(code, prefill) {
     body: function (el, ctl) {
       dr = ctl;
       el.innerHTML = '<div class="bkx-dl' + (x ? ' two hb' : '') + '"><div class="bkx-banner">' + (p && typeof cuBanner === 'function' ? cuBanner(p) : '') + '</div>' + (x ? '<aside class="bkx-side" id="bkx-side">' + sideHtml() + '</aside>' : '') + '<div class="bkx-main">' + formHtml() + '</div></div>';
-      var n = el.querySelector('#bkx-notes'); if (n && typeof cuNotesMount === 'function') cuNotesMount(n, p, { onChange: function () { drawBanner(); } });
+      var n = el.querySelector('#bkx-notes'); if (n && typeof cuNotesMount === 'function') cuNotesMount(n, p, { booking: x ? x.code : null, onChange: function () { drawBanner(); } });
       var ic = el.querySelector('#bkx-ic'); if (ic && typeof cuIcMount === 'function') cuIcMount(ic, p, { bookingName: function () { var f = el.querySelector('[data-key="name"]'); return f ? f.value : p.name; } });
       mountDocs(isNew && pre ? pre.docs : null);
       var fe = el.querySelector('#bkx-fees'); if (fe) fe.innerHTML = feesHtml();
@@ -715,7 +728,11 @@ function bkOpenBooking(code, prefill) {
     var n = Math.max.apply(0, d.bookings.map(function (z) { return z.n; }).concat([B().startNo || 0])) + 1, code2 = B().code + '-' + String(n).padStart(5, '0'), hx = function () { return Math.random().toString(16).slice(2, 10); };
     var nb = Object.assign({ n: n, code: code2, id: code2, received: 0, agent: '', created: NOW(), inspected: false, formId: B().id.slice(0, 3) + '-' + hx(), agentToken: 'agt-' + hx(), submittedAt: rec.submitted ? NOW() : null, ip: '', agentIds: [] }, rec);
     if (nb.submitted) nb.custSig = { typed: person.name };
+    if (leadId) nb.lead = leadId;
     DB.add('bookings', nb, { text: DB.actor() + ' created booking ' + code2 + ' (' + car.plate + ')' });
+    /* a booking made from a lead marks that lead as booked */
+    var ld = leadId && D().leads ? byId(D().leads, leadId) : null;
+    if (ld) DB.update('leads', ld, { status: 'closed', booking: code2, heldUntil: null, reason: 'Booked', closedAt: NOW() }, { where: 'Lead', text: DB.actor() + ' booked the lead of ' + (ld.name || ld.phone) + ' as ' + code2 });
     UI.toast('Booking ' + code2 + ' created.' + tail2 + ' Send the booking form to ' + person.name.split(' ')[0] + '.', { ms: 6000, action: { label: 'Send form', run: function () { bkSendForm(nb); } } });
     return true;
   }
@@ -968,7 +985,7 @@ PAGES['bookings'] = {
       { key: 'docs', label: 'Documents', render: function (x) { return '<div class="bkx-ics">' + docsCell(x) + (can2('tasks.create') ? UI.iconBtn('calendar-plus', 'Assign Task', { size: 'sm', attrs: { 'data-bk': 'task' } }) : '') + '</div>'; } }
     ];
     var t = UI.table(root.querySelector('#bkx-t'), {
-      columns: cols, rows: rows, rowKey: 'code', minWidth: 1080, selectable: can2('bookings.edit') || can2('bookings.delete') || can2('bookings.view'), selected: st.sel, noun: 'booking',
+      columns: cols, rows: rows, rowKey: 'code', minWidth: 1080, selectable: can2('bookings.edit') || can2('bookings.delete') || can2('bookings.view'), selected: st.sel, noun: 'booking', selLabel: 'selected',
       sort: st.sort, onSort: function (s) { st.sort = s; }, page: st.page, onPage: function (pg) { st.page = pg; }, pageSize: st.size || 10, pageSizes: [10, 25, 50, 100], maxHeight: 'min(74vh,900px)',
       rowClass: function (x) { return 'bkx-r' + (x.status === 'Cancelled' ? ' bkx-cx' : ''); },
       /* Edit and Delete only show here, once rows are ticked */

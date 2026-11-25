@@ -579,7 +579,7 @@ function rptModel(id, st, r) {
   } else if (id === 'deposits') {
     var Z = d.bookings.filter(function (x) { return rptIn(x.car.id) && x.dep > 0 && x.status !== 'Cancelled' && x.status !== 'Pending' && x.end >= r.from && x.end < r.end && x.end <= NOW(); }).map(function (x) { return depFor(x.code); });
     var kinds = {}, recv = 0, kept = 0, ret = 0, wait = 0, waitN = 0;
-    var rowsD = Z.map(function (z) { var x = findBooking(z.booking), g = depReceived(z.booking), k = depKept(z), s = depState(z); recv += g; kept += k; if (z.refund) ret += z.refund.amount; if (s === 'waiting') { wait += depDue(z); waitN++; } z.deductions.forEach(function (dd) { kinds[dd.kind] = kinds[dd.kind] || [dd.kind, 0, 0]; kinds[dd.kind][1]++; kinds[dd.kind][2] += Number(dd.amount) || 0; }); return [{ t: z.booking, s: x.cust.name }, car2(x.car), x.end, g, k, z.deductions.map(function (dd) { return dd.kind; }).join(', ') || '-', z.refund ? z.refund.amount : s === 'waiting' ? depDue(z) : '', z.refund ? depHow(z.refund) : s === 'hand' ? 'Marked by hand' : '-', z.refund ? z.refund.at : '', s === 'returned' ? 'Returned' : s === 'hand' ? 'Marked by hand' : 'Waiting']; });
+    var rowsD = Z.map(function (z) { var x = findBooking(z.booking), g = depReceived(z.booking), k = depKept(z), s = depState(z); recv += g; kept += k; if (z.refund) ret += z.refund.amount; if (s === 'waiting') { wait += depDue(z); waitN++; } z.deductions.forEach(function (dd) { kinds[dd.kind] = kinds[dd.kind] || [dd.kind, 0, 0]; kinds[dd.kind][1]++; kinds[dd.kind][2] += Number(dd.amount) || 0; }); return [{ t: z.booking, s: x.cust.name }, car2(x.car), x.end, g, k, z.deductions.map(function (dd) { return dd.kind; }).join(', ') || '-', z.refund ? z.refund.amount : s === 'waiting' ? depDue(z) : '', z.refund ? depHow(z.refund) : s === 'hand' ? 'Marked by hand' : s === 'used' ? 'Used for payments' : s === 'none' ? 'No deposit taken' : '-', z.refund ? z.refund.at : '', s === 'returned' ? 'Returned' : s === 'hand' ? 'Marked by hand' : s === 'used' ? 'Used for payments' : s === 'none' ? 'No deposit taken' : 'Waiting']; });
     m.kpis = [{ l: 'Deposits received', raw: recv, t: 'money', note: plural(Z.length, 'booking') }, { l: 'Kept', raw: kept, t: 'money', note: 'Damage, fuel, summons...' }, { l: 'Returned', raw: ret, t: 'money', note: 'Refunds recorded' }, { l: 'Waiting to be returned', raw: wait, t: 'money', note: plural(waitN, 'deposit') }];
     m.sections.push({ title: 'Kept from deposits', cols: [{ l: 'Reason', w: 26 }, { l: 'Times', t: 'int', a: 'r', w: 9 }, { l: 'Amount', t: 'money', a: 'r', w: 13 }], rows: Object.keys(kinds).map(function (k) { return kinds[k]; }).sort(function (a, b) { return b[2] - a[2]; }), total: ['Total', '', kept], preview: 99, empty: 'Nothing was kept from deposits in this period.' });
     m.sections.push({ title: 'Deposits', sheet: 'Deposits', cols: [{ l: 'Booking', w: 15 }, { l: 'Car', w: 17 }, { l: 'Car back', t: 'date', w: 10 }, { l: 'Received', t: 'money', a: 'r', w: 10 }, { l: 'Kept', t: 'money', a: 'r', w: 9 }, { l: 'Kept for', w: 12 }, { l: 'Returned / to return', t: 'money', a: 'r', w: 12 }, { l: 'How', w: 18 }, { l: 'Refunded on', t: 'date', w: 11 }, { l: 'Status', w: 11 }],
@@ -785,7 +785,7 @@ function rptCarsCounted(onDone) {
 
 PAGES['reports'] = {
   title: 'Reports',
-  search: RPT_LIST.map(function (L) { return { label: 'Report: ' + L.name, icon: L.icon, run: function () { go('reports', { report: L.id }); } }; }).concat([{ label: 'Cars counted in reports', icon: 'car-off', run: function () { go('reports'); setTimeout(function () { rptCarsCounted(function () { go('reports'); }); }, 80); } }]),
+  search: RPT_LIST.map(function (L) { return { label: 'Report: ' + L.name, icon: L.icon, run: function () { go('reports', { report: L.id }); } }; }).concat([{ label: 'Cars counted in reports', icon: 'car-off', run: function () { go('reports', { action: 'carscounted' }); } }]),
   render: function (root, ctx) {
     if (!ctx.can('reports.view')) { root.innerHTML = UI.empty({ icon: 'lock', title: 'You do not have access to Reports', text: 'Ask the owner to give your account the Reports permission.' }); return; }
     var st = ctx.state, canAmt = ctx.can('reports.see_amounts'), canDl = ctx.can('reports.export_excel'), canLog = ctx.can('users.view_audit');
@@ -834,6 +834,8 @@ PAGES['reports'] = {
     drawOpts(); drawPreview();
     UI.on(root, 'click', '[data-rep]', function (ev, el) { ctx.setParams({ report: el.getAttribute('data-rep') === 'bookings' ? null : el.getAttribute('data-rep') }); ctx.refresh(); if (window.innerWidth < 900) setTimeout(function () { var c = document.getElementById('rpt-card'); if (c) c.scrollIntoView({ block: 'start' }); }, 30); });
     UI.on(root, 'click', '[data-cc-open]', function () { rptCarsCounted(function () { ctx.refresh(); }); });
+    /* go('reports', {action: 'carscounted'}) opens the Cars counted dialog */
+    if (ctx.params.action === 'carscounted') { ctx.setParams({ action: null }); setTimeout(function () { rptCarsCounted(function () { ctx.refresh(); }); }, 0); }
     root.querySelector('[data-tq]').addEventListener('input', function (ev) { st.tq = ev.target.value; root.querySelector('#rpt-tiles').innerHTML = tilesHtml(); });
     UI.on(optsEl, 'click', '[data-per]', function (ev, el) { var k = el.getAttribute('data-per'); if (k === 'custom' && o.key !== 'custom') { var r0 = range(); if (!r0.err) { o.from = rptIso(r0.from); o.to = rptIso(r0.to); } } o.key = k; changed(); });
     UI.on(optsEl, 'click', '[data-src]', function (ev, el) { o.src = el.getAttribute('data-src'); changed(); });
@@ -869,4 +871,4 @@ API.bookingsExcel = function (o) {
   return rptXlsx(m.file + '.xlsx', m.sheets());
 };
 API.openReport = function (id) { go('reports', { report: id === 'profit' ? 'carprofit' : id }); };
-API.carsCounted = function () { go('reports'); setTimeout(function () { rptCarsCounted(function () { go('reports'); }); }, 80); };
+API.carsCounted = function () { go('reports', { action: 'carscounted' }); };

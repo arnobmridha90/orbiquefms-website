@@ -366,6 +366,7 @@ function invUsedHtml(f) { return f ? UI.alert(invUsedText(f), 'bad', { icon: 'co
 function invUsedOpen(v) {
   var pr = String(v).split('|');
   if (pr[0] === 'refund') { if (API.openDeposit) API.openDeposit(pr[1]); return; }
+  if (pr[0] === 'bank-in') { var bi = byId(D().bankIns || [], pr[2]); if (bi) invBankInSlip(bi); return; }
   var p = byId(D().payments, pr[2]);
   if (p && p.receipt) invPreview(p.receipt); else if (p && (p.slips || []).length) invSlipViewer(p); else API.openBooking(pr[1]);
 }
@@ -444,7 +445,7 @@ function invVoidPayment(p) {
   var keep = p.void; p.void = { at: NOW() }; var back = depositDueAfterVoid(x); p.void = keep;
   var r = p.receipt ? byId(D().receipts, p.receipt) : null, others = r && r.status !== 'Void' ? invRcpLive(r).filter(function (q) { return q !== p; }).length : 0;
   var lines = [];
-  if (r && r.status !== 'Void') lines.push(others ? 'It drops off receipt ' + r.no + ', which keeps its other ' + plural(others, 'payment') + '.' : 'Receipt ' + r.no + ' is voided too: this is its only payment.');
+  if (r && r.status !== 'Void') lines.push(others ? 'It drops off receipt ' + r.no + ', which keeps ' + (others === 1 ? 'its other payment' : 'its other ' + others + ' payments') + '.' : 'Receipt ' + r.no + ' is voided too: this is its only payment.');
   lines.push(back ? 'The booking goes back to Deposit due, because its deposit is no longer fully recorded.' : 'The booking\'s payment status stays ' + (x.pay || 'as it is') + '.');
   if (src) lines.push(UI.fmt.money(p.amount) + ' goes back to the deposit of ' + src + '.');
   return UI.confirm({ title: 'Void payment', text: 'Void the payment of ' + UI.fmt.money(p.amount) + ' (' + invKindsText(p) + ') on ' + p.booking + '? It stays on record, marked VOID.', html: UI.alert(lines.join(' '), back ? 'warn' : 'info', { html: false }), ok: 'Void payment', danger: true, width: 'md', input: { label: 'Reason', placeholder: 'For example: recorded twice by mistake', required: true } }).then(function (reason) {
@@ -464,8 +465,8 @@ function invVoidPayment(p) {
 function invRedrawSoon(root, redraw) {
   setTimeout(function () {
     var a = document.activeElement, sel = null, idx = 0;
-    if (a && root.contains(a) && a.tagName !== 'BUTTON') {
-      sel = a.getAttribute('data-key') ? '[data-key="' + a.getAttribute('data-key') + '"]' : a.getAttribute('data-xk') ? '[data-xk="' + a.getAttribute('data-xk') + '"]' : a.id ? '#' + a.id : null;
+    if (a && root.contains(a) && (a.tagName !== 'BUTTON' || a.getAttribute('data-how'))) {
+      sel = a.getAttribute('data-how') ? '[data-how="' + a.getAttribute('data-how') + '"]' : a.getAttribute('data-key') ? '[data-key="' + a.getAttribute('data-key') + '"]' : a.getAttribute('data-xk') ? '[data-xk="' + a.getAttribute('data-xk') + '"]' : a.id ? '#' + a.id : null;
       if (sel) idx = [].indexOf.call(root.querySelectorAll(sel), a);
     }
     redraw();
@@ -497,12 +498,12 @@ function invRecentDup(o) {
 /* ---------------- booking picker: code in any form, name, phone, plate; every match; two-line rows ---------------- */
 function invBookingPicker(el, o) {
   o = o || {};
-  var toggles = (o.dueToggle === false ? [] : [{ key: 'due', label: 'Only bookings with money due', value: !!o.due }]).concat([{ key: 'cancelled', label: 'Show cancelled bookings', value: false }]);
+  var toggles = (o.dueToggle === false ? [] : [{ key: 'due', label: 'Only bookings with money due', value: !!o.due, narrows: true }]).concat([{ key: 'cancelled', label: 'Show cancelled bookings', value: false }]);
   var near = TODAY.getTime();
   return UI.combo(el, {
     key: o.key || 'booking', label: o.label || 'Booking', required: o.required !== false, value: o.value || '', help: o.help, error: o.error,
     placeholder: o.placeholder || 'Choose the booking', title: o.title || 'Choose the booking', searchPlaceholder: 'Booking ID, name, phone or plate', recentKey: 'invbk-' + B().id, popWidth: 440,
-    emptyText: o.emptyText || 'No bookings with money due. Turn off "Only bookings with money due" to see the rest.', noMatchHelp: 'Try the Booking ID (' + (D().bookings[0] || {}).code + ' or just ' + ((D().bookings[0] || {}).n || 1) + '), part of the name, the phone or the plate. Paid bookings show when "Only bookings with money due" is off.',
+    emptyText: o.emptyText || 'No bookings with money due.', noMatchHelp: 'Try the Booking ID (' + (D().bookings[0] || {}).code + ' or just ' + ((D().bookings[0] || {}).n || 1) + '), part of the name, the phone or the plate. Paid bookings show when "Only bookings with money due" is off.',
     toggles: toggles,
     items: function (s) {
       var list = D().bookings.filter(function (b) { return (s.toggles.cancelled || b.status !== 'Cancelled' || b.code === o.value) && (!s.toggles.due || invDueOf(b) > 0 || b.code === o.value) && (!o.filter || o.filter(b) || b.code === o.value); });
@@ -589,7 +590,8 @@ function invPayKeep(el, st) {
     if (st.method === 'Deposit adjustment' && st.items['Security deposit'].on) { st.items['Security deposit'].on = false; if (!invTicked(st.items).length) st.items['Rental payment'].on = true; invItemsRefresh(st.items, st.booking ? findBooking(st.booking) : null); }
   } else if (f.depositedTo) st.depositedTo = f.depositedTo;
   if (f.depOf) st.depOf = f.depOf;
-  if (f.afterCharge !== undefined && st.method === 'Card') { var auto = invAfterCharge(invItemsTotal(st.items), st.feePct); st.afterCharge = f.afterCharge === '' || f.afterCharge == null || Math.abs(Number(f.afterCharge) - auto) < .005 ? null : f.afterCharge; }
+  var acEl = el.querySelector('[data-after]');   /* only an amount the person typed counts as changed by hand */
+  if (f.afterCharge !== undefined && st.method === 'Card' && acEl && acEl.getAttribute('data-hand')) { var auto = invAfterCharge(invItemsTotal(st.items), st.feePct); st.afterCharge = f.afterCharge === '' || f.afterCharge == null || Math.abs(Number(f.afterCharge) - auto) < .005 ? null : f.afterCharge; }
   if (f.at) st.at = UI.parseDate(f.at);
   if (f.ref !== undefined) st.ref = f.ref;
   if (f.note !== undefined) st.note = f.note;
@@ -615,7 +617,9 @@ function invPayWire(el, getSt, redraw) {
     if (key === 'afterCharge') { invPayKeep(cardOf(t), st); st.afterErr = ''; redraw(t); }
   });
   el.addEventListener('input', function (ev) {
-    var t = ev.target, k = t.getAttribute('data-ita'); if (!k) return;
+    var t = ev.target, k = t.getAttribute('data-ita');
+    if (t.hasAttribute('data-after')) t.setAttribute('data-hand', '1');
+    if (!k) return;
     var st = getSt(t); if (!st) return;
     st.items[k].amount = t.value; st.items[k].touched = true;
     var box = t.closest('.inv-items'), ft = invItemsFootText(st.items);
@@ -733,7 +737,9 @@ function invLinesFor(x) {
 var INV_EXTRA_MAX = 20;
 function invCreateInvoice(code) {
   if (!can('billing.issue_invoice')) { UI.toast('You cannot issue invoices. Ask the owner for "Issue invoices".', { tone: 'warn' }); return; }
-  var st = { booking: code || '', note: '', extra: [], err: '' }, done = null;
+  /* the extra lines already on the live invoice come back, so Update keeps them and an unchanged booking does not look changed */
+  var extraOf = function (c) { var ex = c ? invInvoiceOf(c) : null; return ex ? (ex.lines || []).filter(function (l) { return l.extra; }).slice(0, INV_EXTRA_MAX).map(function (l) { return { desc: l.desc, qty: l.qty, unit: l.unit }; }) : []; };
+  var st = { booking: code || '', note: '', extra: extraOf(code), err: '' }, done = null;
   var keep = function (el) {
     var f = UI.form(el); if (f.note !== undefined) st.note = f.note;
     el.querySelectorAll('[data-xl]').forEach(function (row) { var k = +row.getAttribute('data-xl'), g = function (n) { var q = row.querySelector('[data-xk="' + n + '"]'); return q ? q.value : ''; }; if (st.extra[k]) { st.extra[k].desc = g('desc'); st.extra[k].qty = g('qty'); st.extra[k].unit = g('unit'); } });
@@ -799,8 +805,8 @@ function invCreateInvoice(code) {
     return [{ label: 'Cancel', kind: 'g' }, { label: 'Create invoice', icon: 'file-plus', disabled: !st.booking, onClick: function (d) { if (!pre(d)) return false; issue(x, 'new'); return false; } }];
   };
   var x0 = code ? findBooking(code) : null;
-  var dl = UI.dialog({ title: x0 && invInvoiceOf(x0.code) ? 'Update invoice' : 'Create invoice', subtitle: x0 ? x0.code + ' · ' + x0.cust.name : 'Choose the booking', width: 'md', body: function (el) { el.innerHTML = html(); var a = el.querySelector('[data-bkp="inv"]'); if (a) invBookingPicker(a, { value: st.booking, dueToggle: false, onChange: function (c) { st.booking = c; st.extra = []; st.err = ''; dl.setTitle(c && invInvoiceOf(c) ? 'Update invoice' : 'Create invoice', c ? c + ' · ' + findBooking(c).cust.name : 'Choose the booking'); redraw(); } }); }, buttons: foot(),
-    dirty: function () { return !done && st.extra.length > 0; } });
+  var dl = UI.dialog({ title: x0 && invInvoiceOf(x0.code) ? 'Update invoice' : 'Create invoice', subtitle: x0 ? x0.code + ' · ' + x0.cust.name : 'Choose the booking', width: 'md', body: function (el) { el.innerHTML = html(); var a = el.querySelector('[data-bkp="inv"]'); if (a) invBookingPicker(a, { value: st.booking, dueToggle: false, onChange: function (c) { st.booking = c; st.extra = extraOf(c); st.err = ''; dl.setTitle(c && invInvoiceOf(c) ? 'Update invoice' : 'Create invoice', c ? c + ' · ' + findBooking(c).cust.name : 'Choose the booking'); redraw(); } }); }, buttons: foot(),
+    dirty: function () { if (done) return false; keep(dl.body); var sig = function (a) { return a.map(function (l) { return [String(l.desc || '').trim(), String(l.qty), String(l.unit)].join('|'); }).join('/'); }; return sig(st.extra) !== sig(extraOf(st.booking)); } });
   var redraw = function () { if (!done) keep(dl.body); dl.refresh(); dl.setFoot(foot()); };
   dl.body.addEventListener('click', function (ev) {
     var v = ev.target.closest('[data-view]'), b; if (v) invPreview(v.getAttribute('data-view'));
@@ -808,7 +814,7 @@ function invCreateInvoice(code) {
     if (ev.target.closest('[data-xadd]')) { keep(dl.body); st.extra.push({ desc: '', qty: 1, unit: '' }); redraw(); var l = dl.body.querySelector('[data-xl="' + (st.extra.length - 1) + '"] [data-xk="desc"]'); if (l) l.focus(); }
     if ((b = ev.target.closest('[data-xrm]'))) { keep(dl.body); st.extra.splice(+b.getAttribute('data-xrm'), 1); redraw(); }
   });
-  dl.body.addEventListener('change', function (ev) { if (!ev.target.getAttribute('data-xk')) return; keep(dl.body); var x = findBooking(st.booking), pv = dl.body.querySelector('[data-xprev]'); if (x && pv) pv.innerHTML = prev(x); });
+  dl.body.addEventListener('change', function (ev) { if (!ev.target.getAttribute('data-xk')) return; keep(dl.body); var x = findBooking(st.booking), pv = dl.body.querySelector('[data-xprev]'); if (x && pv) pv.innerHTML = prev(x); if (st.err && x && !check(x)) { st.err = ''; var eb = dl.body.querySelector(':scope > .col > .alert.bad, .col.gap16 > .alert.bad:last-child'); if (eb) eb.remove(); } });
   return dl;
 }
 
@@ -953,7 +959,7 @@ function invUploadSlips() {
     Object.assign(c, invPayState(cand.code), { method: 'Online Transfer', depositedTo: 'Bank' });
     var k0 = invTicked(c.items)[0], amt = Number(c.items[k0].amount) || invDueOf(cand);
     c.slipAmount = invR2(amt).toFixed(2); c.items[k0].amount = c.slipAmount; c.items[k0].touched = true;
-    c.ref = 'FT' + String(26100000000 + cand.n * 7919 + c.id).slice(0, 12); c.at = new Date(NOW().getTime() - 3 * 36e5); c.at.setSeconds(0, 0);
+    c.ref = 'FT' + String(26100000000 + (parseInt(String(c.file.hash).slice(0, 7), 16) || cand.n * 7919 + c.id) % 899999999).slice(0, 11);   /* made up from the file: the same picture reads the same, another picture never clashes */ c.at = new Date(NOW().getTime() - 3 * 36e5); c.at.setSeconds(0, 0);
     c.readOk = true; c.readBank = 'Bank Contoh'; c.read = { amount: 1, ref: 1, at: 1 };
     c.refUsed = invRefUsed(c.ref);
     redraw();
@@ -1091,7 +1097,7 @@ function invBankInSheet(personId) {
   var dr = UI.drawer({ title: 'Bank in cash', subtitle: sub(), width: 460, body: function (el) { el.innerHTML = body(); setTimeout(mount, 0); }, foot: [{ label: 'Cancel', kind: 'o' }, { label: 'Save bank-in', icon: 'building-bank', onClick: save }], dirty: function () { return !!st.slip || !!st.amount; } });
   dr.el.classList.add('inv-bin');
   var redraw = function () { keep(dr.body); dr.refresh(); dr.setTitle('Bank in cash', sub()); };
-  function mount() { var z = dr.body.querySelector('[data-dz]'); if (z && !z.firstChild) UI.dropzone(z, { accept: 'image/*,.pdf', label: 'Add the bank slip', hint: 'A photo or PDF. Big photos are made smaller.', camera: true, onFiles: function (fs) { UI.readImage(fs[0]).then(function (r) { keep(dr.body); st.slip = invFileSlip(r); st.used = (D().bankIns || []).filter(function (b) { return !b.voided && b.slip && invSlipHash(b.slip) === st.slip.hash; }).map(function (b) { return { what: 'bank-in', booking: staffName(b.staff) + '\'s bank-in', at: b.at }; })[0] || null; st.reading = !st.used && !/pdf/.test(r.type || ''); st.readNote = ''; dr.refresh(); if (st.reading) setTimeout(read, 1100); }); } }); }
+  function mount() { var z = dr.body.querySelector('[data-dz]'); if (z && !z.firstChild) UI.dropzone(z, { accept: 'image/*,.pdf', label: 'Add the bank slip', hint: 'A photo or PDF. Big photos are made smaller.', camera: true, onFiles: function (fs) { UI.readImage(fs[0]).then(function (r) { keep(dr.body); st.slip = invFileSlip(r); st.used = (D().bankIns || []).filter(function (b) { return !b.voided && b.slip && invSlipHash(b.slip) === st.slip.hash; }).map(function (b) { return { what: 'bank-in', booking: staffName(b.staff) + '\'s bank-in', at: b.at, payment: b.id }; })[0] || null; st.reading = !st.used && !/pdf/.test(r.type || ''); st.readNote = ''; dr.refresh(); if (st.reading) setTimeout(read, 1100); }); } }); }
   /* reading the slip is only a help (made up here): the amount, the day and the reference; the person checks them */
   function read() {
     if (dr.closed) return; keep(dr.body); st.reading = false;
@@ -1103,6 +1109,7 @@ function invBankInSheet(personId) {
     dr.refresh();
   }
   dr.body.addEventListener('change', function (ev) { var k = ev.target.getAttribute('data-key'); if (k === 'staff') redraw(); else if (k === 'amount') invRedrawSoon(dr.body, redraw); });
+  invUsedWire(dr.body);
   dr.body.addEventListener('click', function (ev) { if (ev.target.closest('[data-slip-rm]')) { keep(dr.body); st.slip = null; st.used = null; st.readNote = ''; dr.refresh(); } });
   return dr;
 }
@@ -1170,7 +1177,7 @@ PAGES['invoices'] = {
       (miss.length ? '<div class="inv-banner">' + UI.alert('Company details are incomplete. Invoices and receipts print them, so fill in the missing details (' + miss.length + ' to go: ' + miss.join(', ') + ') before sending documents to customers.', 'warn', { action: can('billing.settings') ? UI.btn('Complete company details', { kind: 't', size: 'sm', attrs: { 'data-act': 'company' } }) : '' }) + '</div>' : '') +
       '<div class="inv-kpis">' +
       UI.stat({ label: 'Invoiced this month', value: UI.fmt.money(sum(monthInv.map(invTotal))), note: plural(monthInv.length, 'invoice'), icon: 'file-invoice' }) +
-      UI.stat({ label: 'Received this month', value: UI.fmt.money(invMonthSum(d.payments.filter(function (p) { return !p.void; }), function (p) { return p.at; }, function (p) { return p.amount; })), note: 'Deposits and charges', icon: 'cash', tone: 'ok' }) +
+      UI.stat({ label: 'Received this month', value: UI.fmt.money(invMonthSum(d.payments.filter(function (p) { return !p.void && p.method !== 'Deposit adjustment'; }), function (p) { return p.at; }, function (p) { return p.amount; })), note: 'Deposits and charges', icon: 'cash', tone: 'ok' }) +
       UI.stat({ label: 'Payments without receipt', value: String(d.payments.filter(function (p) { return !p.void && !p.receipt; }).length), note: 'Create them on Payments', icon: 'receipt-off', tone: 'warn', attrs: { 'data-go-tab': 'payments', 'data-go-f': 'norcp' } }) +
       (can('billing.manage_cash') ? UI.stat({ label: 'Cash held by staff', value: UI.fmt.money(heldTotal), note: 'Not banked in yet', icon: 'wallet', tone: 'info', attrs: { 'data-go-tab': 'cash' } }) : '') + '</div>' +
       '<div class="card"><div class="inv-tabs" id="inv-tabs"></div><div id="inv-f"></div><div id="inv-t"></div></div>';
@@ -1315,6 +1322,10 @@ API.companyDetails = function () { invCompany(); };
 API.addSlip = function (paymentId) { var p = byId(D().payments, paymentId); if (p) invAddSlip(p); };
 API.viewSlips = function (paymentId) { var p = byId(D().payments, paymentId); if (p) invSlipViewer(p); };
 API.bankIn = function (userId) { invBankInSheet(userId || null); };
+/* for the staff report's own list of bank-ins: the recorder can void their own within 24 hours */
+API.viewBankIn = function (id) { var b = byId(D().bankIns || [], id); if (b) invBankInSlip(b); };
+API.voidBankIn = function (id) { var b = byId(D().bankIns || [], id); if (b) invVoidBankIn(b); };
+API.canVoidBankIn = function (id) { var b = byId(D().bankIns || [], id); return !!b && invCanVoidBankIn(b); };
 API.voidPayment = function (paymentId) { var p = byId(D().payments, paymentId); if (p) invVoid('payment', p); };
 window.invBankInSheet = invBankInSheet;
 window.addEventListener('resize', UI.debounce(function () { invFit(document.getElementById('ui-layer')); }, 120));

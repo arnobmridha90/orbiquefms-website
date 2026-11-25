@@ -55,4 +55,3 @@
 #tkVoice > .btn { margin-bottom: 12px; }
 .tk-by { text-align: center; font-size: 12.5px; color: var(--muted); margin: 6px 0 2px; }
 .tk-cancel { width: auto; flex: none; }
-main.tk .btn:not(.ghost):not(.link):not(.danger), #tkSave, .tk + .fab { color: #fff; }

@@ -33,7 +33,7 @@ function depLeft(code) { var z = byId(D().deposits, 'dep-' + code); if (z && z.r
 function depState(z) {
   var x = findBooking(z.booking);
   if (z.refund) return 'returned';
-  if (x && x.pay === 'Deposit Refunded') return depUsedAmt(z) > 0 && depDue(z) <= 0 ? 'used' : 'hand';
+  if (x && x.pay === 'Deposit Refunded') { if (depUsedAmt(z) > 0 && depDue(z) <= 0) return 'used'; if (!(x.dep > 0) && !(depReceived(z.booking) > 0)) return 'none'; return 'hand'; }
   if (z.markedByHand) return 'hand';
   return 'waiting';
 }
@@ -42,6 +42,7 @@ function depChip(z) {
   var s = depState(z);
   if (s === 'returned') return UI.chip(z.refund.method === 'None' ? 'Closed, nothing back' : 'Returned ' + UI.fmt.date(z.refund.at), 'ok');
   if (s === 'used') return UI.chip('Used for payments', 'info', { title: 'Payments from the deposit took all of it, so nothing goes back' });
+  if (s === 'none') return UI.chip('No deposit taken', 'grey', { title: 'The booking had no deposit, so nothing goes back' });
   if (s === 'hand') return UI.chip('Marked by hand', 'grey', { title: 'The payment status was set to Deposit Refunded without recording a refund' });
   var n = depWaitDays(z);
   return UI.chip(n ? 'Waiting ' + plural(n, 'day') : 'Waiting since today', n >= 7 ? 'bad' : 'warn');
@@ -52,7 +53,7 @@ function depLists() {
   d.bookings.forEach(function (x) {
     if (x.status === 'Cancelled') return;
     if (x.pay === 'Refund Pending') { var z = depFor(x.code); if (!z.refund) { z.markedByHand = false; wait.push(z); seen[z.id] = 1; } }
-    else if (x.pay === 'Deposit Refunded' && (x.dep > 0 || byId(d.deposits, 'dep-' + x.code)) && TODAY - x.end < 90 * DAY && (x.end <= NOW() || byId(d.deposits, 'dep-' + x.code))) { var z2 = depFor(x.code); if (!z2.refund && depState(z2) !== 'used') z2.markedByHand = true; done.push(z2); seen[z2.id] = 1; }
+    else if (x.pay === 'Deposit Refunded' && TODAY - x.end < 90 * DAY && (x.end <= NOW() || byId(d.deposits, 'dep-' + x.code))) { var z2 = depFor(x.code); if (!z2.refund && depState(z2) === 'hand') z2.markedByHand = true; done.push(z2); seen[z2.id] = 1; }
   });
   /* a refund recorded for a booking that was not waiting (any booking can have one) */
   d.deposits.forEach(function (z) { if (!seen[z.id] && z.refund && NOW() - z.refund.at < 90 * DAY && findBooking(z.booking)) done.push(z); });
@@ -183,6 +184,8 @@ function depRecordRefund(z, after) {
   };
   var dl = UI.dialog({ title: 'Record deposit refund', subtitle: x.code + ' · ' + x.cust.name, width: 'md', body: function () { setTimeout(mount, 0); return body(); }, buttons: foot() });
   function redraw() { keep(dl.body); dl.refresh(); dl.setFoot(foot()); }
+  /* redraw() reads the fields back first, so a new amount goes into its field before that */
+  function setAmt() { var a = dl.body.querySelector('[data-key="amount"]'); if (a) a.value = st.amount; }
   function mount() { var el = dl.body.querySelector('[data-dz]'); if (el) UI.dropzone(el, { accept: 'image/jpeg,image/png,image/webp,.pdf', label: 'Drop the slip here', hint: 'JPG, PNG, WEBP or PDF. Paste with Ctrl+V works too. Big photos are made smaller.', camera: true, onFiles: function (fs) { UI.readImage(fs[0]).then(function (r) { keep(dl.body); st.slip = invFileSlip(r); st.slipUsed = invSlipUsed(st.slip.hash, { refundOf: z.booking }); st.reading = !st.slipUsed && st.method === 'Bank transfer'; dl.refresh(); dl.setFoot(foot()); if (st.reading) setTimeout(read, 1100); }); } }); }
   function read() {
     if (dl.closed) return; keep(dl.body); st.reading = false;
@@ -195,12 +198,12 @@ function depRecordRefund(z, after) {
     var b = ev.target.closest('[data-how]');
     if (b) { keep(dl.body); st.method = b.getAttribute('data-how'); redraw(); return; }
     if (ev.target.closest('[data-slip-rm]')) { keep(dl.body); st.slip = null; st.slipUsed = null; redraw(); return; }
-    if (ev.target.closest('[data-due]')) { keep(dl.body); st.amount = dueNow().toFixed(2); redraw(); }
+    if (ev.target.closest('[data-due]')) { keep(dl.body); st.amount = dueNow().toFixed(2); setAmt(); redraw(); }
   });
   dl.body.addEventListener('change', function (ev) {
     var k = ev.target.getAttribute('data-key');
     if (k === 'ref') { keep(dl.body); st.refUsed = invRefUsed(st.ref, { refundOf: z.booking }); redraw(); return; }
-    if (k === 'depGiven') { keep(dl.body); st.amount = dueNow().toFixed(2); redraw(); return; }
+    if (k === 'depGiven') { keep(dl.body); st.amount = dueNow().toFixed(2); setAmt(); invRedrawSoon(dl.body, redraw); return; }
     if (k === 'amount' || k === 'custRef' || k === 'toName') invRedrawSoon(dl.body, redraw); else if (k === 'keptKind' || k === 'by') redraw();
   });
   invUsedWire(dl.body);
@@ -240,6 +243,8 @@ function depOpen(code) {
         '<p class="b2">The booking is marked Deposit Refunded.</p>' + (can('deposits.reopen') ? UI.btn('Reopen this refund', { kind: 'o', size: 'sm', icon: 'arrow-back-up', attrs: { 'data-reopen': '1' } }) : '') + '</section>';
     } else if (s === 'used') {
       h += '<section class="dep-s"><h4>THE REFUND</h4>' + UI.alert('Payments from the deposit used all of it, so there is nothing to give back. The booking became Deposit Refunded by itself. Voiding one of those payments puts the money back here.', 'info', { icon: 'arrows-exchange' }) + '</section>';
+    } else if (s === 'none') {
+      h += '<section class="dep-s"><h4>THE REFUND</h4>' + UI.alert('This booking had no deposit, so there is nothing to give back. It became Deposit Refunded when the car came back.', 'info') + '</section>';
     } else if (s === 'hand') {
       h += '<section class="dep-s"><h4>THE REFUND</h4>' + UI.alert('Marked as returned by hand: the payment status was set to Deposit Refunded without recording how the money went back.', 'info') + '<div class="row wrap gap8">' + (can('deposits.refund') && due > 0 ? UI.btn('Record the refund now', { size: 'sm', icon: 'cash-banknote', attrs: { 'data-refund': '1' } }) : '') + (can('deposits.reopen') ? UI.btn('Reopen this refund', { kind: 'o', size: 'sm', icon: 'arrow-back-up', attrs: { 'data-reopen': '1' } }) : '') + '</div></section>';
     } else {
@@ -303,7 +308,7 @@ PAGES['deposits'] = {
   title: 'Deposit refunds',
   search: [{ label: 'Deposits waiting to be returned', icon: 'cash-banknote', run: function () { go('deposits', { tab: 'refund' }); } }, { label: 'Refund a deposit for any booking', icon: 'cash-banknote', run: function () { depPickBooking(); } }],
   render: function (root, ctx) {
-    var P = ctx.params, tab = P.tab === 'refunded' ? 'refunded' : 'refund', L = depLists(), q = P.q || '', state = (tab === 'refund' ? ['long'] : ['returned', 'used', 'hand']).indexOf(P.state) >= 0 ? P.state : '', sort = P.sort || '';
+    var P = ctx.params, tab = P.tab === 'refunded' ? 'refunded' : 'refund', L = depLists(), q = P.q || '', state = (tab === 'refund' ? ['long'] : ['returned', 'used', 'hand', 'none']).indexOf(P.state) >= 0 ? P.state : '', sort = P.sort || '';
     var m0 = new Date(NOW().getFullYear(), NOW().getMonth(), 1), thisMonth = L.done.filter(function (z) { return z.refund && z.refund.at >= m0 && z.refund.method !== 'None'; });
     var heldWait = sum(L.wait.map(function (z) { return depBasis(z); })), dueWait = sum(L.wait.map(function (z) { return depDue(z); }));
     /* adjustments this month: taken off deposits refunded this month, and payments paid from deposits this month */
@@ -315,7 +320,7 @@ PAGES['deposits'] = {
       UI.stat({ label: 'Returned this month', value: UI.fmt.money(sum(thisMonth.map(function (z) { return z.refund.amount; }))), note: plural(thisMonth.length, 'deposit'), icon: 'circle-check', tone: 'ok', attrs: { 'data-kgo': 'refunded' } }) +
       '<div class="card stat ui-stat dep-adj" style="--c:var(--info-rgb)"><div class="grow"><div class="l">Adjustments this month</div><div class="dep-adj-r"><span>Taken off deposits</span><b class="num">' + UI.money(takenOff) + '</b></div><div class="dep-adj-r"><span>Used for payments</span><b class="num">' + UI.money(usedM) + '</b></div></div><span class="ic">' + i('receipt-2') + '</span></div></div>' +
       '<div class="card"><div class="dep-tabs" id="dep-tabs"></div><div class="dep-q"><div class="inp srch">' + i('search') + '<input type="search" id="dep-q" data-key="depq" placeholder="Booking ID, customer, plate..." aria-label="Search deposits" value="' + esc(q) + '"></div>' +
-      UI.select({ key: 'state', aria: 'Status', value: state, options: [['', tab === 'refund' ? 'All waiting' : 'All refunded']].concat(tab === 'refund' ? [['long', 'Waiting 7 days or more']] : [['returned', 'Returned'], ['used', 'Used for payments'], ['hand', 'Marked by hand']]), id: 'dep-state' }) +
+      UI.select({ key: 'state', aria: 'Status', value: state, options: [['', tab === 'refund' ? 'All waiting' : 'All refunded']].concat(tab === 'refund' ? [['long', 'Waiting 7 days or more']] : [['returned', 'Returned'], ['used', 'Used for payments'], ['hand', 'Marked by hand'], ['none', 'No deposit taken']]), id: 'dep-state' }) +
       UI.select({ key: 'sort', aria: 'Order', value: sort, options: [['', 'Newest booking first'], ['status', tab === 'refunded' ? 'Status, earliest first' : 'Longest waiting first'], ['-status', tab === 'refunded' ? 'Status, latest first' : 'Shortest waiting first']], id: 'dep-sort' }) +
       (q || state ? UI.btn('Clear', { kind: 't', size: 'sm', icon: 'x', attrs: { 'data-clearq': '1' } }) : '') + '</div><div id="dep-t"></div></div>';
     UI.tabs(root.querySelector('#dep-tabs'), { value: tab, items: [{ id: 'refund', label: 'To refund', icon: 'hourglass', count: L.wait.length, tone: 'warn' }, { id: 'refunded', label: 'Refunded', icon: 'circle-check', count: L.done.length, tone: 'grey' }], onChange: function (id) { ctx.setParams({ tab: id === 'refund' ? null : id, page: null, state: null, sort: null }); ctx.refresh(); } });

@@ -35,3 +35,6 @@
   .pg-staff-reports .sr-acts .btn{flex:1 1 0;min-height:44px}
   .pg-staff-reports .sr-pg{grid-template-columns:minmax(0,1fr)}
 }
+.sr-biacts{flex:none;justify-content:center}
+@media (max-width:760px){.sr-biacts .ib{width:40px;height:40px}}
+.sr-bic{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}

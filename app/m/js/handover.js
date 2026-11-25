@@ -366,7 +366,12 @@ var Handover = (function () {
         '<div class="ho-sum"><div><span>Odometer</span><b>' + esc(hoKm(x.km)) + (x.trusted === false ? ' ' + chip('Not trusted', 'amber') : '') + '</b></div><div><span>Fuel</span><b>' + esc(x.fuel) + '</b></div><div><span>Time</span><b>' + esc(dShort(x.at) + ', ' + hm(x.at)) + '</b></div>' +
         (out ? '' : '<div><span>Payment status</span><b>' + payChip(b) + '</b></div>' + (x.lateHours ? '<div><span>Late</span><b>' + hoHoursText(x.lateHours) + '</b></div>' : '')) + '</div>' +
         fee + comp + '</div>' +
-        '<div class="sheet-foot stack">' + (!out && can('deposits.view') && typeof Deposit !== 'undefined' ? '<button type="button" class="btn ghost" id="hoDep">' + I('shield') + 'Open the deposit</button>' : '') + '<button type="button" class="btn" id="hoDone">Done</button></div>';
+        (function () {
+          /* after a take back the deposit is the next job: Deposit.adjust is the main button while a refund is pending */
+          var depOk = !out && can('deposits.view') && typeof Deposit !== 'undefined';
+          if (depOk && b.paymentStatus === 'Refund Pending') return '<div class="sheet-foot stack"><button type="button" class="btn" id="hoDep">' + I('shield') + 'Next: check the deposit</button><button type="button" class="btn ghost" id="hoDone">Done for now</button></div>';
+          return '<div class="sheet-foot stack">' + (depOk ? '<button type="button" class="btn ghost" id="hoDep">' + I('shield') + 'Open the deposit</button>' : '') + '<button type="button" class="btn" id="hoDone">Done</button></div>';
+        })();
       var fb = $('#hoFee', box); if (fb) fb.onclick = function () { Fees.claim(b.id, group, drawDone); };
       var cb = $('#hoComp', box); if (cb) cb.onclick = function () { Fees.claim(b.id, 'companion', drawDone); };
       var dp = $('#hoDep', box); if (dp) dp.onclick = function () { closeSheet(true); setTimeout(function () { Deposit.adjust(b.id); }, 30); };

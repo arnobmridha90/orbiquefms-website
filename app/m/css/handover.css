@@ -93,6 +93,4 @@
 .fee-opt.on .fee-rad { border-color: var(--brand); }
 .fee-opt.on .fee-rad::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--brand); }
 .fee-opt.taken .fee-rad { border-style: dashed; }
-/* work around: core applyTheme gets NaN from C.contrast(brand, "#fff") (3-digit hex), so --on-brand is #111 for every company. All three brands need white text. */
-.ho-sheet .btn:not(.ghost):not(.link):not(.danger), .fee-sheet .btn:not(.ghost):not(.link) { color: #fff; }
 .banner .ho-bact .btn svg { color: currentColor; }

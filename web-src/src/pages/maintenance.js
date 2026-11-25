@@ -860,7 +860,7 @@ function mtBlockDialog(o) {
   var f = { car: o.car || '', reason: 'Service', from: mtIso(mtToday()), to: '', note: '', force: false };
   var clashes = function () { return f.car && f.from ? mtClashes(f.car, mtDate(f.from), f.to ? new Date(mtDate(f.to).getTime() + DAY) : null) : []; };
   var dl = UI.dialog({ title: 'Block a car for the workshop', width: 'md', body: '<p class="ui-ctext">While a car is blocked it cannot be booked and does not show as free in the Availability Checker or the calendar.</p><div class="mt-form"><div class="mt-carpk full"></div>' +
-    UI.choice({ key: 'reason', label: 'Why?', value: 'Service', options: LISTS.downtimeReasons, full: true }) + UI.dateField({ key: 'from', label: 'Goes in', required: true, value: f.from }) + UI.input({ key: 'to', label: 'Expected back (optional)', type: 'date' }) + UI.textarea({ key: 'note', label: 'Note', rows: 2 }) + '</div><div class="mt-clashbox mt8"></div>',
+    UI.choice({ key: 'reason', label: 'Why?', value: 'Service', options: LISTS.downtimeReasons, full: true }) + UI.dateField({ key: 'from', label: 'Goes in', required: true, value: f.from }) + UI.dateField({ key: 'to', label: 'Expected back (optional)', value: '', min: f.from }) + UI.textarea({ key: 'note', label: 'Note', rows: 2 }) + '</div><div class="mt-clashbox mt8"></div>',
     buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Block the car', icon: 'lock', onClick: function () {
       if (!f.car) { UI.toast('Choose the car', { tone: 'warn' }); return false; }
       if (!f.from) { UI.toast('Pick when it goes in', { tone: 'warn' }); return false; }

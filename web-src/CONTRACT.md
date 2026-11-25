@@ -33,9 +33,21 @@ PAGES['income'] = {
 | `API.openStaffReport(userId, params)` | staff-reports.js | `#page=staff-reports&person=` |
 | `API.openIncome(userId)` | income.js | `#page=income&person=` |
 | `API.makeHandoverTasks(code)` | tasks.js | `#page=tasks&action=handover&booking=` |
+| `API.editCar(id)` | cars.js | opens the car's edit drawer straight away (`API.openCar(id)` opens the read-only profile) |
+| `API.viewBankIn(id)`, `API.voidBankIn(id)`, `API.canVoidBankIn(id)` | invoices.js | slip viewer, void with a reason, and whether the person may void it (office any time, the recorder within 24 hours) |
+| `API.carsCounted()` | reports.js | same as `go('reports', {action: 'carscounted'})`: opens the Cars counted dialog |
+
+- `cuNewBooking(p)` (customers.js): New booking for a customer that checks the blacklist first ("Book anyway?" for people
+  with `customers.blacklist_edit`, logged; everyone else is stopped). Use it instead of `API.newBooking({customer})`
+  wherever the customer could be blacklisted.
+- `API.newBooking(prefill)` takes `car, start, end, customer`, and for a new customer `name, phone`, plus `startOpt`,
+  `endOpt` (an option value, its label, or just `'Pick-up from our location'`; the fee fills in) and `lead` (the lead
+  id: saving marks that lead closed as Booked and stores `booking.lead`).
+- `cuNotesMount(el, person, {booking})`: notes added there link to that booking.
 
   The search palette has a "Bank in cash" action (`expenses.view`) that calls `API.bankIn()`.
-- `build.py` now also finds icons written as `icon: 'name'` and the `PAGE_META` icons, and adds any missing Tabler icon.
+- `build.py` now also finds icons written as `icon: 'name'`, `UI.iconBtn('name', ...)`, the `PAGE_META` icons and every
+  string in a `var X_ICONS = {...}` / `[...]` map, and adds any missing Tabler icon.
 
 ## 2. UI kit additions (`ui.js`, styles in `ui.css`)
 
@@ -101,6 +113,27 @@ UI.drawer({ title: 'Log a service', body: function (el) {
 
 - `UI.popover(..., {keepOnResize: true})` moves with the window instead of closing.
 - `UI.wordsMatch(text, q)`: every typed word is in the text (case blind).
+- `UI.table(el, {selLabel})`: the selection bar text. `'selected'` gives "2 selected"; a function `(n) -> text` for
+  anything else. Default "2 bookings ticked" (with `noun`) or "2 ticked".
+- `UI.options` / `UI.select`: an option can be `{value, label, disabled, title}`.
+- Footer buttons (`foot` / `buttons` arrays) take `cls` for extra classes.
+- Date field chips: `[{label, days}]` (days from today) or `[{label, run: function (current, fieldEl) -> Date}]`.
+- `UI.combo` toggles: `{key, label, value, narrows: true}` for a switch that hides rows when on ("Only bookings with money
+  due"). When nothing matches and a switch is hiding rows, the list says so and offers "Show them", which moves every
+  switch to the position that shows the most.
+- Toasts: on a phone they sit above the footer buttons of the open drawer or dialog. A dialog's own messages close with
+  it (a message shown as it closes, like "Saved", stays), and a page change drops the old page's messages
+  (`UI.clearToasts(ms)`). Hovering only keeps a toast up with a real mouse.
+- Unsaved changes: `UI.isDirty()` is true when an open layer's `dirty()` says so. Every page change (`go`, the company
+  switch, the address, signing out) goes through `UI.leave(run)`, which asks "Leave without saving?" first. So give
+  drawers and dialogs with a form a `dirty` function, and the shell protects them.
+
+### 2.6 Brand colours that look like warnings
+
+When the brand colour is close to red (Bara), focus rings, ticked rows and picked choices use the dark brand colour
+instead (`--focus`, `--sel-rgb`, class `brand-dark-accent` on `<html>`). Use `var(--focus)` for a focus outline and
+`rgb(var(--sel-rgb) / .08)` for a "selected" tint, never `--primary`. Buttons and the menu keep the brand colour, and
+status chips keep their fixed colours.
 
 ## 3. Data additions (`data.js`)
 
@@ -113,7 +146,8 @@ UI.drawer({ title: 'Log a service', body: function (el) {
 | `cardFee {localPct, foreignPct, fixed}` | card payments: after charge = amount - amount x pct% - fixed |
 | `summonsAdminFee` | default admin fee on a summons (20 / 15 / 25) |
 | `fleet {overspeed, historyDays, reminderRecipients [user ids], reminderTime 'HH:MM', warnDays {paper kind: days}}` | Fleet settings |
-| `trackerPlatforms` | list for the tracker and dashcam platform fields |
+| `trackerPlatforms` | list for the tracker platform field and the Tracking page |
+| `dashcamPlatforms` | list for the dashcam platform field on a car (Settings > Fleet edits both lists) |
 | `assistant {hours {from, to}, turnaroundH, airportTurnaroundH, holdMin, minNoticeH, deliveryTiers [{upToKm, fee}], stayOutDays}` | booking assistant rules |
 | `turnaroundH` | availability: warn when the car is back less than this before the next start (3) |
 | `expenseEditDays` | days people may change or delete their own expenses (`null` = no limit) |
@@ -146,8 +180,14 @@ UI.drawer({ title: 'Log a service', body: function (el) {
 - One seeded `Deposit adjustment` payment per company; its deposit has a deduction
   `{kind: 'Used for a payment', amount, note, fromPayment: payId}`: leave those out of money reports and give them back
   when the payment is voided.
-- `D().bankIns [{id, staff (user id), amount, at, slip {name, size}, ref, note, voided null | {at, by (user id), reason}, by (user id), payments [ids]}]`,
+- `D().bankIns [{id, staff (user id), amount, at, slip {name, size, dataUrl}, ref, note, voided null | {at, by (user id), reason}, by (user id), payments [ids]}]`,
   newest first, one voided sample. They come from the old "banked" cash; `payment.banked` is still filled but is old: use bank-ins.
+  Seeded ones have a made-up slip picture (`slip.dataUrl`, drawn when read; `slip.sample: true`).
+- Deposit refunds list every Deposit Refunded booking of the last 90 days, also those with no deposit (state `'none'`,
+  "No deposit taken"). One seeded deposit has waited more than 7 days.
+- `handovers()` rows carry `place` (the place's current name) and label place deliveries `Delivery to <place name>`.
+- `roundRM(v)` rounds halves up (RM 262.50 -> RM 263), so `bkCalc` does too.
+- Bara's sold car has no rentals in the last 5 weeks or later.
 - `cashHeldBy(userId)` = cash payments given to them - their bank-ins - cash deposit refunds they handed back.
 
 ### 3.4 Expense categories and handover fees

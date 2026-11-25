@@ -1,6 +1,6 @@
 /* ---------------- PICKERS (core builder owns this file; nobody else edits it) ----------------
    Full-height searchable sheets, stacked over whatever is open, closed by the phone's Back button.
-   Pickers.car({start, end, exceptId, selected, onPick, showBusy, title})
+   Pickers.car({start, end, exceptId, selected, onPick, showBusy, title, all})
    Pickers.booking({filter, onPick, title, selected})
    Pickers.customer({onPick, title, allowNew})
    Pickers.staff({multi, preferIds, selected, onPick, title, includeOff})
@@ -35,7 +35,7 @@ var Pickers = (function () {
     var draw = function () {
       var term = q.value.trim(), np = normPlate(term), rows = [];
       S.cars.forEach(function (c) {
-        if ((c.status === 'sold' || c.status === 'inactive') && c.id !== o.selected) return;
+        if ((c.status === 'sold' || c.status === 'inactive') && c.id !== o.selected && !o.all) return; /* o.all: also sold and not-in-use cars (filters on old bookings) */
         if (type !== 'All' && (c.type || 'Car') !== type) return;
         if (term) { var hit = normPlate(c.plate).indexOf(np) >= 0 || wordsMatch(term, [c.make, c.model, c.color, c.type, c.serial, c.year].join(' ')); if (!hit) return; }
         var bz = hasDates ? busy(c.id, o.start, o.end, o.exceptId) : { free: c.status === 'active', reason: c.status === 'inactive' ? 'Not in use' : c.status === 'sold' ? 'Sold' : '' };
@@ -52,6 +52,7 @@ var Pickers = (function () {
         var c = r.c, bz = r.bz, pickable = bz.free || o.showBusy, badge;
         if (!bz.free) badge = '<span class="chip tone-red pk-badge">' + esc(bz.reason) + '</span>';
         else if (bz.soon) badge = '<span class="chip tone-amber pk-badge">Check: ' + esc(bz.soon.replace(/^Returned at /, 'returned ').replace(/^Next rental at /, 'next rental ')) + '</span>';
+        else if (c.status === 'active' && carPaper && (function () { var rt = carPaper(c.id, 'Road tax'); return rt && rt.until < toLocalInput(new Date()); })()) badge = '<span class="chip tone-red pk-badge">Road tax expired</span>';
         else if (hasDates) badge = '<span class="chip tone-green pk-badge">Free</span>';
         else badge = '';
         return '<button type="button" class="pk-row car' + (c.id === o.selected ? ' on' : '') + (pickable ? '' : ' busy') + '" data-pick="' + c.id + '"' + (pickable ? '' : ' disabled aria-disabled="true"') + '>' +

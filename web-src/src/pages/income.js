@@ -26,7 +26,8 @@ PAGES['income'] = {
     if (!ctx.can('expenses.view')) { root.innerHTML = UI.empty({ icon: 'lock', title: 'You do not have access to this page', text: 'Ask the owner to give your account the Expenses permission.' }); return; }
     var st = ctx.state, P = ctx.params, everyone = ctx.can('expenses.view_all'), n = NOW(), d = D();
     if (!st.from) { st.from = P.from || incIso(new Date(n.getFullYear(), n.getMonth(), 1)); st.to = P.to || incIso(new Date(n.getFullYear(), n.getMonth() + 1, 0)); }
-    if (P.person !== undefined && st.pp !== P.person) { st.pp = P.person; st.person = P.person || ''; }
+    var pp0 = P.person || ''; if (st.pp !== pp0) { st.pp = pp0; st.person = pp0; }
+    if (st.person && !byId(d.users, st.person)) st.person = '';
     if (!everyone) st.person = me().id;
     var from = incParse(st.from), to = incParse(st.to), bad = !from || !to ? 'Choose the first and the last day.' : to < from ? 'The last day is before the first day.' : '';
     var rows = bad ? [] : incRows(from, to, st.person || null), total = sum(rows.map(function (r) { return r.amount; }));

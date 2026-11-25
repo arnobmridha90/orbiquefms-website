@@ -7,7 +7,7 @@
    ===================================================================== */
 var VAPID_PUBLIC = 'BJhwm70BU_7cvAFMJ3GsWPuOkJ3ny59p7HdA6KFMSCm4O1TrpsmOveLV1atk0Rd7da2oYuvdTOZyk2aRVBzBfRo';
 var DAY = 864e5, HOUR = 36e5, MIN = 6e4;
-var DATA_VERSION = 4;
+var DATA_VERSION = 5; /* 5: two months of history, odometer readings that follow each other */
 
 /* ---------------- tiny helpers ---------------- */
 function $(s, r) { return (r || document).querySelector(s); }
@@ -25,7 +25,7 @@ function sod(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function sameDay(a, b) { return sod(a).getTime() === sod(b).getTime(); }
 function clampNow(d) { var t = new Date(d).getTime(), n = Date.now(); return new Date(Math.min(t, n)).toISOString(); }
 var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function hm(d) { d = new Date(d); var h = d.getHours(), m = d.getMinutes(); return (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' am' : ' pm'); }
+function hm(d) { d = new Date(d); var h = d.getHours(), m = d.getMinutes(); return (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM'); }
 function dShort(d) { d = new Date(d); return d.getDate() + ' ' + MO[d.getMonth()]; }            /* 3 Nov */
 function dLong(d) { d = new Date(d); return WD[d.getDay()] + ' ' + d.getDate() + ' ' + MO[d.getMonth()]; } /* Thu 26 Nov */
 function dFull(d) { d = new Date(d); return d.getDate() + ' ' + MO[d.getMonth()] + ' ' + d.getFullYear(); } /* 3 Nov 2026 */
@@ -95,7 +95,7 @@ function fmtPhone(v) {
 
 /* ---------------- colour helpers (brand from logo colours) ---------------- */
 var C = {
-  rgb: function (h) { h = h.replace('#', ''); return [0, 2, 4].map(function (i) { return parseInt(h.slice(i, i + 2), 16); }); },
+  rgb: function (h) { h = String(h || '').replace('#', ''); if (h.length === 3 || h.length === 4) h = h.slice(0, 3).split('').map(function (c) { return c + c; }).join(''); return [0, 2, 4].map(function (i) { return parseInt(h.slice(i, i + 2), 16); }); },
   hex: function (r) { return '#' + r.map(function (v) { v = Math.max(0, Math.min(255, Math.round(v))); return (v < 16 ? '0' : '') + v.toString(16); }).join(''); },
   mix: function (a, b, t) { var x = C.rgb(a), y = C.rgb(b); return C.hex(x.map(function (v, i) { return v + (y[i] - v) * t; })); },
   lum: function (h) { var c = C.rgb(h).map(function (v) { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; },
@@ -429,7 +429,7 @@ function placeText(b, end) {
   if (k === 'client') return note ? note : (end === 'ret' ? 'Collect from client' : 'Delivery to client');
   return 'Not chosen';
 }
-function placeKindText(b, end) { /* 'Pick-up · Cheras', 'Delivery · Client', 'Delivery · KLIA2', 'Return · ...' */
+function placeKindText(b, end) { /* 'Pick-up · Cheras', 'Delivery · Client', 'Delivery · KL Sentral', 'Return · ...' */
   var out = end === 'ret', k = out ? b.retKind : b.pickKind, id = out ? b.retLoc : b.pickLoc;
   if (k === 'our') { var l = loc(id); return (out ? 'Drop-off' : 'Pick-up') + ' · ' + (l ? l.short || l.name : 'Our location'); }
   if (k === 'place') { var p = place(id); return (out ? 'Return' : 'Delivery') + ' · ' + (p ? p.name : 'Place'); }
@@ -445,7 +445,7 @@ function placeFee(kind, id, end) { /* the delivery (end 'pick') or return (end '
 /* every choice for a select: [{v:'our:L1', kind, id, label, fee}] */
 function placeChoices(end) {
   var s = B(), out = [];
-  (s.locations || []).forEach(function (l) { if (end === 'ret' ? l.dropoff : l.pickup) out.push({ v: 'our:' + l.id, kind: 'our', id: l.id, label: (end === 'ret' ? 'Drop-off at our location - ' : 'Pick-up from our location - ') + l.name, fee: 0 }); });
+  (s.locations || []).forEach(function (l) { if (end === 'ret' ? l.dropoff : l.pickup) out.push({ v: 'our:' + l.id, kind: 'our', id: l.id, label: (end === 'ret' ? 'Drop-off at our location, ' : 'Pick-up from our location, ') + l.name, fee: 0 }); });
   out.push({ v: 'client', kind: 'client', id: null, label: end === 'ret' ? 'Collect from client location' : 'Delivery to client location', fee: placeFee('client', null, end) });
   (s.places || []).forEach(function (p) { out.push({ v: 'place:' + p.id, kind: 'place', id: p.id, label: (end === 'ret' ? 'Return from ' : 'Delivery to ') + p.name, fee: placeFee('place', p.id, end) }); });
   return out;
@@ -491,7 +491,7 @@ function noAccess(code) { return '<div class="empty noaccess">' + I('lock') + '<
 function openTasksOf(staffId) { return (S.tasks || []).filter(function (t) { return (t.staff || []).indexOf(staffId) >= 0 && (t.status === 'Pending' || t.status === 'In Progress'); }).length; }
 
 /* per-person preferences: S.prefs is the signed-in person's object inside S.prefsBy */
-var PREF_DEFAULTS = { new: true, change: true, staff: true, wa: true, pay: true, due: true, startTab: 'home' };
+var PREF_DEFAULTS = { new: true, change: true, staff: true, wa: true, pay: true, due: true, job: true, tomorrow: true, lead: true, service: true, alarm: true, startTab: 'home' };
 function usePrefs(d) { d = d || S; if (!d) return; d.prefsBy = d.prefsBy || {}; var k = d.me || 'guest'; d.prefsBy[k] = Object.assign({}, PREF_DEFAULTS, d.prefsBy[k] || {}); d.prefs = d.prefsBy[k]; }
 
 /* ---------------- logs and activity ---------------- */
@@ -508,7 +508,7 @@ function applyTheme() {
   if (nearDanger) brand = b.dark;
   var ink = C.readable(brand);
   r.setProperty('--brand', brand); r.setProperty('--brand-ink', ink); r.setProperty('--dark', b.dark); r.setProperty('--accent', b.accent);
-  r.setProperty('--on-brand', C.contrast(brand, '#fff') >= 3 ? '#fff' : '#111');
+  r.setProperty('--on-brand', C.contrast(brand, '#ffffff') >= 3 ? '#fff' : '#111');
   r.setProperty('--tint', C.mix(brand, '#ffffff', nearDanger ? .9 : .89));
   document.documentElement.classList.toggle('brand-dark-accent', nearDanger);
   var tc = $('#themeColor'); if (tc) tc.content = '#F4F5F7';
@@ -521,7 +521,12 @@ var KINDS = {
   staff: { label: 'Staff chat', desc: 'New messages in the team chat', icon: 'users' },
   wa: { label: 'Customer chat (WhatsApp)', desc: 'Customers writing to the booking assistant', icon: 'wa' },
   pay: { label: 'Payments', desc: 'Money recorded or a transfer slip received', icon: 'cash' },
-  due: { label: 'Handovers due', desc: 'Pick-ups and returns in the next hour, late returns', icon: 'clock' }
+  due: { label: 'Handovers due', desc: 'Pick-ups and returns in the next hour, late returns', icon: 'clock' },
+  job: { label: 'My job in 30 minutes', desc: 'A pick-up, return or task given to you starts soon', icon: 'key' },
+  tomorrow: { label: 'Tomorrow\u2019s schedule', desc: 'An evening summary of what goes out and comes back tomorrow', icon: 'cal' },
+  lead: { label: 'New lead waiting', desc: 'A customer on WhatsApp is ready for a person to take over', icon: 'bot' },
+  service: { label: 'Service or paper due', desc: 'A service, road tax, insurance or inspection is due soon', icon: 'wrench' },
+  alarm: { label: 'Tracker alarm', desc: 'A car tracker reports a power cut, tow or a move without a booking', icon: 'warn' }
 };
 /* opts: {self:true} for your own action (no toast, no inbox; a small say() snackbar), {silentToast:true} */
 function notify(kind, title, body, link, opts) {
@@ -544,8 +549,17 @@ function kindIcon(kind) { return '<div class="ic k-' + kind + '">' + I(KINDS[kin
 function placeToasts() {
   var box = $('#toasts'); if (!box) return; var off = 10;
   ['.nav', '.stickybar', '.composer'].forEach(function (s) { var el = $(s); if (el && el.getClientRects().length) off = Math.max(off, el.getBoundingClientRect().height + 10); });
-  /* with a sheet open the bottom holds its buttons, so the toast goes to the top */
-  if (SHEETS.length) { box.style.bottom = 'auto'; box.style.top = 'calc(var(--safe-t) + 10px)'; return; }
+  /* with a sheet open: the toast must not cover its heading or its buttons.
+     A short sheet leaves the top of the screen free, so the toast goes there.
+     A tall or full-height sheet: the toast sits just above its footer (or near the bottom when it has none). */
+  if (SHEETS.length) {
+    var sh = SHEETS[SHEETS.length - 1].sh, r = sh.getBoundingClientRect(), vh = window.innerHeight;
+    if (r.top > 90 && !sh.classList.contains('full')) { box.style.bottom = 'auto'; box.style.top = 'calc(var(--safe-t) + 10px)'; return; }
+    var foot = sh.querySelector('.sheet-foot'), fb = 10;
+    if (foot && foot.getClientRects().length) { var fr = foot.getBoundingClientRect(); if (fr.top < vh && fr.bottom > 0) fb = Math.max(10, vh - fr.top + 8); }
+    else fb = Math.max(10, vh - Math.min(vh, r.bottom) + 10);
+    box.style.top = 'auto'; box.style.bottom = fb + 'px'; return;
+  }
   box.style.top = 'auto'; box.style.bottom = off + 'px';
 }
 function _showToastEl(el, ms) {
@@ -888,7 +902,7 @@ function pdfHtml(kind, data) {
   var bank = b.bank ? 'Bank: ' + b.bank.name + ' · ' + b.bank.accName + ' · ' + b.bank.accNo : '';
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc((data.no || t) + ' ' + b.name) + '</title><style>' + css + '</style></head><body><div class="pg">' +
     '<div class="hd"><div class="lg"><div class="m">' + MARKS[CO] + '</div><div class="co"><b>' + esc(b.name) + '</b>' + esc(b.regNo ? 'Reg. no ' + b.regNo : '') + '<br>' + esc(b.address || '') + '<br>' + esc(b.phone || '') + '</div></div>' +
-    '<div><h1>' + esc(t) + '</h1><div class="meta">' + (data.no ? '<b>' + esc(data.no) + '</b><br>' : '') + esc(dFull(data.date || new Date())) + (data.booking ? '<br>Booking ' + esc(data.booking) : '') + '</div></div></div>' +
+    '<div><h1>' + esc(t) + '</h1><div class="meta">' + (data.no && data.no !== t ? '<b>' + esc(data.no) + '</b><br>' : '') + esc(dFull(data.date || new Date())) + (data.booking ? '<br>Booking ' + esc(data.booking) : '') + '</div></div></div>' +
     (data.to ? '<div class="to"><div><div class="sub">' + (kind === 'report' ? 'For' : 'Bill to') + '</div><b>' + esc(data.to.name || '') + '</b><br>' + esc(data.to.phone || '') + (data.to.extra ? '<br>' + esc(data.to.extra) : '') + '</div></div>' : '<div style="height:18px"></div>') +
     (lines ? '<table>' + lines + '</table>' : '') + (totals ? '<table class="tot">' + totals + '</table>' : '') +
     (data.notes ? '<div class="notes">' + esc(data.notes) + '</div>' : '') +
@@ -915,3 +929,55 @@ function pdfDoc(kind, data) {
 }
 pdfDoc.html = pdfHtml;
 pdfDoc.print = function (html) { var f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f); f.srcdoc = html; f.onload = function () { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { say('Printing is not available here'); } setTimeout(function () { f.remove(); }, 60000); }; };
+
+/* ---------------- date and time fields ----------------
+   Native date / time inputs show the phone's own format (10/19/2026, 15:00). Every <input class="inp"> of type date, time,
+   datetime-local or month gets a visible label on top that always reads "19 Oct 2026", "3:00 PM", "19 Oct 2026, 3:00 PM" or "Oct 2026".
+   The native input stays underneath (its text made clear), so a tap still opens the phone's own picker, and code keeps using .value.
+   Add data-nodtf to an input to leave it alone. */
+var DTF_TYPES = { date: 1, time: 1, 'datetime-local': 1, month: 1 };
+function dtfTime(v) { var p = String(v || '').split(':'), h = +p[0], m = +p[1]; if (isNaN(h) || isNaN(m)) return ''; return (h % 12 || 12) + ':' + pad(m) + (h < 12 ? ' AM' : ' PM'); }
+function dtfDate(v) { var p = String(v || '').split('-'); if (p.length < 3 || !MO[+p[1] - 1]) return ''; return (+p[2]) + ' ' + MO[+p[1] - 1] + ' ' + p[0]; }
+function dtfText(type, v) {
+  if (!v) return '';
+  if (type === 'date') return dtfDate(v);
+  if (type === 'time') return dtfTime(v);
+  if (type === 'month') { var p = v.split('-'); return MO[+p[1] - 1] ? MO[+p[1] - 1] + ' ' + p[0] : v; }
+  if (type === 'datetime-local') { var q = v.split('T'); return dtfDate(q[0]) + (q[1] ? ', ' + dtfTime(q[1].slice(0, 5)) : ''); }
+  return v;
+}
+function dtfSync(inp) {
+  var l = inp && inp._dtfLbl; if (!l) return;
+  var t = dtfText(inp.type, inp.value);
+  l.textContent = t || inp.getAttribute('placeholder') || (inp.type === 'time' ? 'Pick a time' : inp.type === 'month' ? 'Pick a month' : 'Pick a date');
+  l.classList.toggle('ph', !t);
+  if (l.parentNode) l.parentNode.hidden = !!inp.hidden;
+}
+function dtfEnhance(root) {
+  if (!root || !root.querySelectorAll) return;
+  var list = root.matches && root.matches('input.inp') ? [root] : $$('input.inp', root);
+  list.forEach(function (inp) {
+    if (!DTF_TYPES[inp.type] || inp._dtfLbl || inp.hasAttribute('data-nodtf') || !inp.parentNode) return;
+    var w = document.createElement('span'); w.className = 'dtf';
+    if (inp.style.width) { w.style.width = inp.style.width; inp.style.width = ''; }
+    if (inp.style.flex) { w.style.flex = inp.style.flex; inp.style.flex = ''; }
+    inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    var l = document.createElement('span'); l.className = 'dtf-l'; l.setAttribute('aria-hidden', 'true'); w.appendChild(l);
+    inp.classList.add('dtf-i'); inp._dtfLbl = l;
+    inp.addEventListener('input', function () { dtfSync(inp); }); inp.addEventListener('change', function () { dtfSync(inp); });
+    dtfSync(inp);
+  });
+}
+(function () {
+  /* code that sets .value directly (no input event) still updates the label */
+  try {
+    var d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    if (d && d.set) Object.defineProperty(HTMLInputElement.prototype, 'value', { configurable: true, enumerable: d.enumerable, get: d.get, set: function (v) { d.set.call(this, v); if (this._dtfLbl) dtfSync(this); } });
+  } catch (e) {}
+  if (!window.MutationObserver) return;
+  var mo = new MutationObserver(function (recs) {
+    for (var i = 0; i < recs.length; i++) for (var j = 0; j < recs[i].addedNodes.length; j++) { var n = recs[i].addedNodes[j]; if (n.nodeType === 1) dtfEnhance(n); }
+  });
+  var go = function () { mo.observe(document.body, { childList: true, subtree: true }); dtfEnhance(document.body); };
+  if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);
+})();

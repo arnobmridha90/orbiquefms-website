@@ -25,7 +25,7 @@
 .tr-pin .tr-arrow{fill:#fff}
 .tr-pin text{font-size:13px;font-weight:600;fill:var(--text);paint-order:stroke;stroke:var(--paper);stroke-width:4px;stroke-linejoin:round}
 .tr-pin.sel .tr-dot{stroke:var(--text)}
-.tr-pin:focus-visible .tr-dot{stroke:var(--primary);stroke-width:4}
+.tr-pin:focus-visible .tr-dot{stroke:var(--focus);stroke-width:4}
 .tr-scale line{stroke:var(--text2);stroke-width:3}
 .tr-scale text,.tr-north text{font-size:12px;fill:var(--text2)}
 .tr-north path{fill:var(--text2)}

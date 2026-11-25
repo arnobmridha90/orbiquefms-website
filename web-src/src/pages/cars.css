@@ -10,7 +10,7 @@
 .pg-cars .cr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:20px}
 .pg-cars .cr-card{background:var(--paper);border-radius:8px;box-shadow:var(--sh-md);overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:box-shadow .15s,transform .15s}
 .pg-cars .cr-card:hover{box-shadow:var(--sh-xl);transform:translateY(-2px)}
-.pg-cars .cr-card:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.pg-cars .cr-card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .pg-cars .cr-photo{position:relative;background:linear-gradient(180deg,var(--hover),transparent);padding:18px 16px 6px}
 .pg-cars .cr-acts{position:absolute;top:8px;right:8px;display:flex;gap:4px}
 .pg-cars .cr-acts .ib{background:var(--paper);box-shadow:var(--sh-sm)}

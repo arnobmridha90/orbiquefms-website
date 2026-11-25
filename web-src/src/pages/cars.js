@@ -16,6 +16,8 @@ var CARS_CHIPS = [
   ['shop', 'In workshop', function (c) { return !!c.inWorkshop; }, 'warn']
 ];
 function carsPlatforms() { var l = (CO().trackerPlatforms || []).filter(Boolean); return l.length ? l : ['Tracksolid Pro']; }
+/* the dashcam list in Settings > Fleet (falls back to the tracker list for older settings) */
+function carsCamPlatforms() { var l = (CO().dashcamPlatforms || []).filter(Boolean); return l.length ? l : carsPlatforms(); }
 var CARS_SLOTS = [['roadtax', 'Road tax', 'receipt-tax'], ['insurance', 'Insurance', 'shield-check'], ['grant', 'Car grant', 'license']];
 var CARS_OWNER = [['ic', 'Owner IC', 'id'], ['licence', 'Owner driving licence', 'id-badge-2'], ['agreement', 'Agreement', 'file-text']];
 var CARS_SHAPE = { Hatchback: 'hatch', Sedan: 'sedan', SUV: 'suv', MPV: 'mpv', Other: 'sedan' };
@@ -231,6 +233,8 @@ function carsDrawer(id, onClose) {
   var start = JSON.stringify(w) + JSON.stringify(x);
   var dis = ro ? { disabled: true } : {};
   var I = function (o) { return UI.input(Object.assign(o, ro ? { readonly: true } : {})); };
+  /* dates always read "19 Oct 2026", whatever the browser's language */
+  var Dt = function (o) { return ro ? I(Object.assign({}, o, { value: o.value ? UI.fmt.date(UI.parseDate(o.value)) : '' })) : UI.dateField(Object.assign({ chips: false, placeholder: 'Not set' }, o)); };
   var Sel = function (o) { return UI.select(Object.assign(o, dis)); };
   var sec = function (title, body, o) { return '<section class="cr-sec' + (o && o.lock ? ' lock' : '') + '"><h3 class="cr-cap">' + (o && o.icon ? i(o.icon) : '') + esc(title) + '</h3>' + body + '</section>'; };
   var facts = function () {
@@ -264,19 +268,20 @@ function carsDrawer(id, onClose) {
       '<datalist id="cr-colors">' + Object.keys(CAR_COLORS).map(function (k) { return '<option value="' + k + '">'; }).join('') + '</datalist>' +
       I({ key: 'year', label: 'Year', type: 'number', required: true, min: 1980, max: 2030, value: w.year }) + I({ key: 'seats', label: 'Seats', type: 'number', required: true, min: 1, max: 60, value: w.seats }) + I({ key: 'cc', label: 'Engine capacity (cc)', type: 'number', min: 0, value: w.cc }) +
       Sel({ key: 'type', label: 'Type', required: true, options: LISTS.carTypes, value: w.type, placeholder: 'Choose' }) + Sel({ key: 'fuel', label: 'Fuel Type', options: LISTS.fuels, value: w.fuel }) + Sel({ key: 'trans', label: 'Transmission', options: LISTS.transmissions, value: w.trans }) +
-      I({ key: 'tax', label: 'Road Tax Valid Until', type: 'date', value: w.tax }) + '</div>', { icon: 'car' });
+      Dt({ key: 'tax', label: 'Road Tax Valid Until', value: w.tax }) + '</div>', { icon: 'car' });
     h += sec('Fleet status', '<div class="cr-form">' + Sel({ key: 'fleet', label: 'Status', options: LISTS.fleetStatus, value: w.fleet, help: 'Cars that are not active are left out of reminders and the idle list' }) +
       UI.switch({ key: 'web', label: 'Show on the website', checked: w.web, disabled: ro }) + I({ key: 'vin', label: 'VIN / chassis number', value: w.vin }) + I({ key: 'engine', label: 'Engine number', value: w.engine }) +
-      I({ key: 'spec', label: 'Spec', value: w.spec, help: 'Body / fuel as on the grant, for example SALOON / PETROL' }) + I({ key: 'boughtOn', label: 'Bought on', type: 'date', value: w.boughtOn }) +
+      I({ key: 'spec', label: 'Spec', value: w.spec, help: 'Body / fuel as on the grant, for example SALOON / PETROL' }) + Dt({ key: 'boughtOn', label: 'Bought on', value: w.boughtOn, max: NOW() }) +
       (mtCostsOk() ? I({ key: 'boughtFor', label: 'Bought for (RM)', type: 'number', prefix: 'RM', min: 0, value: w.boughtFor }) : '') + I({ key: 'rate', label: 'Daily rate (RM)', type: 'number', prefix: 'RM', min: 0, value: w.rate }) +
       I({ key: 'hourly', label: 'Hourly rate (RM)', type: 'number', prefix: 'RM', min: 0, value: w.hourly }) + I({ key: 'deposit', label: 'Deposit (RM)', type: 'number', prefix: 'RM', min: 0, value: w.deposit }) + '</div>' +
       (isNew ? '' : '<p class="b2 cr-note">' + i('gauge') + 'Odometer: ' + mtKm(c.odo) + '. Update it from the Maintenance button, it follows every service and hand-over.</p>'), { icon: 'flag' });
     if (seeOwn || seeInst) h += sec('Owner and instalment', '<div class="cr-form">' + (seeOwn ? I({ key: 'ownerName', label: 'Owner name', value: w.ownerName }) + I({ key: 'ownerMobile', label: 'Owner mobile', type: 'tel', value: w.ownerMobile, placeholder: '+60 00-000 0000' }) + I({ key: 'ownerIc', label: 'Owner IC number (12 digits)', value: w.ownerIc, maxlength: 14, placeholder: '900101145678' }) : '') +
       (seeInst ? I({ key: 'instDay', label: 'Instalment day', type: 'number', min: 1, max: 31, value: w.instDay, help: 'The same date every month. Leave empty for none.' }) + I({ key: 'instAmt', label: 'Monthly instalment (RM)', type: 'number', prefix: 'RM', min: 0, value: w.instAmt, help: 'Shows on the Instalments page when it is due' }) : '') + '</div>', { icon: 'user-dollar' });
     var plats = carsPlatforms();
-    h += '<datalist id="cr-plats">' + plats.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>';
+    var cams = carsCamPlatforms();
+    h += '<datalist id="cr-plats">' + plats.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist><datalist id="cr-cams">' + cams.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>';
     h += sec('Tracker', '<div class="cr-form">' + I({ key: 'trkPlatform', label: 'Platform / app', value: w.trkPlatform, placeholder: plats[0], attrs: { list: 'cr-plats' }, help: 'Pick one from your list in Settings, or type it' }) + I({ key: 'trkImei', label: 'IMEI', value: w.trkImei, maxlength: 15, attrs: { inputmode: 'numeric' }, help: 'The IMEI is how the Tracking page recognises this car, so each IMEI can be on one car only.' }) + I({ key: 'trkSim', label: 'SIM number', value: w.trkSim, type: 'tel' }) + '</div>', { icon: 'radar-2' });
-    h += sec('Dashcam', '<div class="cr-form">' + I({ key: 'camPlatform', label: 'Platform / app', value: w.camPlatform, placeholder: plats[0], attrs: { list: 'cr-plats' } }) + I({ key: 'camImei', label: 'IMEI', value: w.camImei, maxlength: 16, attrs: { inputmode: 'numeric' }, help: '14 to 16 digits, on a sticker on the dashcam' }) + I({ key: 'camSim', label: 'SIM number', value: w.camSim, type: 'tel' }) + '</div>', { icon: 'video' });
+    h += sec('Dashcam', '<div class="cr-form">' + I({ key: 'camPlatform', label: 'Platform / app', value: w.camPlatform, placeholder: cams[0], attrs: { list: 'cr-cams' }, help: 'Pick one from your list in Settings, or type it' }) + I({ key: 'camImei', label: 'IMEI', value: w.camImei, maxlength: 16, attrs: { inputmode: 'numeric' }, help: '14 to 16 digits, on a sticker on the dashcam' }) + I({ key: 'camSim', label: 'SIM number', value: w.camSim, type: 'tel' }) + '</div>', { icon: 'video' });
     h += facts();
     h += sec('Road tax, insurance and car grant', '<p class="b2">Upload each paper as a picture or PDF. "Read document" reads the expiry date, engine and chassis numbers, capacity, model, year, spec and owner IC from it and shows them to you to check. Nothing changes on the car until you press Save on that screen.</p>' +
       CARS_SLOTS.map(function (s) { return slot(s[0], s[1], s[2], x.papers[s[0]], { read: true, manage: canE, group: 'papers' }); }).join(''), { icon: 'files' });

@@ -32,6 +32,3 @@
 .si-lockav { width: 56px; height: 56px; font-size: 19px; margin: -30px auto 10px; border: 3px solid var(--bg); position: relative; left: 22px; }
 .si-lock .si-logo { margin-bottom: 0; }
 .si-lock .btn.link { margin: 10px auto 0; display: flex; }
-/* work around: core applyTheme compares with the short '#fff', which reads as NaN, so --on-brand becomes #111 (dark text on the brand).
-   Our brand colours are all dark enough for white text, so M9 screens and sheets keep it white. */
-.si-main, .hm-main, .st-main, .tm-person, .act-main-wrap, #stfSave, #sigSave, #pwWa, #apSave, .hm-next-act .btn, .tm-addbtn, .nt-card .btn { --on-brand: #fff; }

@@ -4,7 +4,7 @@
 .pg-activity .ac-row{display:grid;grid-template-columns:150px 150px minmax(0,1fr) 160px 36px;gap:12px;align-items:center;padding:11px 24px;border-bottom:1px solid var(--divider);font-size:14px;color:var(--text)}
 .pg-activity .ac-row[data-ac]{cursor:pointer}
 .pg-activity .ac-row[data-ac]:hover{background:var(--hover)}
-.pg-activity .ac-row[data-ac]:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.pg-activity .ac-row[data-ac]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 .pg-activity .ac-head{font-size:13px;text-transform:uppercase;letter-spacing:.2px;color:var(--text);font-weight:500;padding-top:14px;padding-bottom:14px}
 .pg-activity .ac-when{color:var(--text2);font-size:13.5px}
 .pg-activity .ac-what{min-width:0}

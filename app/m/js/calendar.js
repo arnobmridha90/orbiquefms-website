@@ -45,7 +45,7 @@ function calGrid(s, e) {
     n++;
     var cells = '';
     for (var i = 0; i < CAL_DAYS; i++) {
-      var d = new Date(S0 + i * DAY), past = d.getTime() < today, wk = d.getDay() === 0 || d.getDay() === 6, st = new Date(d); st.setHours(10, 0, 0, 0);
+      var d = new Date(S0 + i * DAY), past = d.getTime() < today, wk = d.getDay() === 0 || d.getDay() === 6, st = new Date(d); st.setHours(10, 0, 0, 0); if (d.getTime() === today && st.getTime() < Date.now()) { st = new Date(); st.setHours(st.getHours() + 1, 0, 0, 0); } /* today after 10 am: the next full hour */
       cells += '<button type="button" class="cal-cell' + (wk ? ' wk' : '') + (d.getTime() === today ? ' today' : '') + '" style="left:' + i * CAL_W + 'px;width:' + CAL_W + 'px"' +
         (past || c.status !== 'active' ? ' disabled aria-hidden="true" tabindex="-1"' : ' aria-label="New booking for ' + esc(c.plate) + ' on ' + dLong(d) + '" onclick="location.hash=\'' + hashWith('new', { car: c.id, start: st.toISOString() }) + '\'"') + '></button>';
     }

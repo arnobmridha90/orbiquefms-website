@@ -78,6 +78,11 @@ function waThread(id) {
   var right = (tel ? '<a class="iconbtn" href="tel:' + esc(tel) + '" aria-label="Call">' + I('phone') + '</a>' : '') +
     (cu && can('customers.view') ? '<button class="iconbtn" type="button" onclick="Cust.open(\'' + cu.id + '\')" aria-label="View customer">' + I('user') + '</button>' : '') +
     '<a class="iconbtn" href="https://wa.me/' + normPhone(c.phone) + '" target="_blank" rel="noopener" aria-label="Open in WhatsApp">' + I('wa') + '</a>';
+  /* free cars for the dates the customer asked about (or the default period when the chat has no dates) */
+  if (can('bookings.view')) {
+    var ld = c.lead || {}, avh = ld.start && ld.end && new Date(ld.end) > new Date(ld.start) ? hashWith('availability', { from: avLocal(ld.start), to: avLocal(ld.end) }) : '#availability';
+    right = '<a class="iconbtn" href="' + avh + '" aria-label="Check free cars" title="Check free cars">' + I('car') + '</a>' + right;
+  }
   var a = S.assistant || { on: true }, sum = leadsOn() ? Leads.summary(id, { thread: true }) : '';
   var who_ = cu ? cu.name : c.name || c.phone;
   var banner = !a.on ? '<div class="banner ch-tb">' + I('users') + '<div style="flex:1">The assistant is off. Staff answer this chat.</div></div>' :

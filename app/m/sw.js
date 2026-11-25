@@ -1,5 +1,5 @@
 /* Orbique FMS staff app: service worker (fast opening, offline shell, phone notifications) */
-var CACHE = 'fms-staff-v5';
+var CACHE = 'fms-staff-v6';
 var SHELL = ['./', './manifest-kilat.webmanifest', './manifest-padi.webmanifest', './manifest-bara.webmanifest',
   './icons/kilat-192.png', './icons/padi-192.png', './icons/bara-192.png', './icons/badge-96.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL).catch(function () {}); })); self.skipWaiting(); });

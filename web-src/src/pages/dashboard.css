@@ -59,7 +59,7 @@
 
 /* KPI */
 .dsh-info{border:0;background:transparent;padding:0;display:inline-grid;place-items:center;vertical-align:middle;color:var(--text3);font-size:16px;cursor:help;width:40px;height:40px;margin:-12px -12px -12px -10px;border-radius:50%}
-.dsh-info:focus-visible{outline:2px solid var(--primary);outline-offset:-6px}
+.dsh-info:focus-visible{outline:2px solid var(--focus);outline-offset:-6px}
 .dsh-info:hover{color:var(--text);background:var(--hover)}
 .dsh-k1{grid-template-columns:repeat(var(--n,5),minmax(0,1fr))}
 @media (max-width:1250px){.dsh-k1{grid-template-columns:repeat(6,minmax(0,1fr))}}

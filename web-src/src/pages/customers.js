@@ -343,7 +343,7 @@ PAGES['customers'] = {
     ];
     if (showCol === 'black') cols.splice(2, 0, { key: 'why', label: 'On the blacklist', render: function (p) { return '<div class="cu-why"><b>Since ' + UI.fmt.date(p.blacklist.since) + '</b><small>' + esc(p.blacklist.reason || '') + '</small></div>'; } });
     if (showCol === 'careful' || showCol === 'vip') cols.splice(2, 0, { key: 'why', label: 'Pinned note', render: function (p) { var n = (p.notes || []).filter(function (z) { return z.flag === (showCol === 'vip' ? 'VIP' : 'Be careful'); }).sort(function (a, b) { return b.pinned - a.pinned || b.at - a.at; })[0]; return n ? '<div class="cu-why"><small>' + esc(n.text) + '</small><span class="faint">' + esc(n.by) + ' · ' + UI.fmt.date(n.at) + '</span></div>' : '<span class="faint">-</span>'; } });
-    if (showCol === 'repeat') cols.splice(2, 0, { key: 'cnt', label: 'Rentals', align: 'right', sort: function (p) { return flagsOf[p.id].count; }, render: function (p) { var f = flagsOf[p.id], spent = sum(cuBookings(p, d).filter(function (x) { return x.status !== 'Cancelled'; }).map(function (x) { return x.payable - x.dep; })); return '<div class="cu-why r"><b>' + f.count + ' rentals</b><small>' + (ctx.can('bookings.see_amounts') ? UI.money(spent, { dp: 0 }) + ' spent' : '') + '</small></div>'; } });
+    if (showCol === 'repeat') cols.splice(2, 0, { key: 'cnt', label: 'Rentals', align: 'right', sort: function (p) { return flagsOf[p.id].count; }, render: function (p) { var f = flagsOf[p.id], spent = sum(cuBookings(p, d).filter(function (x) { return x.status !== 'Cancelled'; }).map(function (x) { return x.payable - x.dep; })); return '<div class="cu-why r"><b>' + f.count + ' rentals</b><small>' + (ctx.can('bookings.see_amounts') ? UI.money(spent) + ' spent' : '') + '</small></div>'; } });
     if (showCol) cols = cols.filter(function (c) { return c.key !== 'email' && c.key !== 'nat'; }); /* the segment column takes their room; both stay in the customer drawer */
 
     var rowsFor = function () {
@@ -360,7 +360,7 @@ PAGES['customers'] = {
     var t = UI.table(root.querySelector('#cu-t'), {
       columns: cols, rows: rowsFor(), rowKey: 'id', density: 'compact', minWidth: 1080, pageSize: st.size || 25, pageSizes: [10, 25, 50, 100], sort: st.sort, onSort: function (s) { st.sort = s; },
       onRowClick: function (p) { cuOpen(p.id); },
-      empty: st.show === 'all' ? { icon: 'users', title: 'No customers found', text: 'Try another name, IC, phone or email.' } : { icon: 'flag', title: 'No customers with this flag yet', text: 'Flags appear once someone adds a note or a customer rents again.' },
+      empty: st.show === 'all' ? { icon: 'users', title: 'No customers found', text: 'Try another name, IC, phone or email.' } : { icon: 'flag', title: 'No customers here', text: 'Nobody with this flag matches the search, or nobody has this flag yet. Flags appear once someone adds a note or a customer rents again.' },
       card: function (p) {
         var f = flagsOf[p.id];
         return '<div class="cu-card"><div class="cu-who">' + UI.avatar(p.name) + '<div class="cu-who-t"><b class="ellip">' + esc(p.name) + '</b><small>' + plural(f.count, 'rental') + ' · ' + esc(p.nat) + '</small></div></div>' +
@@ -414,14 +414,14 @@ function cuOpen(id) {
   var editing = false;
   function head() {
     var f = cuFlags(p), btn = '';
-    if (can('customers.blacklist_edit')) btn = f.black ? UI.btn('Blacklisted', { kind: 'c', size: 'sm', icon: 'ban', cls: 'cu-blk on', attrs: { 'data-cu-black': 'off', title: 'On the blacklist. Click to take this customer off it.' } }) : UI.btn('Blacklist Customer', { kind: 'o', size: 'sm', icon: 'ban', cls: 'cu-blk', attrs: { 'data-cu-black': 'on' } });
+    if (can('customers.blacklist_edit')) btn = f.black ? UI.btn('Blacklisted', { kind: 'c', size: 'sm', icon: 'ban', cls: 'cu-blk on', attrs: { 'data-cu-black': 'off', title: 'On the blacklist. Click to take this customer off it.', 'aria-label': 'Blacklisted. Take this customer off the blacklist' } }) : UI.btn('Blacklist Customer', { kind: 'o', size: 'sm', icon: 'ban', cls: 'cu-blk', attrs: { 'data-cu-black': 'on', title: 'Put this customer on the blacklist', 'aria-label': 'Blacklist this customer' } });
     else if (f.black && can('customers.blacklist_view')) btn = UI.chip('Blacklisted', 'bad', { icon: 'lock', title: 'Only people with "Change the blacklist" can change this' });
     return btn;
   }
   function body(el) {
     var f = cuFlags(p), bks = cuBookings(p).sort(function (a, b) { return b.start - a.start; });
     var info = editing ? '<div class="cu-g2">' + UI.input({ key: 'name', label: 'Full Name', value: p.name, required: true }) + UI.input({ key: 'phone', label: 'Phone Number', value: p.phone, required: true }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: p.email }) +
-      UI.select({ key: 'nat', label: 'Nationality', options: LISTS.nationalities, value: p.nat }) + UI.textarea({ key: 'address', label: 'Residential Address', value: p.address, rows: 2 }) + UI.input({ key: 'ic', label: 'IC / Passport No', value: p.ic }) + UI.input({ key: 'licenceNo', label: 'Driver License No', value: p.licenceNo }) + UI.input({ key: 'licenceExp', label: 'License Expiry', type: 'date', value: p.licenceExp }) + '</div>' +
+      UI.select({ key: 'nat', label: 'Nationality', options: LISTS.nationalities, value: p.nat }) + UI.textarea({ key: 'address', label: 'Residential Address', value: p.address, rows: 2 }) + UI.input({ key: 'ic', label: 'IC / Passport No', value: p.ic }) + UI.input({ key: 'licenceNo', label: 'Driver License No', value: p.licenceNo }) + UI.dateField({ key: 'licenceExp', label: 'License Expiry', value: p.licenceExp, chips: false, placeholder: 'Not set' }) + '</div>' +
       '<div class="row gap8" style="justify-content:flex-end">' + UI.btn('Cancel', { kind: 't', size: 'sm', attrs: { 'data-cu-edit': 'cancel' } }) + UI.btn('Save details', { size: 'sm', icon: 'check', attrs: { 'data-cu-edit': 'save' } }) + '</div>'
       : '<div class="cu-kv">' + UI.kv('Full Name', esc(p.name)) + UI.kv('Phone Number', UI.phone(p.phone, { wa: true })) + UI.kv('Email', esc(p.email)) + UI.kv('Nationality', esc(p.nat)) + UI.kv('Residential Address', esc(p.address), { full: true }) +
         UI.kv('IC / Passport No', '<span class="num">' + cuIcText(p.ic) + '</span>') + UI.kv('Total Booking', String(bks.length)) + UI.kv('Driver License No', esc(p.licenceNo)) + UI.kv('License Expiry', UI.fmt.date(p.licenceExp) + (p.licenceExp < NOW() ? ' ' + UI.chip('Expired', 'bad') : '')) + '</div>';

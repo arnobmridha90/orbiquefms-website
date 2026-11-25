@@ -19,7 +19,7 @@ function hoRow(h) {
   var end = h.done ? '<span class="chip tone-green">' + I('check', 2.6) + (h.type === 'out' ? 'Handed over' : 'Back') + '</span>'
     : late ? chip(h.type === 'out' ? 'Not picked up' : 'Late', 'red')
     : (can('bookings.see_amounts') || can('billing.view')) && b.paymentStatus ? payChip(b) : CHEV;
-  return '<a class="row hm-ho' + (h.done ? ' done' : '') + '" href="#booking/' + b.id + '"><div class="ho"><div class="time"><b class="num">' + hm(h.at).replace(/ (am|pm)/, '<small>$1</small>') + '</b><span class="' + h.type + '">' + (h.type === 'out' ? 'Out' : 'Back') + '</span></div></div>' +
+  return '<a class="row hm-ho' + (h.done ? ' done' : '') + '" href="#booking/' + b.id + '"><div class="ho"><div class="time"><b class="num">' + hm(h.at).replace(/ (am|pm)/i, '<small>$1</small>') + '</b><span class="' + h.type + '">' + (h.type === 'out' ? 'Out' : 'Back') + '</span></div></div>' +
     '<div class="grow"><div class="t1">' + esc(cu.name) + '</div><div class="t2">' + esc(c.plate || '') + ' · ' + esc(placeText(b, h.type === 'out' ? 'pick' : 'ret')) + '</div></div>' + end + '</a>';
 }
 function installBanner() {

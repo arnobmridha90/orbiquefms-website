@@ -52,3 +52,5 @@
 .iv-more { margin: 12px 0 4px; }
 .dc-send .btn.sm { padding: 0 11px; white-space: nowrap; font-size: 14px; gap: 6px; }
 .dc-send .btn.sm svg { width: 18px; height: 18px; }
+/* a voided document keeps its amount for the record, struck through so nobody counts it */
+.dc-doc.void .money, .card2.muted[data-doc] .c2-end .money { text-decoration: line-through; color: var(--muted); }

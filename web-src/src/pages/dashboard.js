@@ -574,7 +574,7 @@ PAGES['dashboard'] = {
       var pays = d.payments.filter(function (p) { return !p.void; });
       var box = function (title, since, from) {
         var main = 0, side = 0, dep = 0;
-        pays.forEach(function (p) { if (p.at < from || p.at > now) return; var x = findBooking(p.booking); if (p.kind === 'Security deposit') dep += p.amount; else if (x && (x.status === 'Pending' || x.status === 'Cancelled')) side += p.amount; else main += p.amount; });
+        pays.forEach(function (p) { if (p.at < from || p.at > now || p.method === 'Deposit adjustment') return; var x = findBooking(p.booking); if (p.kind === 'Security deposit') dep += p.amount; else if (x && (x.status === 'Pending' || x.status === 'Cancelled')) side += p.amount; else main += p.amount; });
         return '<div class="card dsh-cash"><div><b>' + title + '</b><span class="b2">' + since + '</span></div><b class="dsh-cashv num">' + UI.fmt.money(main) + '</b><p class="b2">Rental and other payments received. Cash, not revenue.</p><div class="dsh-cashside"><span>On pending or cancelled bookings (not revenue)</span><b class="num">' + UI.fmt.money(side) + '</b><span>Deposits taken (not income)</span><b class="num">' + UI.fmt.money(dep) + '</b></div></div>';
       };
       var wait = d.deposits.filter(function (z) { return !z.refund && !z.markedByHand; }).map(function (z) { var x = findBooking(z.booking); return x ? { x: x, amt: Math.max(0, x.dep - sum(z.deductions.map(function (q) { return q.amount; }))) } : null; }).filter(Boolean);
@@ -631,7 +631,7 @@ PAGES['dashboard'] = {
       else if (a === 'expense') ctx.api.addExpense();
       else if (a === 'bankin') ctx.api.bankIn();
       else if (a === 'unfold') { st.open[v] = true; draw(); jump('dsh-' + v); }
-      else if (a === 'notcounted') { ctx.go('reports'); setTimeout(function () { if (typeof rptCarsCounted === 'function') rptCarsCounted(); }, 350); }
+      else if (a === 'notcounted') { ctx.go('reports', { action: 'carscounted' }); }
       else if (a === 'unfollow') { st.follow = null; draw(); }
       else if (a === 'opencar') ctx.api.openCar(v);
       else if (a === 'info') UI.popover(el, '<p class="b2" style="margin:0;padding:12px 14px">' + esc(v) + '</p>', { width: 280, align: 'start' });

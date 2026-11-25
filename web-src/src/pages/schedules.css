@@ -71,7 +71,7 @@
 .sc-url{display:flex;align-items:center;gap:6px;background:rgb(255 255 255 / .08);border-radius:10px;padding:4px 4px 4px 10px;color:rgb(255 255 255 / .6)}
 .sc-url input{flex:1;min-width:0;background:none;border:0;color:#fff;font:inherit;font-size:12px;padding:6px 0}
 .sc-url input:focus{outline:none}
-.sc-url:focus-within{box-shadow:0 0 0 2px var(--primary)}
+.sc-url:focus-within{box-shadow:0 0 0 2px var(--focus)}
 .sc-url button{border:0;background:var(--primary);color:var(--on-primary);width:30px;height:30px;border-radius:8px;display:grid;place-items:center;cursor:pointer}
 .sc-pbody{padding:12px 8px 6px;max-height:min(64vh,640px);overflow:auto}
 .sc-step{display:flex;align-items:center;justify-content:center;gap:0;margin:4px 0 6px}

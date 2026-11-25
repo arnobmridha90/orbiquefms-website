@@ -1,13 +1,7 @@
 /* ---------------- NOTIFICATION SETTINGS (M9) ----------------
    Lists only the kinds the person can use, adds My job in 30 minutes, Tomorrow's schedule, New lead waiting, Service or paper due,
    Tracker alarm. Quiet hours (default 11 pm to 7 am; late returns still ring). A Try it button for each kind. */
-Object.assign(KINDS, {
-  job: { label: 'My job in 30 minutes', desc: 'A pick-up, return or task given to you starts soon', icon: 'key' },
-  tomorrow: { label: 'Tomorrow’s schedule', desc: 'An evening summary of what goes out and comes back tomorrow', icon: 'cal' },
-  lead: { label: 'New lead waiting', desc: 'A customer on WhatsApp is ready for a person to take over', icon: 'bot' },
-  service: { label: 'Service or paper due', desc: 'A service, road tax, insurance or inspection is due soon', icon: 'wrench' },
-  alarm: { label: 'Tracker alarm', desc: 'A car tracker reports a power cut, tow or a move without a booking', icon: 'warn' }
-});
+/* the five extra kinds (job, tomorrow, lead, service, alarm) live in core KINDS and PREF_DEFAULTS */
 /* which kinds a person can get */
 var KIND_ACCESS = { new: ['bookings.view'], change: ['bookings.view'], staff: [], wa: ['leads.view', 'bookings.create'], pay: ['billing.view', 'billing.record_payment'], due: ['bookings.view'],
   job: [], tomorrow: ['bookings.view'], lead: ['leads.view'], service: ['maintenance.view'], alarm: ['tracking.alarms'] };
@@ -19,7 +13,7 @@ function inQuiet(d) {
   d = d || new Date(); var m = d.getHours() * 60 + d.getMinutes(), f = q.from.split(':'), t = q.to.split(':'), a = +f[0] * 60 + +f[1], b = +t[0] * 60 + +t[1];
   return a === b ? false : a < b ? m >= a && m < b : m >= a || m < b;
 }
-function hmText(v) { var p = String(v).split(':'), h = +p[0], m = +p[1]; return (h % 12 || 12) + (m ? ':' + pad(m) : '') + (h < 12 ? ' am' : ' pm'); }
+function hmText(v) { var p = String(v).split(':'), h = +p[0], m = +p[1]; return (h % 12 || 12) + (m ? ':' + pad(m) : '') + (h < 12 ? ' AM' : ' PM'); }
 /* during quiet hours a notification still goes to the inbox, without a toast or sound (late returns still show) */
 (function () {
   var inner = notify;
@@ -99,6 +93,8 @@ function simulate(kind) {
     var t0 = sod(now).getTime() + DAY, outN = 0, inN = 0;
     S.bookings.forEach(function (q) { if (q.bookingStatus === 'Cancelled') return; var s1 = new Date(q.start).getTime(), e1 = new Date(q.end).getTime(); if (s1 >= t0 && s1 < t0 + DAY) outN++; if (e1 >= t0 && e1 < t0 + DAY) inN++; });
     ev = ['tomorrow', 'Tomorrow’s schedule', outN + ' going out, ' + inN + ' coming back. Tap to see who is doing what.', '#schedule?range=tomorrow'];
+  } else if (kind === 'lead' && typeof Leads !== 'undefined' && Leads.simulateNew) {
+    Leads.simulateNew(); return; /* a full lead (dates, car hold, question) from the leads module */
   } else if (kind === 'lead') {
     var ph = fmtPhone('01' + (2 + Math.floor(Math.random() * 7)) + (1000000 + Math.floor(Math.random() * 8999999))), cx = S.cars.filter(function (c2) { return c2.status === 'active'; })[2] || S.cars[0];
     var ls = new Date(sod(now).getTime() + 3 * DAY + 10 * HOUR), le = new Date(ls.getTime() + 2 * DAY);

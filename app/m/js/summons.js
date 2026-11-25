@@ -183,8 +183,11 @@ var Summons = (function () {
     $('#sfok', sh).onclick = function () {
       var vals = collect(true); if (!vals) return;
       var keep = s && (s.status === 'Waived' || s.status === 'Disputed');
-      var row = store(vals, keep ? s.status : chosen ? (s && s.status === 'Charged' ? 'Charged' : 'Ready to charge') : 'No booking');
-      closeAllSheetsM7(); render(false, true); say(keep ? 'Details saved. It stays ' + s.status.toLowerCase() + '.' : chosen ? 'Details confirmed. You can charge it now.' : 'Saved under No booking');
+      /* a charged summons moved to another booking: the old charge was asked from someone else, so it is ready to charge again */
+      var moved = s && s.status === 'Charged' && chosen !== s.booking;
+      var row = store(vals, keep ? s.status : chosen ? (s && s.status === 'Charged' && !moved ? 'Charged' : 'Ready to charge') : 'No booking');
+      if (moved) { row.chargedAmt = null; row.chargedAt = null; logS(row, 'Summons ' + title(row) + ' moved to another booking: charge it again'); save(); }
+      closeAllSheetsM7(); render(false, true); say(moved && chosen ? 'Moved to another booking. Charge the new customer.' : keep ? 'Details saved. It stays ' + s.status.toLowerCase() + '.' : chosen ? 'Details confirmed. You can charge it now.' : 'Saved under No booking');
       if (!keep && chosen && can('summons.charge')) later(function () { open(row.id); }, 350);
     };
     var lt = $('#sflater', sh); if (lt) lt.onclick = function () { var vals = collect(false); if (!vals) return; store(vals, 'Needs review'); closeAllSheetsM7(); render(false, true); say('Saved under Needs review'); };

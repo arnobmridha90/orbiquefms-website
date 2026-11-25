@@ -77,6 +77,8 @@ var Leads = (function () {
     var c = l.car ? car(l.car) : null, pf = feeOf(l, 'pick'), rf = feeOf(l, 'ret'), b = l.bookingId ? bk(l.bookingId) : (w.bookingId ? bk(w.bookingId) : null);
     var body = '';
     if (s === 'booked' && b) body += '<div class="ld-booked">' + I('check', 2.4) + '<span class="grow">Booked as <a class="chip tone-emerald ld-bkchip" href="#booking/' + b.id + '">' + esc(b.code) + '</a></span>' + statusChip(b) + '</div>';
+    /* the customer's question is the line staff need most: it comes first, above the details */
+    if (l.question && s !== 'booked' && s !== 'closed') body += '<div class="ld-q">' + I('chat') + '<div><b>Customer asks:</b> ' + esc(l.question) + '</div></div>';
     body += '<div class="ld-grid">';
     body += row('Dates', l.start ? esc(datesText(l)) : '<span class="muted">Not given yet</span>', l.start && l.end ? esc(durationText(l.start, l.end)) : '', true);
     body += row('Car', c ? esc(c.make + ' ' + c.model) + ' <span class="muted">' + esc(c.plate) + '</span>' : '<span class="muted">Not chosen yet</span>', s !== 'booked' && s !== 'closed' ? holdChip(l, true) || (c && l.start && !l.holdUntil ? 'Not held' : '') : '', true);
@@ -88,7 +90,6 @@ var Leads = (function () {
     }
     if (l.deposit != null && can('bookings.see_amounts')) body += row('Deposit', '<span class="money">' + rm(l.deposit) + '</span>', 'Returned after the trip');
     body += '</div>';
-    if (l.question && s !== 'booked' && s !== 'closed') body += '<div class="ld-q">' + I('chat') + '<div><b>Customer asks:</b> ' + esc(l.question) + '</div></div>';
     if (l.takenBy && (s === 'taken' || s === 'waiting' || s === 'booked')) body += '<div class="ld-by">' + I('user') + (l.takenBy === S.me ? 'You took it' : esc(who(l.takenBy)) + ' took it') + (l.takenAt ? ' ' + esc(ago(l.takenAt)) : '') + '</div>';
     if (s === 'closed' && l.closedAt) body += '<div class="ld-by">' + I('check') + 'Closed ' + esc(ago(l.closedAt)) + (l.takenBy ? ' by ' + esc(firstName(who(l.takenBy))) : '') + '</div>';
     if (inThread && can('leads.manage')) {

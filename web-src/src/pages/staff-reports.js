@@ -73,7 +73,7 @@ function srModel(R, from, to, everyone) {
   var rows = function (part, note) { return who.entries.filter(function (e) { return e.part === part; }).sort(function (a, b) { return b.at - a.at; }).map(function (e) { return [e.date, e.booking || '', e.plate || '', note && e.note ? { t: e.kind, s: e.note } : e.kind, e.amount]; }); };
   if (who) {
     m.info = [['Staff member', who.name]];
-    m.kpis = [{ l: 'Balance at hand', raw: who.closing, t: 'money', hero: true, note: who.closing < 0 ? 'The company owes them this' : 'Company money they hold' }, { l: 'Income', raw: who.income, t: 'money', note: 'Handover fees' }, { l: 'Expenses paid', raw: who.expenses, t: 'money' }, { l: 'Cash from customers', raw: who.cash_received, t: 'money' }, { l: 'From the company', raw: who.from_owners, t: 'money' }];
+    m.kpis = [{ l: 'Balance at hand', raw: who.closing, t: 'money', hero: true, note: who.closing < 0 ? (everyone ? 'The company owes them this' : 'The company owes you this') : (everyone ? 'Company money they hold' : 'Company money you hold') }, { l: 'Income', raw: who.income, t: 'money', note: 'Handover fees' }, { l: 'Expenses paid', raw: who.expenses, t: 'money' }, { l: 'Cash from customers', raw: who.cash_received, t: 'money' }, { l: 'From the company', raw: who.from_owners, t: 'money' }];
     var tin = sum(R.ledger.map(function (r) { return r.inn || 0; })), tout = sum(R.ledger.map(function (r) { return r.out || 0; }));
     m.sections.push({ title: 'Balance', sheet: 'Balance', noFormula: true, cols: [{ l: 'Date', t: 'date', w: 11 }, { l: 'Booking ID', w: 12 }, { l: 'Description', w: 38 }, { l: 'In', t: 'money', w: 12 }, { l: 'Out', t: 'money', w: 12 }, { l: 'Balance at hand', t: 'money', w: 14, strong: true }],
       rows: R.ledger.map(function (r) { return [r.date, r.booking || '', r.note ? { t: r.desc, s: r.note } : r.desc, r.inn == null ? '' : r.inn, r.out == null ? '' : r.out, r.balance]; }), total: ['Total, and balance at hand', '', '', tin, tout, who.closing] });
@@ -116,7 +116,7 @@ PAGES['staff-reports'] = {
     if (!ctx.can('expenses.view')) { root.innerHTML = UI.empty({ icon: 'lock', title: 'You do not have access to this page', text: 'Ask the owner to give your account the Expenses permission.' }); return; }
     var st = ctx.state, P = ctx.params, everyone = ctx.can('expenses.staff_reports_all'), n = NOW();
     if (!st.from) { st.from = srIso(new Date(n.getFullYear(), n.getMonth(), 1)); st.to = srIso(new Date(n.getFullYear(), n.getMonth() + 1, 0)); }
-    if (P.person !== undefined && st.pp !== P.person) { st.pp = P.person; st.person = P.person || ''; }
+    var pp0 = P.person || ''; if (st.pp !== pp0) { st.pp = pp0; st.person = pp0; }
     if (!everyone) st.person = me().id;
     st.tab = st.tab || 'balance';
     var from = srParse(st.from), to = srParse(st.to), bad = !from || !to ? 'Choose the first and the last day.' : to < from ? 'The last day is before the first day.' : '';
@@ -146,8 +146,8 @@ PAGES['staff-reports'] = {
             var bl = (D().bankIns || []).filter(function (b) { return b.staff === who.id; });
             el.innerHTML = '<div class="sr-bih"><p class="b2">Cash ' + esc(who.name.split(' ')[0]) + ' paid into the company bank. A voided one is not counted.</p>' + (canBank ? UI.btn('Bank in cash', { kind: 'tonal', size: 'sm', icon: 'plus', attrs: { 'data-bank': '1' } }) : '') + '</div><div id="sr-bit"></div>';
             UI.table(el.querySelector('#sr-bit'), { rows: bl, rowKey: 'id', density: 'compact', pageSize: 10, minWidth: 640,
-              columns: [{ key: 'at', label: 'Banked in', render: function (b) { return '<span class="nowrap">' + esc(UI.fmt.dt(b.at)) + '</span>'; } }, { key: 'ref', label: 'Reference', render: function (b) { return esc(b.ref || '-') + (b.note ? '<small class="sr-sm">' + esc(b.note) + '</small>' : ''); } }, { key: 'slip', label: 'Slip', render: function (b) { return b.slip ? i('paperclip') + ' ' + esc(b.slip.name) : '-'; } }, { key: 'st', label: 'Status', render: function (b) { return b.voided ? UI.chip('Voided', 'grey') + '<small class="sr-sm">' + esc(b.voided.reason || '') + '</small>' : UI.chip('Counted', 'ok'); } }, { key: 'amount', label: 'Amount', money: true, render: function (b) { return '<span class="' + (b.voided ? 'sr-void' : '') + '">' + UI.money(b.amount) + '</span>'; } }],
-              card: function (b) { return '<div class="row gap10"><div class="grow"><b>' + esc(UI.fmt.dt(b.at)) + '</b><small class="sr-sm">' + esc(b.ref || '') + (b.note ? ' · ' + esc(b.note) : '') + '</small>' + (b.voided ? UI.chip('Voided', 'grey') : '') + '</div><b class="' + (b.voided ? 'sr-void' : '') + '">' + UI.money(b.amount) + '</b></div>'; },
+              columns: [{ key: 'at', label: 'Banked in', render: function (b) { return '<span class="nowrap">' + esc(UI.fmt.dt(b.at)) + '</span>'; } }, { key: 'ref', label: 'Reference', render: function (b) { return esc(b.ref || '-') + (b.note ? '<small class="sr-sm">' + esc(b.note) + '</small>' : ''); } }, { key: 'slip', label: 'Slip', render: function (b) { return b.slip ? i('paperclip') + ' ' + esc(b.slip.name) : '-'; } }, { key: 'st', label: 'Status', render: function (b) { return b.voided ? UI.chip('Voided', 'grey') + '<small class="sr-sm">' + esc(b.voided.reason || '') + '</small>' : UI.chip('Counted', 'ok'); } }, { key: 'amount', label: 'Amount', money: true, render: function (b) { return '<span class="' + (b.voided ? 'sr-void' : '') + '">' + UI.money(b.amount) + '</span>'; } }, { key: 'acts', label: '', width: 100, render: srBankActs }],
+              card: function (b) { return '<div class="row gap10"><div class="grow"><b>' + esc(UI.fmt.date(b.at)) + '</b><small class="sr-sm">' + esc([UI.fmt.time(b.at), b.ref, b.note].filter(Boolean).join(' · ')) + '</small>' + (b.voided ? UI.chip('Voided', 'grey') : '') + '</div><div class="sr-bic"><b class="' + (b.voided ? 'sr-void' : '') + '">' + UI.money(b.amount) + '</b>' + srBankActs(b) + '</div></div>'; },
               empty: { icon: 'building-bank', title: 'No bank-ins yet', text: canBank ? 'Press Bank in cash when the cash goes into the bank.' : '' } });
           }
         };
@@ -164,8 +164,15 @@ PAGES['staff-reports'] = {
     UI.on(root, 'click', '[data-all]', function () { st.person = ''; st.pp = ''; ctx.setParams({ person: null }); ctx.refresh(); });
     UI.on(root, 'click', '[data-bk]', function (ev, el) { API.openBooking(el.getAttribute('data-bk')); });
     UI.on(root, 'click', '[data-bank]', function () { API.bankIn(who ? who.id : me().id); });
+    UI.on(root, 'click', '[data-biv]', function (ev, el) { ev.stopPropagation(); if (API.viewBankIn) API.viewBankIn(el.getAttribute('data-biv')); });
+    UI.on(root, 'click', '[data-bivoid]', function (ev, el) { ev.stopPropagation(); if (API.voidBankIn) API.voidBankIn(el.getAttribute('data-bivoid')); });
     UI.on(root, 'click', '[data-xl]', function () { if (!m) return; rptXlsx(m.file + '.xlsx', m.sheets()); DB.log('Exported', 'Expense', '', me().name + ' downloaded the staff report (Excel, ' + m.period + ')'); });
     UI.on(root, 'click', '[data-pdf]', function () { if (!m) return; rptPdf(m, m.file + '.pdf'); DB.log('Exported', 'Expense', '', me().name + ' downloaded the staff report (PDF, ' + m.period + ')'); });
   }
 };
+/* the slip and Void buttons of one bank-in (Void only for the office, or the person who recorded it within 24 hours) */
+function srBankActs(b) {
+  return '<span class="row gap4 sr-biacts">' + (API.viewBankIn ? UI.iconBtn('eye', 'See the slip', { attrs: { 'data-biv': b.id } }) : '') +
+    (API.canVoidBankIn && API.canVoidBankIn(b.id) ? UI.iconBtn('ban', 'Void this bank-in', { attrs: { 'data-bivoid': b.id } }) : '') + '</span>';
+}
 API.openStaffReport = function (userId, params) { var p = Object.assign({}, params || {}); if (userId) p.person = userId; go('staff-reports', p); };

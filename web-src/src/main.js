@@ -18,9 +18,16 @@ function measureBar() {
   render = function () { r0(); measureBar(); };
   render();
   window.addEventListener('resize', measureBar);
+  var lastHash = location.hash;
   window.addEventListener('hashchange', function () {
-    var cur = '#' + location.hash.replace(/^#/, '');
-    var b0 = S.b; readHash(cur); if (S.b !== b0) applyTheme(B());
-    UI.closeAll(); render();
+    var cur = '#' + location.hash.replace(/^#/, ''), before = lastHash;
+    /* unsaved changes in an open drawer or dialog: ask first, and put the old address back if the person stays */
+    if (UI.isDirty()) { try { history.replaceState(null, '', before); } catch (e) { /* ignore */ } }
+    UI.leave(function () {
+      if (location.hash !== cur) { try { history.replaceState(null, '', cur); } catch (e) { /* ignore */ } }
+      var b0 = S.b; readHash(cur); if (S.b !== b0) applyTheme(B());
+      UI.closeAll(); UI.clearToasts(); render(); lastHash = location.hash;
+    });
   });
+  window.addEventListener('resize', function () { if (UI.placeToasts) UI.placeToasts(); });
 })();

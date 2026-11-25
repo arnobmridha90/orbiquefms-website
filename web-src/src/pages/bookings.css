@@ -27,7 +27,7 @@
 .bkx-sts2.row{flex-direction:row;flex-wrap:wrap;justify-content:flex-end}
 .bkx-stb{border:0;background:transparent;padding:0;margin:0;display:inline-flex;align-items:center;gap:2px;cursor:pointer;border-radius:999px;color:var(--text2);font:inherit}
 .bkx-stb:hover .ui-st{filter:brightness(.95);box-shadow:0 0 0 2px rgb(var(--primary-rgb) / .18)}
-.bkx-stb:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.bkx-stb:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .bkx-stb > i{font-size:15px}
 .bkx-amt{display:inline-flex;flex-direction:column;align-items:center;gap:2px;min-width:92px;--c:var(--grey-rgb)}
 .bkx-amt b{font-weight:600;color:var(--text);font-size:13.5px;white-space:nowrap}

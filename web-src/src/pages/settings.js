@@ -36,7 +36,7 @@ function setGuide(b, d) {
   var list = [
     { id: 'company', t: 'Fill in your company details', d: 'Name, registration number, address, phone and email. They print on invoices, receipts and the agreement.', ok: !!(b.legal && b.reg && b.address && b.phone && b.email), act: ['Company profile', function (ctx) { setGoSec(ctx, 'company'); }] },
     { id: 'logo', t: 'Add your logo and colours', d: 'Every page, the booking form, the documents and the website use them.', ok: !!(b.logoImg || b.mark), act: ['Brand colours', function (ctx) { setGoSec(ctx, 'brand'); }] },
-    { id: 'bank', t: 'Add your bank details', d: 'Customers see them on invoices so they can pay by transfer.', ok: !!(d.company && d.company.bank && d.company.bank.accNo), act: ['Company details', function (ctx) { ctx.go('invoices', { action: 'company' }); }] },
+    { id: 'bank', t: 'Add your bank details', d: 'Customers see them on invoices so they can pay by transfer.', ok: !!(d.company && d.company.bank && d.company.bank.accNo), act: ['Bank details', function (ctx) { setGoSec(ctx, 'bank'); }] },
     { id: 'rules', t: 'Check the rules and amounts', d: 'Fines, the usual deposit and the hours in the rental terms the customer signs.', ok: !!d.settings.rulesChecked, act: ['Rules and amounts', function (ctx) { setGoSec(ctx, 'rules'); }] },
     { id: 'locations', t: 'Add where customers pick up and drop off', d: 'Each place becomes a choice in the booking form.', ok: b.locations.length > 0, act: ['Our locations', function (ctx) { setGoSec(ctx, 'locations'); }] },
     { id: 'cars', t: 'Add your cars', d: 'With plates, rates and deposits, and the road tax and insurance dates.', ok: d.cars.length > 0, act: ['Cars', function (ctx) { ctx.go('cars'); }] },
@@ -310,6 +310,8 @@ SET_DRAW.ic = function (el, ctx, redraw) {
    Every value lives in the company settings (D().company, B().places) and every page reads it from there.
    =================================================================== */
 function setNewLocId(b) { var n = 1; while ((b.locations || []).some(function (l) { return l.id === 'loc-' + n; })) n++; return 'loc-' + n; }
+/* a number box read from UI.form: '' when left empty (UI.form gives null), so the checks can ask for it */
+function setNB(v) { return v == null || v === '' || isNaN(+v) ? '' : +v; }
 function setNum(v, dp) { var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); if (isNaN(n)) return null; var f = Math.pow(10, dp == null ? 2 : dp); return Math.round(n * f) / f; }
 function setTimes(step) { var out = []; for (var m = 0; m < 1440; m += step || 30) { var d = new Date(2026, 0, 1, Math.floor(m / 60), m % 60); out.push([String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'), tm(d)]); } return out; }
 /* a card whose fields save together: o = {title, desc, body(draft) -> html, read(form, draft), check(draft) -> msg, save(draft) -> changes [], after(el, draft)} */
@@ -347,7 +349,7 @@ SET_DRAW.places = function (el, ctx, redraw) {
       }).join('') + '</div>' : UI.empty({ icon: 'plane-off', title: 'No other places yet', text: 'Add the airport or a station if you deliver there.' })) +
         '<div class="mt8">' + UI.btn('Add a place', { kind: 'o', icon: 'plus', size: 'sm', attrs: { 'data-pl-add': '1' } }) + '</div>';
     },
-    read: function (f, dr) { dr.forEach(function (p, k) { if (('pn' + k) in f) { p.name = String(f['pn' + k] || ''); p.deliveryFee = f['pd' + k] === '' ? '' : +f['pd' + k]; p.returnFee = f['pr' + k] === '' ? '' : +f['pr' + k]; } }); },
+    read: function (f, dr) { dr.forEach(function (p, k) { if (('pn' + k) in f) { p.name = String(f['pn' + k] || ''); p.deliveryFee = setNB(f['pd' + k]); p.returnFee = setNB(f['pr' + k]); } }); },
     check: function (dr) {
       if (dr.some(function (p) { return !p.name.trim(); })) return 'Give every place a name.';
       var names = dr.map(function (p) { return p.name.trim().toLowerCase(); }); if (names.some(function (n, k) { return names.indexOf(n) !== k; })) return 'Two places have the same name.';
@@ -445,7 +447,7 @@ SET_DRAW.card = function (el, ctx, redraw) {
   setFormCard(el, ctx, redraw, 'card', cur, {
     title: 'Card fee', desc: 'What the card terminal keeps from each card payment. Payments by card show the money after the charge, and reports count that amount.',
     body: function (dr) { return '<div class="grid g3 set-form">' + UI.input({ key: 'localPct', label: 'Local card', type: 'number', min: 0, max: 20, step: '0.1', value: dr.localPct, help: '% of the amount' }) + UI.input({ key: 'foreignPct', label: 'Foreign card', type: 'number', min: 0, max: 20, step: '0.1', value: dr.foreignPct, help: '% of the amount' }) + UI.input({ key: 'fixed', label: 'Fixed charge', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: dr.fixed, help: 'On every card payment' }) + '</div><p class="b2 set-ex">' + ex(dr) + '</p>'; },
-    read: function (f, dr) { dr.localPct = f.localPct === '' ? '' : +f.localPct; dr.foreignPct = f.foreignPct === '' ? '' : +f.foreignPct; dr.fixed = f.fixed === '' ? '' : +f.fixed; var p = el.querySelector('.set-ex'); if (p) p.textContent = ex(dr); },
+    read: function (f, dr) { dr.localPct = setNB(f.localPct); dr.foreignPct = setNB(f.foreignPct); dr.fixed = setNB(f.fixed); var p = el.querySelector('.set-ex'); if (p) p.textContent = ex(dr); },
     check: function (dr) { if ([dr.localPct, dr.foreignPct, dr.fixed].some(function (v) { return v === '' || isNaN(v) || v < 0; })) return 'Type a number for each (0 is fine).'; if (dr.localPct > 20 || dr.foreignPct > 20) return 'A card fee above 20% does not look right.'; return ''; },
     save: function (dr) { var ch = [].concat(setDiff('Local card %', cf.localPct, dr.localPct), setDiff('Foreign card %', cf.foreignPct, dr.foreignPct), setDiff('Fixed charge', cf.fixed, dr.fixed)); co.cardFee = { localPct: +dr.localPct, foreignPct: +dr.foreignPct, fixed: setNum(dr.fixed) }; return ch; },
     after: function (el2) { el2.querySelectorAll('[data-key="fixed"]').forEach(function (x) { x.addEventListener('blur', function () { var n = setNum(x.value); if (n != null) x.value = n.toFixed(2); }); }); }
@@ -455,7 +457,8 @@ SET_DRAW.card = function (el, ctx, redraw) {
 /* ---------- Fleet ---------- */
 SET_DRAW.fleet = function (el, ctx, redraw) {
   var co = ctx.data.company, fl = co.fleet || (co.fleet = { warnDays: {} });
-  var cur = { summonsAdminFee: co.summonsAdminFee, overspeed: fl.overspeed, historyDays: fl.historyDays, recipients: (fl.reminderRecipients || []).slice(), time: fl.reminderTime || '09:00', warn: Object.assign({}, fl.warnDays || {}), platforms: (co.trackerPlatforms || []).slice() };
+  var cur = { summonsAdminFee: co.summonsAdminFee, overspeed: fl.overspeed, historyDays: fl.historyDays, recipients: (fl.reminderRecipients || []).slice(), time: fl.reminderTime || '09:00', warn: Object.assign({}, fl.warnDays || {}), platforms: (co.trackerPlatforms || []).slice(), cams: (co.dashcamPlatforms || []).slice() };
+  var platHtml = function (dr, list, title, ph) { return '<div class="set-tg">' + title + '</div><div class="row wrap gap6">' + dr[list].map(function (p, k) { return '<span class="chip grey">' + esc(p) + '<button type="button" class="set-x" data-plat-del="' + k + '" data-plat-list="' + list + '" aria-label="Remove ' + esc(p) + '">' + i('x') + '</button></span>'; }).join('') + '</div><div class="row gap8 mt8"><div class="inp grow" style="max-width:280px"><input data-plat-new="' + list + '" placeholder="' + ph + '" aria-label="' + ph + '" maxlength="40"></div>' + UI.btn('Add', { kind: 'o', size: 'sm', attrs: { 'data-plat-add': list } }) + '</div>'; };
   var papers = Object.keys(cur.warn);
   setFormCard(el, ctx, redraw, 'fleet', cur, {
     title: 'Fleet', desc: 'Summons, speed alarms, tracking history and the paper reminders (road tax, insurance and the rest).',
@@ -464,12 +467,12 @@ SET_DRAW.fleet = function (el, ctx, redraw) {
         UI.input({ key: 'overspeed', label: 'Over-speed alarm above', type: 'number', min: 40, max: 250, value: dr.overspeed, help: 'km/h' }) + UI.input({ key: 'historyDays', label: 'Keep tracking history for', type: 'number', min: 1, max: 365, value: dr.historyDays, help: 'days' }) + '</div>' +
         '<div class="set-tg">Paper reminders</div><div class="grid g2 set-form"><div class="set-rcp"></div>' + UI.select({ key: 'time', label: 'Send the reminders at', value: dr.time, options: setTimes(30) }) + '</div>' +
         '<p class="b2">Warn this many days before a paper runs out (0 = no warning):</p><div class="grid g3 set-form">' + papers.map(function (k) { return UI.input({ key: 'w-' + k, label: k, type: 'number', min: 0, max: 365, value: dr.warn[k], help: 'days before' }); }).join('') + '</div>' +
-        '<div class="set-tg">Tracker and dashcam platforms</div><div class="row wrap gap6">' + dr.platforms.map(function (p, k) { return '<span class="chip grey">' + esc(p) + '<button type="button" class="set-x" data-plat-del="' + k + '" aria-label="Remove ' + esc(p) + '">' + i('x') + '</button></span>'; }).join('') + '</div><div class="row gap8 mt8"><div class="inp grow" style="max-width:280px"><input data-plat-new placeholder="Add a platform" aria-label="Add a platform" maxlength="40"></div>' + UI.btn('Add', { kind: 'o', size: 'sm', attrs: { 'data-plat-add': '1' } }) + '</div>';
+        platHtml(dr, 'platforms', 'Tracker platforms', 'Add a tracker platform') + platHtml(dr, 'cams', 'Dashcam platforms', 'Add a dashcam platform');
     },
     read: function (f, dr) {
-      ['summonsAdminFee', 'overspeed', 'historyDays'].forEach(function (k) { if (k in f) dr[k] = f[k] === '' ? '' : +f[k]; });
+      ['summonsAdminFee', 'overspeed', 'historyDays'].forEach(function (k) { if (k in f) dr[k] = setNB(f[k]); });
       if (f.time) dr.time = f.time; if ('rcp' in f) dr.recipients = String(f.rcp || '').split(',').filter(Boolean);
-      papers.forEach(function (k) { if (('w-' + k) in f) dr.warn[k] = f['w-' + k] === '' ? '' : +f['w-' + k]; });
+      papers.forEach(function (k) { if (('w-' + k) in f) dr.warn[k] = setNB(f['w-' + k]); });
     },
     check: function (dr) {
       if ([dr.summonsAdminFee, dr.overspeed, dr.historyDays].some(function (v) { return v === '' || isNaN(v) || v < 0; })) return 'Type the admin fee, the speed and the days.';
@@ -480,18 +483,18 @@ SET_DRAW.fleet = function (el, ctx, redraw) {
       return '';
     },
     save: function (dr) {
-      var ch = [].concat(setDiff('Summons admin fee', co.summonsAdminFee, dr.summonsAdminFee), setDiff('Over-speed', fl.overspeed, dr.overspeed), setDiff('Tracking history days', fl.historyDays, dr.historyDays), setDiff('Reminder time', fl.reminderTime, dr.time), setDiff('Reminder recipients', (fl.reminderRecipients || []).map(function (u) { return staffName(u); }).join(', '), dr.recipients.map(function (u) { return staffName(u); }).join(', ')), setDiff('Tracker platforms', (co.trackerPlatforms || []).join(', '), dr.platforms.join(', ')));
+      var ch = [].concat(setDiff('Summons admin fee', co.summonsAdminFee, dr.summonsAdminFee), setDiff('Over-speed', fl.overspeed, dr.overspeed), setDiff('Tracking history days', fl.historyDays, dr.historyDays), setDiff('Reminder time', fl.reminderTime, dr.time), setDiff('Reminder recipients', (fl.reminderRecipients || []).map(function (u) { return staffName(u); }).join(', '), dr.recipients.map(function (u) { return staffName(u); }).join(', ')), setDiff('Tracker platforms', (co.trackerPlatforms || []).join(', '), dr.platforms.join(', ')), setDiff('Dashcam platforms', (co.dashcamPlatforms || []).join(', '), dr.cams.join(', ')));
       papers.forEach(function (k) { ch = ch.concat(setDiff(k + ' warning days', (fl.warnDays || {})[k], dr.warn[k])); });
-      co.summonsAdminFee = setNum(dr.summonsAdminFee); fl.overspeed = +dr.overspeed; fl.historyDays = +dr.historyDays; fl.reminderTime = dr.time; fl.reminderRecipients = dr.recipients.slice(); fl.warnDays = Object.assign({}, dr.warn); co.trackerPlatforms = dr.platforms.slice();
+      co.summonsAdminFee = setNum(dr.summonsAdminFee); fl.overspeed = +dr.overspeed; fl.historyDays = +dr.historyDays; fl.reminderTime = dr.time; fl.reminderRecipients = dr.recipients.slice(); fl.warnDays = Object.assign({}, dr.warn); co.trackerPlatforms = dr.platforms.slice(); co.dashcamPlatforms = dr.cams.slice();
       return ch;
     },
     saved: 'Fleet settings saved.',
     after: function (el2, dr, sync) {
       UI.staffPicker(el2.querySelector('.set-rcp'), { key: 'rcp', label: 'Who gets the paper reminders', multi: true, values: dr.recipients.slice(), onChange: function () { sync(); } });
       el2.querySelectorAll('[data-key="summonsAdminFee"]').forEach(function (x) { x.addEventListener('blur', function () { var n = setNum(x.value); if (n != null) x.value = n.toFixed(2); }); });
-      var addP = function () { var f = el2.querySelector('[data-plat-new]'), v = f.value.trim(); if (!v) { f.focus(); return; } if (dr.platforms.some(function (p) { return p.toLowerCase() === v.toLowerCase(); })) { UI.toast(v + ' is already on the list.', { tone: 'warn' }); return; } sync(); dr.platforms.push(v); redraw(); };
-      el2.addEventListener('click', function (ev) { var x; if (ev.target.closest('[data-plat-add]')) addP(); else if ((x = ev.target.closest('[data-plat-del]'))) { sync(); dr.platforms.splice(+x.getAttribute('data-plat-del'), 1); redraw(); } });
-      el2.querySelector('[data-plat-new]').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') addP(); });
+      var addP = function (list) { var f = el2.querySelector('[data-plat-new="' + list + '"]'), v = f.value.trim(); if (!v) { f.focus(); return; } if (dr[list].some(function (p) { return p.toLowerCase() === v.toLowerCase(); })) { UI.toast(v + ' is already on the list.', { tone: 'warn' }); return; } sync(); dr[list].push(v); redraw(); };
+      el2.addEventListener('click', function (ev) { var x; if ((x = ev.target.closest('[data-plat-add]'))) addP(x.getAttribute('data-plat-add')); else if ((x = ev.target.closest('[data-plat-del]'))) { sync(); dr[x.getAttribute('data-plat-list')].splice(+x.getAttribute('data-plat-del'), 1); redraw(); } });
+      el2.querySelectorAll('[data-plat-new]').forEach(function (f) { f.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') addP(f.getAttribute('data-plat-new')); }); });
     }
   });
 };
@@ -511,7 +514,7 @@ SET_DRAW.assistant = function (el, ctx, redraw) {
         '<div class="set-tiers">' + dr.tiers.map(function (t, k) { return '<div class="set-tier"><span class="b2">Up to</span>' + UI.input({ key: 'tk' + k, label: '', type: 'number', min: 1, value: t.upToKm, attrs: { 'aria-label': 'Up to km, line ' + (k + 1) } }) + '<span class="b2">km</span>' + UI.input({ key: 'tf' + k, label: '', type: 'number', min: 0, step: '0.01', prefix: 'RM', value: t.fee, attrs: { 'aria-label': 'Fee, line ' + (k + 1) } }) + UI.iconBtn('trash', 'Remove this line', { attrs: { 'data-tier-del': k } }) + '</div>'; }).join('') + '</div>' +
         UI.btn('Add a distance', { kind: 'o', size: 'sm', icon: 'plus', attrs: { 'data-tier-add': '1' } });
     },
-    read: function (f, dr) { ['from', 'to'].forEach(function (k) { if (f[k]) dr[k] = f[k]; }); ['turnaroundH', 'airportTurnaroundH', 'holdMin', 'minNoticeH', 'stayOutDays'].forEach(function (k) { if (k in f) dr[k] = f[k] === '' ? '' : +f[k]; }); dr.tiers.forEach(function (t, k) { if (('tk' + k) in f) { t.upToKm = f['tk' + k] === '' ? '' : +f['tk' + k]; t.fee = f['tf' + k] === '' ? '' : +f['tf' + k]; } }); },
+    read: function (f, dr) { ['from', 'to'].forEach(function (k) { if (f[k]) dr[k] = f[k]; }); ['turnaroundH', 'airportTurnaroundH', 'holdMin', 'minNoticeH', 'stayOutDays'].forEach(function (k) { if (k in f) dr[k] = setNB(f[k]); }); dr.tiers.forEach(function (t, k) { if (('tk' + k) in f) { t.upToKm = setNB(f['tk' + k]); t.fee = setNB(f['tf' + k]); } }); },
     check: function (dr) {
       if (['turnaroundH', 'airportTurnaroundH', 'holdMin', 'minNoticeH', 'stayOutDays'].some(function (k) { return dr[k] === '' || isNaN(dr[k]) || dr[k] < 0; })) return 'Type a number in every box (0 is fine).';
       if (dr.from >= dr.to) return 'The hours must end after they start.';
