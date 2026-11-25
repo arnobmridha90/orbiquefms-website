@@ -1,6 +1,6 @@
 /* customers screens (M6). Shared classes live in base.css. */
 .cu-search { position: relative; margin-bottom: 8px; }
-.cu-clear { width: 32px; height: 32px; margin-right: -6px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.cu-clear { width: 40px; height: 40px; margin-right: -10px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); flex: none; }
 .cu-clear svg { width: 16px; height: 16px; }
 .cu-chips { margin-bottom: 4px; }
 .cu-count { font-size: 12.5px; font-weight: 650; color: var(--muted); margin: 6px 2px 8px; }

@@ -90,7 +90,7 @@ function schedRow(ev) {
   else if (!ev.done && ev.type === 'in' && b.bookingStatus === 'Car Delivered') prim = '<button type="button" class="btn sm sc-go" data-ho="in" data-id="' + b.id + '">' + I('in') + (draft ? 'Resume' : 'Take back') + '</button>';
   var tm = hm(ev.at).split(' ');
   return '<div class="sc-card' + (ev.done ? ' done' : '') + (ev.overdue ? ' late' : '') + '">' +
-    '<a class="sc-main" href="#booking/' + b.id + '"><div class="sc-time"><b class="num">' + tm[0] + '</b><small>' + tm[1] + '</small><span class="sc-dir ' + ev.type + '">' + (ev.type === 'out' ? 'Out' : 'Back') + '</span></div>' +
+    '<a class="sc-main" href="#booking/' + b.id + '"><div class="sc-time"><b class="num">' + tm[0] + '</b><small>' + tm[1] + '</small>' + (ev.overdue && !ev.done && !sameDay(ev.at, new Date()) ? '<small class="sc-dw">' + esc(dayWord(ev.at)) + '</small>' : '') + '<span class="sc-dir ' + ev.type + '">' + (ev.type === 'out' ? 'Out' : 'Back') + '</span></div>' +
     '<div class="sc-body"><div class="sc-l1"><b>' + esc(c.name) + '</b>' + payChip(b) + '</div>' +
     '<div class="sc-l2"><b class="sc-plate">' + esc(k.plate || 'No car') + '</b> ' + esc((k.make || '') + ' ' + (k.model || '')) + ' · ' + esc(b.code) + '</div>' +
     '<div class="sc-l3">' + I('pin') + '<span>' + esc(ev.label) + (note ? ' · ' + esc(note) : '') + '</span></div>' +
@@ -111,6 +111,8 @@ VIEWS.schedule = function (r) {
   var list = inRange.filter(function (e) { return (sched.tab === 'all' || e.type === sched.tab) && (!sched.kind || e.label === sched.kind); });
   list.sort(function (a, b) { return (b.overdue - a.overdue) || (a.at - b.at); });
   var nOut = inRange.filter(function (e) { return e.type === 'out'; }).length, nIn = inRange.length - nOut;
+  /* the header counts the days picked; late ones from earlier days are counted apart */
+  var early = inRange.filter(function (e) { return e.overdue && !sameDay(e.at, now) && (q || !schedInRange(e, sched.range, sched.date)); }), hOut = nOut - early.filter(function (e) { return e.type === 'out'; }).length, hIn = nIn - early.filter(function (e) { return e.type !== 'out'; }).length;
 
   /* day strip: two weeks with counts */
   var base = sod(now), strip = '';
@@ -137,7 +139,7 @@ VIEWS.schedule = function (r) {
     });
   }
 
-  var html = topbar('Schedule', { back: '#more', sub: rangeName + ' · ' + nOut + ' out, ' + nIn + ' back', right: '<button type="button" class="iconbtn" id="scRefresh" aria-label="Refresh">' + I('reset') + '</button>' }) +
+  var html = topbar('Schedule', { back: '#more', sub: rangeName + ' · ' + hOut + ' out, ' + hIn + ' back' + (early.length ? ' · ' + early.length + ' late' : ''), right: '<button type="button" class="iconbtn" id="scRefresh" aria-label="Refresh">' + I('reset') + '</button>' }) +
     '<main class="sc"><div class="sc-ptr" id="scPtr"><span>' + I('reset') + '<i id="scPtrT">Pull to refresh</i></span></div>' +
     '<div class="sc-sticky"><label class="search">' + I('search') + '<input id="scQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="Name, plate, model, booking or phone" value="' + esc(sched.q) + '">' + (sched.q ? '<button type="button" class="sc-x" id="scX" aria-label="Clear search">' + I('x', 2.2) + '</button>' : '') + '</label></div>' +
     (q ? '<div class="sc-searching">Searching all upcoming days</div>' : '<div class="chiprow sc-range">' + rangeChip('today', 'Today') + rangeChip('tomorrow', 'Tomorrow') + rangeChip('week', 'This week') +
@@ -183,7 +185,7 @@ function schedRefresh() {
 }
 function schedWa(ev) {
   var b = ev.b, c = cust(b.cust), k = car(b.car) || {}, out = ev.type === 'out';
-  var txt = 'Hi ' + firstName(c.name) + ', this is ' + B().short + '. ' + (out ? 'Your car ' + (k.make || '') + ' ' + (k.model || '') + ' (' + (k.plate || '') + ') is ready for ' : 'A reminder that the car ' + (k.plate || '') + ' is due back ') +
+  var txt = 'Hi ' + callName(c.name) + ', this is ' + B().short + '. ' + (out ? 'Your car ' + (k.make || '') + ' ' + (k.model || '') + ' (' + (k.plate || '') + ') is ready for ' : 'A reminder that the car ' + (k.plate || '') + ' is due back ') +
     dayWord(ev.at).toLowerCase().replace(/^(mon|tue|wed|thu|fri|sat|sun)/, function (m) { return m.charAt(0).toUpperCase() + m.slice(1); }) + ' at ' + hm(ev.at) + ', ' + placeText(b, out ? 'pick' : 'ret') + '. See you!';
   Share.wa(c.phone, txt);
 }
@@ -206,5 +208,5 @@ function schedMore(ev) {
     Pickers.staff({ title: 'Send the agent link to', preferIds: team.map(function (p) { return p.id; }), onPick: function (p) { if (p) send(p); } });
   });
   on('scmCuCopy', function () { Share.copy(Links.customer(b), 'Customer link copied'); });
-  on('scmCuWa', function () { Share.wa(c.phone, 'Hi ' + firstName(c.name) + ', before you drive off please take a few photos of the car here: ' + Links.customer(b)); bLog(b, 'Customer inspection link sent on WhatsApp'); save(); });
+  on('scmCuWa', function () { Share.wa(c.phone, 'Hi ' + callName(c.name) + ', before you drive off please take a few photos of the car here: ' + Links.customer(b)); bLog(b, 'Customer inspection link sent on WhatsApp'); save(); });
 }

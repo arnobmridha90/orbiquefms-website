@@ -111,7 +111,7 @@ var Leads = (function () {
 
   /* ---------- actions ---------- */
   function done(text) { save(); render(false, true); say(text); }
-  function clearAlerts(id) { S.notifs.forEach(function (n) { if (n.link === '#chat/wa/' + id) n.read = true; }); }
+  function clearAlerts(id) { S.notifs.forEach(function (n) { if (n.link === '#chat/wa/' + id) setNotifRead(n, true); }); }
   function take(id) {
     var w = wa(id); if (!w || !can('leads.manage')) return; var l = w.lead;
     var go = function () {

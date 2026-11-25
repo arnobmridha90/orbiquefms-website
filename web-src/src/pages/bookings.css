@@ -249,3 +249,7 @@
   .bkx-feehint{display:none}
   .bkx-mon{grid-template-columns:1fr 1fr}
 }
+.bkx-est{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:13px;font-weight:500}
+.bkx-est i{font-size:16px}
+.bkx-est.ok{color:rgb(var(--success-rgb))}
+.bkx-est.warn{color:rgb(var(--warning-rgb))}

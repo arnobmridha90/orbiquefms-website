@@ -49,7 +49,7 @@ var Track = (function () {
     if (r.q && r.q.q != null) { TRS.q = r.q.q; TRS.f = 'all'; TRS.tab = 'fleet'; try { history.replaceState(history.state, '', location.pathname + location.search + '#tracking'); } catch (e) {} }
     var alarmsOk = can('tracking.alarms'), recent = (S.alarms || []).filter(function (a) { return Date.now() - new Date(a.at) < DAY; }).length;
     if (!alarmsOk) TRS.tab = 'fleet';
-    var html = topbar('Where is it now', { back: '#more', sub: 'Updates every 30 seconds' }) + '<main class="tr-main">' +
+    var html = topbar('Where is it now', { back: '#more', sub: 'Updates every 30 seconds' }) + '<main class="tr-page">' +
       (alarmsOk ? '<div class="seg2 tr-tabs"><a href="javascript:void 0" data-tab="fleet" class="' + (TRS.tab === 'fleet' ? 'on' : '') + '">Cars</a><a href="javascript:void 0" data-tab="alarms" class="' + (TRS.tab === 'alarms' ? 'on' : '') + '">Alarms' + (recent ? '<span class="dot">' + recent + '</span>' : '') + '</a></div>' : '') +
       (TRS.tab === 'fleet' ? '<div class="cr-sticky"><label class="search">' + I('search') + '<input id="trq" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search" placeholder="Plate or model" value="' + esc(TRS.q) + '"></label><div class="chiprow" id="trchips"></div></div><div id="trlist"></div>' : '<div id="tralarms"></div>') +
       '</main>';

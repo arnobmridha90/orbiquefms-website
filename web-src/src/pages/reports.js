@@ -311,7 +311,7 @@ function rptMoneyIn(r) {
 }
 function rptExpRows(r, src) {
   var d = D();
-  return allExpenses(d).filter(function (e) { return e.day >= r.from && e.day < r.end && (!src || src === 'all' || e.source === src) && rptIn(rptExpCar(e)); });
+  return allExpenses(d).filter(function (e) { return e.day >= r.from && e.day < r.end && (!src || src === 'all' || e.source === src) && isSpending(e, d) && rptIn(rptExpCar(e)); });
 }
 function rptExpName(e) { if (e.source === 'job') return e.kind || 'Service job'; if (e.source === 'paper') return e.kind || 'Paper'; var c = byId(D().expenseCats, e.cat); return c ? c.name : 'Other'; }
 function rptExpGroup(e) { if (e.source === 'job') return 'Service and repair jobs'; if (e.source === 'paper') return 'Road tax, insurance and other papers'; return rptExpName(e); }
@@ -464,6 +464,8 @@ function rptModel(id, st, r) {
     m.sections.push({ title: 'By car', cols: [{ l: 'Car', w: 30 }, { l: 'Entries', t: 'int', a: 'r', w: 9 }, { l: 'Amount', t: 'money', a: 'r', w: 14 }, { l: 'Share', t: 'pct', a: 'r', w: 16, bar: true }], rows: gg(function (e) { return e.car || ''; }).map(function (g) { return [car2(rptCarOf(g.k)), g.n, g.v, et ? g.v / et : 0]; }), total: ['Total', E.length, et, 1], preview: 8 });
     m.sections.push({ title: 'Expenses', cols: [{ l: 'Day', t: 'date', w: 11 }, { l: 'What', w: 24 }, { l: 'From', w: 10 }, { l: 'Car', w: 18 }, { l: 'Booking', w: 11 }, { l: 'Recorded by', w: 14 }, { l: 'Amount', t: 'money', a: 'r', w: 11 }],
       rows: E.map(function (e) { return [e.day, { t: rptExpName(e), s: e.paidTo || '' }, rptSrcLabel(e.source), car2(rptCarOf(e.car)), e.booking || '-', rptWho(e), e.amount]; }), total: ['Total', '', '', '', '', '', et], preview: 12, empty: 'Nothing was spent in this period.' });
+    var floats = allExpenses(d).filter(function (e) { return e.day >= r.from && e.day < r.end && !isSpending(e, d) && rptIn(rptExpCar(e)); });
+    m.notes = ['Payment to staff is money given to staff to spend for the company, not spending, so it is left out' + (floats.length ? ' (' + UI.fmt.money(sum(floats.map(function (e) { return e.amount; }))) + ' in this period)' : '') + '. What they then spend is recorded as expenses.'].concat(m.notes || []);
     m.sheets = function () { return rptExpBook(E, r.label, m.info[0][0] + ': ' + m.info[0][1]); };
   } else if (id === 'moneyio') {
     var L = [], voidN = 0, chP = { Cash: 'cash', 'Online Transfer': 'bank', Card: 'card' }, chE = { Cash: 'cash', 'Bank transfer': 'bank', Card: 'card' };

@@ -14,7 +14,7 @@ VIEWS.calendar = function (r) {
     '<a class="btn sm ghost" href="' + hashWith('calendar', {}) + '" onclick="calGo(event,this)">Today</a>' +
     '<a class="iconbtn cal-nav next" href="' + shift(7) + '" onclick="calGo(event,this)" aria-label="Next week">' + I('back', 2.2) + '</a>' +
     '<label class="search cal-search">' + I('search') + '<input id="calq" type="search" placeholder="Plate" value="' + esc(calQ) + '" autocomplete="off" autocapitalize="characters"></label></div>' +
-    '<div class="cal-legend">' + [['Confirmed', 'grey'], ['Agreement Sent', 'red'], ['Agreement Signed', 'orange'], ['Car Delivered', 'green'], ['Car Returned', 'blue']].map(function (x) { return '<span><i class="tone-' + x[1] + '"></i>' + x[0] + '</span>'; }).join('') + '<span><i class="cal-ws"></i>Workshop</span></div>' +
+    '<div class="cal-legend">' + [['Pending', 'amber'], ['Confirmed', 'grey'], ['Agreement Sent', 'red'], ['Agreement Signed', 'orange'], ['Car Delivered', 'green'], ['Car Returned', 'blue'], ['Late return', 'late'], ['Completed', 'done']].map(function (x) { return '<span><i class="tone-' + x[1] + '"></i>' + x[0] + '</span>'; }).join('') + '<span><i class="cal-ws"></i>Workshop</span></div>' +
     '<div class="cal-wrap" id="calwrap"><div class="cal-grid" id="calgrid"></div></div></main>';
   return { html: html, keepScroll: false, after: function () {
     var draw = function () { $('#calgrid').innerHTML = calGrid(s, e); };
@@ -27,6 +27,8 @@ VIEWS.calendar = function (r) {
 };
 /* moving between weeks is a view setting: no Back step for each tap */
 function calGo(e, a) { e.preventDefault(); history.replaceState(history.state, '', location.pathname + location.search + a.getAttribute('href')); render(false); }
+/* '2 days', '4d 2h', '5h' */
+function calLen(a, b) { var h = Math.round((new Date(b) - new Date(a)) / HOUR), d = Math.floor(h / 24), r = h % 24; return h < 24 ? h + 'h' : r ? d + 'd ' + r + 'h' : d + (d === 1 ? ' day' : ' days'); }
 function calGrid(s, e) {
   var S0 = s.getTime(), E0 = e.getTime(), today = sod(new Date()).getTime(), term = normPlate(calQ.trim());
   var inRange = function (a, b) { return new Date(a).getTime() < E0 && (b ? new Date(b).getTime() : Infinity) > S0; };
@@ -54,10 +56,12 @@ function calGrid(s, e) {
       var a = px(new Date(d.from).getTime()), z = px(d.to ? new Date(d.to).getTime() : E0);
       return '<div class="cal-bar ws" style="left:' + a + 'px;width:' + Math.max(8, z - a - 2) + 'px" title="' + esc(d.reason || 'Workshop') + '"><span>' + esc(d.reason || 'Workshop') + '</span></div>';
     }).join('') + bks.map(function (b) {
-      var a = px(new Date(b.start).getTime()), z = px(new Date(b.end).getTime()), w = Math.max(10, z - a - 2), tone = isLate(b) ? 'red' : BK_TONE[b.bookingStatus] || 'grey';
-      var hrs = (new Date(b.end) - new Date(b.start)) / HOUR, len = hrs < 24 ? Math.round(hrs) + 'h' : Math.round(hrs / 24 * 10) / 10 + 'd';
-      var cu = cust(b.cust);
-      return '<button type="button" class="cal-bar tone-' + tone + (b.bookingStatus === 'Completed' ? ' done' : '') + (new Date(b.start).getTime() < S0 ? ' cut-l' : '') + (new Date(b.end).getTime() > E0 ? ' cut-r' : '') + '" style="left:' + a + 'px;width:' + w + 'px" onclick="location.hash=\'#booking/' + b.id + '\'" aria-label="' + esc(b.code + ', ' + cu.name + ', ' + b.bookingStatus) + '"><span>' + esc(firstName(cu.name)) + ' · ' + len + '</span></button>';
+      var a = px(new Date(b.start).getTime()), z = px(new Date(b.end).getTime()), w = Math.max(10, z - a - 2), late = isLate(b), tone = late ? 'red' : BK_TONE[b.bookingStatus] || 'grey';
+      var cu = cust(b.cust), len = calLen(b.start, b.end);
+      /* the tap area is at least 40 px wide, centred on the bar and kept inside the row */
+      var hw = Math.max(40, w), hl = Math.max(0, Math.min(CAL_DAYS * CAL_W - hw, a - (hw - w) / 2));
+      return '<button type="button" class="cal-hit" style="left:' + hl + 'px;width:' + hw + 'px" onclick="location.hash=\'#booking/' + b.id + '\'" aria-label="' + esc(b.code + ', ' + cu.name + ', ' + liveStatus(b) + ', ' + durationText(b.start, b.end)) + '">' +
+        '<span class="cal-bar tone-' + tone + (late ? ' late' : '') + (b.bookingStatus === 'Completed' ? ' done' : '') + (new Date(b.start).getTime() < S0 ? ' cut-l' : '') + (new Date(b.end).getTime() > E0 ? ' cut-r' : '') + '" style="left:' + (a - hl) + 'px;width:' + w + 'px"><span>' + esc(firstName(cu.name)) + ' · ' + len + '</span></span></button>';
     }).join('');
     rows += '<div class="cal-row"><a class="cal-car" href="#car/' + c.id + '"><b>' + esc(c.plate) + '</b><small>' + esc(c.model) + (c.status !== 'active' ? ' · ' + (c.status === 'sold' ? 'Sold' : 'Not in use') : '') + '</small></a><div class="cal-track" style="width:' + CAL_DAYS * CAL_W + 'px">' + cells + bars + '</div></div>';
   });

@@ -87,6 +87,7 @@
 @media (max-width:400px){
   .pg-calendar .cl-views button{padding:7px 9px;font-size:13px}
 }
+/* the grid is as wide as its columns, so the sticky car column stays pinned at any sideways scroll (min-width set in calendar.js) */
 /* plate box, click-to-book cue, today in the list */
 .pg-calendar .cl-q{width:190px}
 .pg-calendar .cl-q .inp{margin:0}

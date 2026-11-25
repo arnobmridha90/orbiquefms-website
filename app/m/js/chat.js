@@ -72,7 +72,7 @@ function staffThread() {
 function waThread(id) {
   var c = S.wa.filter(function (x) { return x.id === id; })[0]; if (!c) { location.hash = '#chat'; return { html: '' }; }
   c.unread = 0; save();
-  S.notifs.forEach(function (n) { if (n.link === '#chat/wa/' + id) n.read = true; });
+  S.notifs.forEach(function (n) { if (n.link === '#chat/wa/' + id) setNotifRead(n, true); });
   var list = c.msgs.map(function (m) { return { at: m.at, text: m.text, from: m.from, who: m.from === 'bot' ? 'Booking assistant' : m.from === 'staff' ? firstName(who(m.by || S.me)) : '' }; });
   var tel = String(c.phone || '').replace(/[^\d+]/g, ''), cu = typeof Cust !== 'undefined' && Cust.byPhone ? Cust.byPhone(c.phone) : null;
   var right = (tel ? '<a class="iconbtn" href="tel:' + esc(tel) + '" aria-label="Call">' + I('phone') + '</a>' : '') +
@@ -130,7 +130,7 @@ function sendStaff(text) {
     var here = route().name === 'chat' && route().a === 'staff';
     if (!here) S.staffUnread = (S.staffUnread || 0) + 1;
     save();
-    if (here) { render(false); toBottom(); } else notify('staff', firstName(mate.name) + ' in Team chat', msg, '#chat/staff');
+    if (here) { render(false); toBottom(); } else notify('staff', firstName(mate.name) + ' in Team chat', msg, '#chat/staff', { from: mate.id });
     if (here) refreshBadges();
   }, 5000 + Math.random() * 3000);
 }

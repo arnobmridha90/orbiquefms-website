@@ -46,7 +46,7 @@
 .nt-row .ic svg { width: 19px; height: 19px; }
 .nt-row .sw { margin-top: 4px; }
 .nt-desc { white-space: normal !important; }
-.nt-try { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; margin-top: 4px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 650; color: var(--brand-ink); }
+.nt-try { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; margin-top: 4px; padding: 0 14px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 650; color: var(--brand-ink); }
 .nt-try svg { width: 14px; height: 14px; }
 .nt-foot { margin: 8px 4px 0; }
 .nt-qrow { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; }

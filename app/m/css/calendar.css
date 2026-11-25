@@ -9,7 +9,9 @@
 .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .cal-legend i { width: 12px; height: 10px; border-radius: 3px; display: inline-block; }
 .cal-legend i.tone-grey { background: #C9CED6; } .cal-legend i.tone-red { background: var(--t-red); } .cal-legend i.tone-orange { background: var(--t-orange); }
-.cal-legend i.tone-green { background: var(--t-green); } .cal-legend i.tone-blue { background: var(--t-blue); }
+.cal-legend i.tone-green { background: var(--t-green); } .cal-legend i.tone-blue { background: var(--t-blue); } .cal-legend i.tone-amber { background: var(--t-amber); }
+.cal-legend i.tone-late { background: repeating-linear-gradient(135deg, var(--t-red) 0 3px, #fff 3px 5px); outline: 1.5px solid var(--t-red); }
+.cal-legend i.tone-done { background: #C9CED6; opacity: .6; }
 .cal-ws { background: repeating-linear-gradient(135deg, #8A93A3 0 3px, #E2E5EA 3px 6px); }
 .cal-wrap { overflow: auto; max-height: calc(100vh - 250px); max-height: calc(100dvh - 250px); background: var(--card); border: 1px solid var(--line); border-radius: var(--r); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .cal-grid { width: max-content; min-width: 100%; }
@@ -33,7 +35,9 @@
 .cal-cell.today { background: var(--tint); }
 .cal-cell:not([disabled]):active { background: var(--tint); }
 .cal-cell[disabled] { background-image: linear-gradient(rgba(240,241,244,.55), rgba(240,241,244,.55)); }
-.cal-bar { position: absolute; top: 9px; height: 34px; border-radius: 8px; padding: 0 7px; display: flex; align-items: center; font-size: 11.5px; font-weight: 700; overflow: hidden; z-index: 2; text-align: left; border-left: 3px solid; }
+.cal-hit { position: absolute; top: 6px; height: 40px; padding: 0; background: transparent; z-index: 2; }
+.cal-hit .cal-bar { top: 0; height: 40px; }
+.cal-bar { position: absolute; top: 6px; height: 40px; border-radius: 8px; padding: 0 7px; display: flex; align-items: center; font-size: 11.5px; font-weight: 700; overflow: hidden; z-index: 2; text-align: left; border-left: 3px solid; }
 .cal-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-bar.tone-grey { background: var(--t-grey-bg); color: var(--t-grey); border-color: #A3A9B4; }
 .cal-bar.tone-amber { background: var(--t-amber-bg); color: var(--t-amber); }
@@ -42,6 +46,8 @@
 .cal-bar.tone-green { background: var(--t-green-bg); color: var(--t-green); }
 .cal-bar.tone-blue { background: var(--t-blue-bg); color: var(--t-blue); }
 .cal-bar.done { opacity: .6; }
+/* late: red stripes and a solid outline, so it never reads as Agreement Sent */
+.cal-bar.late { background: repeating-linear-gradient(135deg, var(--t-red-bg) 0 6px, #fff 6px 10px); box-shadow: inset 0 0 0 2px var(--t-red); color: var(--t-red); }
 .cal-bar.cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-style: dashed; }
 .cal-bar.cut-r { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .cal-bar.ws { background: repeating-linear-gradient(135deg, #DADEE5 0 6px, #EEF0F3 6px 12px); color: #3B4250; border-color: #8A93A3; pointer-events: none; }

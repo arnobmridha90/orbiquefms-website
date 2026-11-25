@@ -148,8 +148,8 @@ status chips keep their fixed colours.
 | `fleet {overspeed, historyDays, reminderRecipients [user ids], reminderTime 'HH:MM', warnDays {paper kind: days}}` | Fleet settings |
 | `trackerPlatforms` | list for the tracker platform field and the Tracking page |
 | `dashcamPlatforms` | list for the dashcam platform field on a car (Settings > Fleet edits both lists) |
-| `assistant {hours {from, to}, turnaroundH, airportTurnaroundH, holdMin, minNoticeH, deliveryTiers [{upToKm, fee}], stayOutDays}` | booking assistant rules |
-| `turnaroundH` | availability: warn when the car is back less than this before the next start (3) |
+| `assistant {hours {from, to}, airportTurnaroundH, holdMin, minNoticeH, deliveryTiers [{upToKm, fee}], stayOutDays}` | booking assistant rules (the gap between rentals is the company `turnaroundH`) |
+| `turnaroundH` | the gap between two rentals in hours (3): Availability, the car picker, the booking form and the assistant. Read it with `turnaroundH()`; Settings > Booking assistant edits it |
 | `expenseEditDays` | days people may change or delete their own expenses (`null` = no limit) |
 | `carsNotCounted` | car ids left out of report and dashboard figures (Bara starts with its sold car) |
 | `refundLockDate` | Date, default 1 Nov 2026 (see `canPickRefunded`) |

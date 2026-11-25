@@ -16,7 +16,7 @@ function ldTone(s) { return { waiting: 'warn', taken: 'ok', chatting: 'info', cl
 function ldStatusLabel(s) { var t = LD_TABS.filter(function (x) { return x[0] === s; })[0]; return t ? t[1] : s; }
 function ldCar(l) { return l.car ? carById(l.car) : null; }
 function ldCarName(l) { var c = ldCar(l); return c ? carModel(c) + ' ' + c.plate : ''; }
-function ldRules(d) { var a = (CO(d) || {}).assistant || {}; return { hours: a.hours || { from: '08:00', to: '22:00' }, turnaroundH: a.turnaroundH || 2, airportTurnaroundH: a.airportTurnaroundH || 4, holdMin: a.holdMin || 30, minNoticeH: a.minNoticeH || 3, tiers: a.deliveryTiers || [], stayOutDays: a.stayOutDays || 30 }; }
+function ldRules(d) { var a = (CO(d) || {}).assistant || {}; return { hours: a.hours || { from: '08:00', to: '22:00' }, turnaroundH: turnaroundH(d), airportTurnaroundH: a.airportTurnaroundH || 4, holdMin: a.holdMin || 30, minNoticeH: a.minNoticeH || 3, tiers: a.deliveryTiers || [], stayOutDays: a.stayOutDays || 30 }; }
 /* the delivery fee for a distance from the company's tiers, or null when it is too far (staff quote it) */
 function ldTierFee(km, d) { var t = ldRules(d).tiers.slice().sort(function (a, b) { return a.upToKm - b.upToKm; }).filter(function (x) { return km <= x.upToKm; })[0]; return t ? t.fee : null; }
 function ldFee(p) { return !p ? 0 : p.kind === 'office' ? 0 : p.fee; }
@@ -39,7 +39,9 @@ DATA_INIT.push(function (d, b) {
     var start = new Date(base.getFullYear(), base.getMonth(), base.getDate() + ri(1, 12), pick([9, 10, 11, 14, 15, 18]), pick([0, 0, 30]));
     var len = pick([1, 2, 2, 3, 4, 7]), end = new Date(start.getTime() + len * DAY + (R() < .2 ? 3 * 36e5 : 0));
     var noDates = st === 'chatting' && k === 10;
-    var car = noDates || (st === 'chatting' && k === 9) ? null : pick(cars);
+    /* the assistant only offers cars that are free for the dates (bookings, workshop time and the gap between rentals) */
+    var freeCars = cars.filter(function (c) { var bz = busy(c, start, end, null, d); return bz.free && !bz.soon; });
+    var car = noDates || (st === 'chatting' && k === 9) ? null : pick(freeCars.length ? freeCars : cars);
     var place = function (start) {
       if (len <= 1 || !places.length || R() < .45) { var l = locs[0] || { n: 'our office' }; return { kind: 'office', label: (start ? 'Pick-up at ' : 'Drop-off at ') + l.n, fee: 0 }; }
       if (R() < .5) { var p = pick(places); return { kind: 'place', label: (start ? 'Delivery to ' : 'Return from ') + p.name, fee: start ? p.deliveryFee : p.returnFee }; }
@@ -51,7 +53,7 @@ DATA_INIT.push(function (d, b) {
     var unknown = !!(pk && pk.fee == null) || !!(dp && dp.fee == null);
     var lastAt = new Date(base.getTime() - (st === 'closed' ? ri(2, 9) * DAY : st === 'chatting' ? ri(1, 25) * 6e4 : ri(5, 300) * 6e4));
     var who = (d.users[2] || d.users[0]).name, who2 = (d.users[1] || d.users[0]).name;
-    var held = car && b.id !== 'padi' && (st === 'waiting' || st === 'chatting') && k % 2 === 0 ? new Date(base.getTime() + ri(4, hold - 2) * 6e4) : null;
+    var held = car && freeCars.indexOf(car) >= 0 && b.id !== 'padi' && (st === 'waiting' || st === 'chatting') && k % 2 === 0 ? new Date(base.getTime() + ri(4, hold - 2) * 6e4) : null;
     var reasons = ['Asked a question', 'Ready to book', 'Typed "staff"', 'Delivery fee to quote'];
     var qs = ['Can I pay the deposit by card when I collect?', 'Is a child seat available for this car?', 'Can I take the car to another state?', 'Do you deliver to my hotel? I sent the address.'];
     var l = { id: 'lead-' + (k + 1), name: nm, phone: ph, lastAt: lastAt, created: new Date(lastAt.getTime() - ri(10, 90) * 6e4), start: noDates ? null : start, end: noDates ? null : end, car: car ? car.id : null, heldUntil: held,
@@ -130,8 +132,35 @@ function ldMakeBooking(l) {
   var opt = function (p, start) { if (!p) return null; if (p.kind === 'office') return start ? 'Pick-up from our location' : 'Drop-off at our location'; if (p.kind === 'place') return p.label; return start ? 'Delivery to client location' : 'Return from client location'; };
   var cust = (D().people || []).filter(function (p) { return normPhone(p.phone) === normPhone(l.phone); })[0];
   UI.closeAll();
-  API.newBooking({ car: l.car || undefined, start: l.start ? UI.isoDateTime(l.start) : undefined, end: l.end ? UI.isoDateTime(l.end) : undefined, customer: cust ? cust.id : undefined, name: l.name, phone: l.phone, startOpt: opt(l.pick, true), endOpt: opt(l.drop, false), lead: l.id });
+  API.newBooking({ car: l.car || undefined, start: l.start ? UI.isoDateTime(l.start) : undefined, end: l.end ? UI.isoDateTime(l.end) : undefined, customer: cust ? cust.id : undefined, name: l.name, phone: l.phone, startOpt: opt(l.pick, true), endOpt: opt(l.drop, false), lead: l.id,
+    /* exactly what the assistant quoted: its delivery and return fees, no damage cover the customer did not ask for, and the estimate to check against */
+    deliv: l.pick && l.pick.fee != null ? ldFee(l.pick) : undefined, ret: l.drop && l.drop.fee != null ? ldFee(l.drop) : undefined, pkg: '',
+    estimate: l.total != null && !l.feesUnknown ? l.total + (l.deposit || 0) : undefined, estDep: l.deposit != null ? l.deposit : undefined });
   DB.log('Opened', 'Lead', l.id, me().name + ' started a booking from the lead of ' + (l.name || l.phone));
+}
+
+/* ---------- is the lead's car still free for its dates? ---------- */
+function ldClash(l, c) { if (!c || !l.start || !l.end || l.booking || l.status === 'closed') return null; var b = busy(c, l.start, l.end); return b.free ? null : b; }
+function ldClashText(c, b) {
+  if (b.kind === 'booking') return c.plate + ' is booked on ' + b.booking.code + ' until ' + UI.fmt.date(b.booking.end) + '. Choose another car before you reply to the customer.';
+  if (b.kind === 'workshop') return c.plate + ' is in the workshop' + (b.downtime && b.downtime.to ? ' until ' + UI.fmt.date(b.downtime.to) : '') + '. Choose another car before you reply to the customer.';
+  return c.plate + ' is marked ' + b.reason + ', so it cannot be rented. Choose another car before you reply to the customer.';
+}
+function ldClashHtml(l, c, mg) { var b = ldClash(l, c); return b ? UI.alert(ldClashText(c, b), 'bad', { action: mg ? UI.btn('Choose another car', { kind: 'o', size: 'sm', icon: 'car', attrs: { 'data-ld': 'swap' } }) : '' }) : ''; }
+/* pick a free car for the lead's dates; the rent and estimate follow the new car */
+function ldSwapCar(l) {
+  var pick = null;
+  var dl = UI.dialog({ title: 'Choose another car', subtitle: ldDates(l), width: 'sm', body: function (el) {
+    el.innerHTML = '<div data-ld-car></div><p class="b2">Free cars for these dates come first.</p>';
+    UI.carPicker(el.querySelector('[data-ld-car]'), { key: 'car', label: 'Car', start: l.start, end: l.end, hideInactive: true, onChange: function (v) { pick = v; } });
+  }, buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Use this car', onClick: function () {
+    var c = pick ? carById(pick) : null; if (!c) { UI.toast('Choose a car first.', { tone: 'warn' }); return false; }
+    var b = busy(c, l.start, l.end); if (!b.free) { UI.toast(ldClashText(c, b).replace(/ Choose another car.*$/, ''), { tone: 'warn' }); return false; }
+    var rent = bkCalc({ start: l.start, end: l.end, rate: c.rate, hourly: c.hourly || Math.round(c.rate / 8) }).rent;
+    ldUpdate(l, { car: c.id, rent: rent, deposit: c.deposit || l.deposit, total: rent + ldFee(l.pick) + ldFee(l.drop) }, me().name + ' changed the car of the lead of ' + (l.name || l.phone) + ' to ' + c.plate);
+    UI.toast('The lead now has ' + c.plate + '. Tell the customer the new car and price.');
+  } }] });
+  return dl;
 }
 
 /* ---------- the lead drawer ---------- */
@@ -149,6 +178,7 @@ function ldDrawer(id) {
         row('Pick-up', l.pick ? esc(l.pick.label) + ' <span class="b2 nw">(' + ldFeeText(l.pick) + ')</span>' : '-') + row('Return', l.drop ? esc(l.drop.label) + ' <span class="b2 nw">(' + ldFeeText(l.drop) + ')</span>' : '-') +
         (l.rent != null ? row('Rent', UI.money(l.rent)) : '') + (l.total != null ? row('Estimate given', UI.money(l.total) + (l.feesUnknown ? ' <span class="ld-q">+ delivery to quote</span>' : '')) : '') + (l.deposit != null ? row('Deposit', UI.money(l.deposit)) : '') + '</div>' +
         (l.question ? UI.alert('<b>Question:</b> ' + esc(l.question), 'warn', { html: true }) : '') +
+        ldClashHtml(l, c, mg) +
         '<div class="ld-acts">' +
         (mg && (l.status === 'waiting' || l.status === 'chatting') ? UI.btn("I'll take it", { icon: 'hand-stop', attrs: { 'data-ld': 'take' } }) : '') +
         (mg && hold ? UI.btn('Let go of the car', { kind: 'o', icon: 'lock-open', attrs: { 'data-ld': 'release' } }) : '') +
@@ -162,7 +192,7 @@ function ldDrawer(id) {
   dr.el.addEventListener('click', function (ev) {
     var x = ev.target.closest('[data-ld]'); if (!x) return;
     var a = x.getAttribute('data-ld');
-    if (a === 'take') ldTake(l); else if (a === 'release') ldRelease(l); else if (a === 'close') ldClose(l); else if (a === 'book') ldMakeBooking(l);
+    if (a === 'take') ldTake(l); else if (a === 'release') ldRelease(l); else if (a === 'close') ldClose(l); else if (a === 'book') ldMakeBooking(l); else if (a === 'swap') ldSwapCar(l);
   });
   return dr;
 }

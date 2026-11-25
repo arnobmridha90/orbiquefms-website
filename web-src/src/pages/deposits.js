@@ -51,7 +51,8 @@ function depHow(r) { if (!r) return ''; return r.method === 'None' ? 'Nothing re
 function depLists() {
   var d = D(), wait = [], done = [], seen = {};
   d.bookings.forEach(function (x) {
-    if (x.status === 'Cancelled') return;
+    /* a cancelled booking is listed only while it still owes the customer a deposit (or had one given back) */
+    if (x.status === 'Cancelled' && x.pay !== 'Refund Pending' && !(x.pay === 'Deposit Refunded' && byId(d.deposits, 'dep-' + x.code))) return;
     if (x.pay === 'Refund Pending') { var z = depFor(x.code); if (!z.refund) { z.markedByHand = false; wait.push(z); seen[z.id] = 1; } }
     else if (x.pay === 'Deposit Refunded' && TODAY - x.end < 90 * DAY && (x.end <= NOW() || byId(d.deposits, 'dep-' + x.code))) { var z2 = depFor(x.code); if (!z2.refund && depState(z2) === 'hand') z2.markedByHand = true; done.push(z2); seen[z2.id] = 1; }
   });

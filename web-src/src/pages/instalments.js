@@ -19,7 +19,7 @@ function insMarkPaid(it) {
   var body = function () {
     var on = rptParse(st.on), err = !on ? 'Choose the day it was paid.' : on > insToday() ? 'The day cannot be in the future.' : '';
     return '<p class="ins-dl"><b>' + esc(car.plate) + '</b> · due ' + esc(UI.fmt.date(it.due)) + ' · ' + UI.money(it.amount) + '</p>' +
-      UI.input({ id: 'ins-on', key: 'on', label: 'Paid on', type: 'date', value: st.on, max: rptIso(insToday()), required: true, error: err }) +
+      UI.dateField({ id: 'ins-on', key: 'on', label: 'Paid on', value: st.on, max: insToday(), required: true, error: err, chips: [{ label: 'Today', days: 0 }, { label: 'Yesterday', days: -1 }] }) +
       UI.input({ id: 'ins-amt', key: 'amount', label: 'Amount paid (RM)', prefix: 'RM', value: st.amount, placeholder: it.amount.toFixed(2), attrs: { inputmode: 'decimal' }, help: 'Leave empty if you paid the amount due. Type it only if you paid a different amount.' }) +
       '<div class="exp-f"><label class="exp-l">Paid with</label><div class="exp-qc">' + [['Cash', 'cash'], ['Card', 'credit-card'], ['Bank transfer', 'building-bank'], ['E-wallet', 'device-mobile'], ['Other', 'dots']].map(function (m) { return '<button type="button" class="exp-chip" data-pm="' + m[0] + '" aria-pressed="' + (st.method === m[0]) + '">' + i(m[1]) + m[0] + '</button>'; }).join('') + '</div></div>' +
       UI.input({ id: 'ins-note', key: 'note', label: 'Note (optional)', value: st.note, placeholder: 'For example: reference of the bank transfer', maxlength: 120 }) +

@@ -425,6 +425,21 @@ function teamAgentDrawer(e) {
     } });
   return dr;
 }
+/* a form problem: the fields turn red with their message, the first one scrolls into view and gets the cursor, and a
+   toast says it too (the old line at the bottom of a long form was off screen on a phone).
+   marks: [[key, message], ...]; returns false so a footer button keeps the drawer open */
+function teamMark(body, marks, toast) {
+  body.querySelectorAll('.tm-bad').forEach(function (x) { x.classList.remove('bad', 'tm-bad'); var s = x.querySelector('.tm-ferr'); if (s) s.remove(); });
+  var first = null;
+  marks.forEach(function (m) {
+    var f = body.querySelector('[data-key="' + m[0] + '"]'), box = f && f.closest('.inp'); if (!box) return;
+    box.classList.add('bad', 'tm-bad'); var s = document.createElement('span'); s.className = 'ui-err tm-ferr'; s.textContent = m[1]; box.appendChild(s);
+    if (!first) first = f;
+  });
+  if (first) { var bx = first.closest('.inp'); if (bx.scrollIntoView) bx.scrollIntoView({ block: 'center', behavior: 'smooth' }); try { first.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }
+  UI.toast(toast || (marks[0] && marks[0][1]) || 'Check the fields marked in red.', { tone: 'warn' });
+  return false;
+}
 /* New / Edit Employee (field agent) */
 function teamEmployeeDrawer(e, prefill, after) {
   var isNew = !e, p = prefill || {}, docs = { idCard: e && e.docs ? e.docs.idCard : null, poa: e && e.docs ? e.docs.poa : null };
@@ -444,8 +459,8 @@ function teamEmployeeDrawer(e, prefill, after) {
     },
     foot: [{ label: 'Cancel', kind: 'o', close: false, onClick: function (d2) { d2.close(); } }, { label: isNew ? 'Create' : 'Update', icon: 'check', onClick: function (d2) {
       var f = UI.form(d2.body), miss = [];
-      if (!f.name.trim()) miss.push('Full Name'); if (!f.wa.trim()) miss.push('WhatsApp Number'); if (!f.en.trim()) miss.push('emergency contact Name'); if (!f.er) miss.push('Relation'); if (!f.ep.trim()) miss.push('Phone Number');
-      if (miss.length) { var er = d2.body.querySelector('.tm-err'); er.textContent = 'Fill in: ' + miss.join(', ') + '.'; er.hidden = false; return false; }
+      if (!f.name.trim()) miss.push(['name', 'Type the full name.', 'Full Name']); if (!f.wa.trim()) miss.push(['wa', 'Type the WhatsApp number.', 'WhatsApp Number']); if (!f.en.trim()) miss.push(['en', 'Type the emergency contact name.', 'emergency contact Name']); if (!f.er) miss.push(['er', 'Choose the relation.', 'Relation']); if (!f.ep.trim()) miss.push(['ep', 'Type the phone number.', 'Phone Number']);
+      if (miss.length) return teamMark(d2.body, miss, 'Fill in: ' + miss.map(function (m) { return m[2]; }).join(', ') + '.');
       var rec = { name: f.name.trim(), wa: f.wa.trim(), email: f.email.trim(), blood: f.blood, emergency: { name: f.en.trim(), rel: f.er, phone: f.ep.trim() }, docs: { idCard: docs.idCard, poa: docs.poa } };
       if (isNew) { rec.active = true; rec.login = p.login || null; var ne = DB.add('employees', rec, { where: 'Team member', text: me().name + ' added field agent ' + rec.name }); if (p.login) { var u = userById(p.login); if (u) u.agent = ne.id; } UI.toast(rec.name + ' added. Tasks can now be given to them.'); }
       else { DB.update('employees', e, rec, { where: 'Team member', text: me().name + ' changed the profile of ' + rec.name }); UI.toast('Profile updated.'); }
@@ -465,16 +480,16 @@ function teamLoginDrawer(o) {
       el.innerHTML = '<div class="grid g2 tm-form">' + UI.input({ key: 'name', label: 'Name', required: true, value: e ? e.name : '', help: 'Shown in the team list and the activity log.' }) + UI.input({ key: 'username', label: 'Username', required: true, value: guess, help: 'What they type to sign in. Every person needs their own; never share one.' }) +
         UI.input({ key: 'email', label: 'Email (optional)', type: 'email', value: e ? e.email : '' }) + UI.select({ key: 'agent', label: 'Linked field profile (optional)', value: e ? e.id : '', options: [['', 'None']].concat((e ? [e] : []).concat(free.filter(function (x) { return x !== e; })).map(function (x) { return [x.id, x.name]; })) }) +
         UI.select({ key: 'role', label: 'Start from template', value: 'role-none', options: D().roles.filter(function (r) { return r.key !== 'owner'; }).map(function (r) { return [r.id, r.name]; }), help: 'New logins start with No access. You can switch features on in the Access tab later.', full: true }) + teamPwFields('Password') + '</div>' +
-        UI.alert('Choose a password and pass it on to them yourself. It is never shown again.', 'pri') + '<p class="ui-err tm-err" hidden></p>';
+        UI.alert('Choose a password and pass it on to them yourself. It is never shown again.', 'pri');
       teamWirePw(el, function () { return el.querySelector('[data-key="username"]').value.trim().toLowerCase(); }, function () { var f = UI.form(el), ag = f.agent ? employeeById(f.agent) : null; return { name: f.name, phone: ag ? ag.wa : '' }; });
       teamWireEmail(el, null);
     },
     foot: [{ label: 'Cancel', kind: 'o', close: false, onClick: function (d2) { d2.close(); } }, { label: 'Add login', icon: 'user-plus', onClick: function (d2) {
-      var f = UI.form(d2.body), un = String(f.username || '').trim().toLowerCase(), er = d2.body.querySelector('.tm-err'), bad = function (t) { er.textContent = t; er.hidden = false; return false; };
-      if (!f.name.trim()) return bad('Type the name.');
-      if (!/^[a-z0-9._]{3,30}$/.test(un)) return bad('The username needs 3 to 30 small letters, numbers, dots or underscores.');
-      if (D().users.some(function (x) { return x.username === un; })) return bad('Someone already has the username "' + un + '". Every person needs their own.');
-      if (!teamPwOk(f.password, un)) return bad('The password does not follow the rules yet.');
+      var f = UI.form(d2.body), un = String(f.username || '').trim().toLowerCase(), bad = function (t, key) { return teamMark(d2.body, [[key, t]]); };
+      if (!f.name.trim()) return bad('Type the name.', 'name');
+      if (!/^[a-z0-9._]{3,30}$/.test(un)) return bad('The username needs 3 to 30 small letters, numbers, dots or underscores.', 'username');
+      if (D().users.some(function (x) { return x.username === un; })) return bad('Someone already has the username "' + un + '". Every person needs their own.', 'username');
+      if (!teamPwOk(f.password, un)) return bad('The password does not follow the rules yet.', 'password');
       var u = DB.add('users', { name: f.name.trim(), username: un, email: f.email.trim(), role: f.role || 'role-none', extra: [], removed: [], active: true, superAdmin: false, agent: f.agent || null, lastSignIn: null, created: NOW(), pwSetAt: NOW() }, { where: 'Team member', text: me().name + ' added a login for ' + f.name.trim() });
       if (f.agent) { var ag = employeeById(f.agent); if (ag) ag.login = u.id; }
       UI.toast('Login added for ' + u.name + '. Pass the password on to them yourself.');

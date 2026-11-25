@@ -79,10 +79,11 @@ function avList(st) {
   });
   var byPlate = function (a, b) { return (a.c.make + a.c.model).localeCompare(b.c.make + b.c.model) || a.c.plate.localeCompare(b.c.plate); };
   free.sort(byPlate); check.sort(byPlate); booked.sort(byPlate);
-  var html = '<div class="sec av-sec"><h2 class="tone-green-text">' + free.length + ' available</h2></div>' +
+  /* the same count as New booking and the car picker: every free car, with the ones close to another booking called out */
+  var html = '<div class="sec av-sec"><h2 class="tone-green-text">' + (free.length + check.length) + ' free' + (check.length ? ' (' + check.length + ' need' + (check.length === 1 ? 's' : '') + ' a check)' : '') + '</h2></div>' +
     (free.length ? '<div class="av-cards">' + free.map(function (x) { return avCard(x, st, 'free'); }).join('') + '</div>' :
       '<div class="empty small">' + (term ? 'No free car matches “' + esc(term) + '”.' : 'No cars are free for the whole period. ' + (check.length ? 'Some cars below are close. Moving the times a little may free them.' : 'Try a shorter period or different times.')) + '</div>');
-  if (check.length) html += '<div class="sec av-sec"><h2 class="tone-amber-text">Check ' + check.length + ' car' + (check.length > 1 ? 's' : '') + '</h2></div><p class="hint av-hint">' + (check.length === 1 ? 'It has a booking' : 'They have bookings') + ' ending within 3 hours before your start, or starting within 3 hours after your end.</p>' +
+  if (check.length) html += '<div class="sec av-sec"><h2 class="tone-amber-text">Free, but check ' + (check.length > 1 ? 'these ' + check.length : 'this one') + '</h2></div><p class="hint av-hint">' + (check.length === 1 ? 'It has a booking' : 'They have bookings') + ' ending within 3 hours before your start, or starting within 3 hours after your end.</p>' +
     '<div class="av-cards">' + check.map(function (x) { return avCard(x, st, 'check'); }).join('') + '</div>';
   html += '<label class="av-showbooked"><span><b class="tone-red-text">' + booked.length + ' booked</b><small>Cars that are not free in this period</small></span><span class="sw"><input type="checkbox" onchange="avToggleBooked(this.checked)"' + (st.booked ? ' checked' : '') + '><i></i></span></label>';
   if (st.booked && booked.length) html += '<div class="av-cards">' + booked.map(function (x) { return avCard(x, st, 'booked'); }).join('') + '</div>';
@@ -94,5 +95,5 @@ function avCard(x, st, kind) {
   var act = kind === 'booked' ? (bz.booking ? '<a class="btn sm ghost" href="#booking/' + bz.booking.id + '">Open ' + esc(bz.booking.code) + '</a>' : '') :
     can('bookings.create') ? '<a class="btn sm' + (kind === 'check' ? ' ghost' : '') + '" href="' + hashWith('new', { car: c.id, start: st.from.toISOString(), end: st.to.toISOString() }) + '">' + I('plus', 2.2) + 'Book this car</a>' : '';
   return '<div class="card av-card ' + kind + '"><div class="av-top"><span class="av-pic">' + carSVG(c.color, c.shape) + '</span><div class="grow"><div class="av-plate">' + esc(c.plate) + '</div><div class="small muted av-model">' + esc(c.make + ' ' + c.model + ' · ' + (c.type || '') + ' · ' + c.color) + '</div></div>' +
-    (can('bookings.see_amounts') ? '<div class="av-price"><b class="money">' + rm(rent) + '</b><small>' + rm(c.rate) + ' / day</small></div>' : '') + '</div>' + note + (act ? '<div class="av-act">' + act + '</div>' : '') + '</div>';
+    (can('bookings.see_amounts') ? '<div class="av-price"><b class="money">' + rm(rent) + '</b><small>rent for ' + esc(durationText(st.from, st.to)) + '</small><small>plus deposit</small></div>' : '') + '</div>' + note + (act ? '<div class="av-act">' + act + '</div>' : '') + '</div>';
 }

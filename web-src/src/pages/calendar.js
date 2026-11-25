@@ -110,7 +110,7 @@ PAGES['calendar'] = {
         return '<div class="cl-car" data-car="' + c.id + '" role="button" tabindex="0" title="Open ' + esc(c.plate) + '">' + carsThumb(c, 'cl-ph') + '<div class="cl-ci"><b>' + esc(c.plate) + '</b><span>' + esc(carName(c)) + '</span><small>' + esc(c.color) + (c.fleet && c.fleet !== 'Active' ? ' · ' + esc(c.fleet) : '') + '</small></div></div>' +
           '<div class="cl-track' + (ctx.can('bookings.create') && (!c.fleet || c.fleet === 'Active') ? ' book' : '') + '" style="height:' + (16 + nl * 30) + 'px" data-row="' + c.id + '">' + bg + nowP + bars + '</div>';
       }).join('');
-      return '<div class="cl-wrap"><div class="cl-grid" style="grid-template-columns:var(--cl-left) minmax(' + minW + 'px,1fr)">' +
+      return '<div class="cl-wrap"><div class="cl-grid" style="grid-template-columns:var(--cl-left) minmax(' + minW + 'px,1fr);min-width:calc(var(--cl-left) + ' + minW + 'px)">' +
         '<div class="cl-corner">Cars (' + cars.length + ')</div><div class="cl-head" style="grid-template-columns:repeat(' + r.n + ',minmax(0,1fr))">' + head + '</div>' + rows + '</div></div>' +
         (cars.length ? '' : st.q ? UI.empty({ icon: 'car-off', title: 'No car matches "' + st.q + '"', text: 'Try the numbers of the plate, or clear the box.' }) : UI.empty({ icon: 'car-off', title: 'No cars yet', text: 'Add a car on the Cars page to see it here.' }));
     }

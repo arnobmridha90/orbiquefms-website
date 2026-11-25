@@ -312,31 +312,47 @@ function invDueOf(x) { return Math.max(0, invR2((x.payable || 0) - invReceived(x
 function invKindsText(p) { var k = invItems(p).map(function (it) { return it.kind; }); return k.length > 2 ? k[0] + ' and ' + (k.length - 1) + ' more' : k.join(' + '); }
 /* the booking's charges without the deposit: the live invoice's total when there is one */
 function invCharges(x) { var iv = invInvoiceOf(x.code); return iv ? invTotal(iv) : Math.max(0, (x.payable || 0) - (x.dep || 0)); }
-/* what an item suggests: the deposit and the separate charges as the booking has them; rent is the charges less any
-   separate charge ticked beside it, so rent + delivery never counts the delivery twice; extension and other start blank */
-function invItemSuggest(x, kind, ticked) {
-  if (!x) return '';
-  if (kind === 'Security deposit') return x.dep > 0 ? invR2(x.dep).toFixed(2) : '';
-  if (INV_SEP[kind]) { var v = x[INV_SEP[kind]] || 0; return v > 0 ? invR2(v).toFixed(2) : ''; }
-  if (kind === 'Rental payment') { var r = invCharges(x) - (ticked || []).reduce(function (s, k) { return s + (INV_SEP[k] ? x[INV_SEP[k]] || 0 : 0); }, 0); return r > 0 ? invR2(r).toFixed(2) : ''; }
-  return '';
-}
-/* what the booking expects for each kind (extension and other are never checked) */
+/* what is still due for each kind: the deposit and each separate charge less what was already paid for it; rent is the
+   charges less every separate charge (paid or ticked beside it, so rent + delivery never counts the delivery twice) less
+   the rent already paid. Extension and other are never checked. Nothing goes below zero. */
 function invFigures(x, kinds) {
-  var f = { 'Security deposit': x.dep || 0 };
-  Object.keys(INV_SEP).forEach(function (k) { f[k] = x[INV_SEP[k]] || 0; });
-  f['Rental payment'] = Math.max(0, invCharges(x) - (kinds || []).reduce(function (s, k) { return s + (INV_SEP[k] ? x[INV_SEP[k]] || 0 : 0); }, 0));
+  var by = invPaidByKind(x.code), f = {}, sepLeft = 0;
+  f['Security deposit'] = Math.max(0, invR2((x.dep || 0) - (by['Security deposit'] || 0)));
+  Object.keys(INV_SEP).forEach(function (k) {
+    var full = x[INV_SEP[k]] || 0, left = Math.max(0, invR2(full - (by[k] || 0)));
+    f[k] = left;
+    /* a separate charge counts against the rent when it is paid on its own, or ticked to be paid on its own now */
+    sepLeft += (by[k] || 0) + ((kinds || []).indexOf(k) >= 0 ? left : 0);
+  });
+  f['Rental payment'] = Math.max(0, invR2(invCharges(x) - sepLeft - (by['Rental payment'] || 0)));
   return f;
+}
+/* the amount an item starts with: what is still due for it, and never more than the booking's whole balance */
+function invItemSuggest(x, kind, ticked) {
+  if (!x || kind === 'Extension payment' || kind === 'Other payment') return '';
+  var t = ticked || [], f = invFigures(x, t), v = f[kind] || 0;
+  if (kind === 'Rental payment') { var others = t.reduce(function (s, k) { return s + (k !== kind && f[k] != null ? f[k] : 0); }, 0); v = Math.min(v, Math.max(0, invDueOf(x) - others)); }
+  return v > 0 ? invR2(v).toFixed(2) : '';
 }
 function invOverLines(lines, fig, slack) {
   return lines.filter(function (l) { return fig[l.kind] != null && l.amount > fig[l.kind] + ((slack || {})[l.kind] || 0) + .004; }).map(function (l) { return { kind: l.kind, booking: fig[l.kind], paying: l.amount }; });
+}
+/* every line over what is still due for it, and the whole payment over the booking's balance (extension and other
+   payments are extra charges, so they never count against the balance) */
+function invOverAll(x, lines, slack) {
+  var over = invOverLines(lines, invFigures(x, lines.map(function (l) { return l.kind; })), slack);
+  if (!over.length) {
+    var counted = invR2(sum(lines.filter(function (l) { return l.kind !== 'Extension payment' && l.kind !== 'Other payment'; }).map(function (l) { return l.amount; }))), due = invDueOf(x);
+    if (counted > due + ((slack || {})['Rental payment'] || 0) + .004) over = [{ kind: 'Total', booking: due, paying: counted }];
+  }
+  return over;
 }
 /* the big stop before recording more than the booking says. "Go back and check" is the default. Resolves true to record. */
 function invOverAsk(over, context) {
   return new Promise(function (res) {
     var one = over.length === 1 ? over[0] : null, done = false, fin = function (v) { if (!done) { done = true; res(v); } };
-    var body = '<div class="inv-over-h">' + i('alert-triangle') + '<p>' + (one ? 'The ' + esc(one.kind.toLowerCase()) + ' in the booking details is <b>' + UI.fmt.money(one.booking) + '</b>. Are you sure you want to record <b>' + UI.fmt.money(one.paying) + '</b> as ' + esc(one.kind.toLowerCase()) + '?' : 'These amounts are more than the booking details say. Are you sure you want to record them?') + '</p></div>' +
-      '<ul class="inv-over-l">' + over.map(function (l) { return '<li><b>' + esc(l.kind) + '</b>: booking says ' + UI.fmt.money(l.booking) + ', you are recording <b>' + UI.fmt.money(l.paying) + '</b> (' + UI.fmt.money(l.paying - l.booking) + ' more)</li>'; }).join('') + '</ul>';
+    var body = '<div class="inv-over-h">' + i('alert-triangle') + '<p>' + (one ? (one.kind === 'Total' ? 'The booking has <b>' + UI.fmt.money(one.booking) + '</b> still due in all.' : 'The ' + esc(one.kind.toLowerCase()) + ' still due on this booking is <b>' + UI.fmt.money(one.booking) + '</b>.') + ' Are you sure you want to record <b>' + UI.fmt.money(one.paying) + '</b>' + (one.kind === 'Total' ? '' : ' as ' + esc(one.kind.toLowerCase())) + '?' : 'These amounts are more than the booking still has due. Are you sure you want to record them?') + '</p></div>' +
+      '<ul class="inv-over-l">' + over.map(function (l) { return '<li><b>' + esc(l.kind) + '</b>: still due ' + UI.fmt.money(l.booking) + ', you are recording <b>' + UI.fmt.money(l.paying) + '</b> (' + UI.fmt.money(l.paying - l.booking) + ' more)</li>'; }).join('') + '</ul>';
     var d = UI.dialog({ title: 'More than the booking says', subtitle: context || '', width: 'md', alert: true, body: body, onClose: function () { fin(false); },
       buttons: [{ label: 'Yes, record anyway', kind: 'o', cls: 'inv-over-yes', onClick: function () { fin(true); } }, { label: 'Go back and check', icon: 'arrow-back-up', onClick: function () { fin(false); } }] });
     d.el.classList.add('inv-over');
@@ -545,13 +561,21 @@ function invItemsRefresh(it, x) { var t = invTicked(it); INV_KINDS.forEach(funct
 function invItemsTotal(it) { return invR2(sum(invTicked(it).map(function (k) { var v = String(it[k].amount || '').replace(/,/g, ''); return /^\d{1,9}(\.\d{1,2})?$/.test(v.trim()) ? Number(v) : 0; }))); }
 function invItemProblem(row) { if (!row.on) return ''; var a = String(row.amount == null ? '' : row.amount).replace(/,/g, '').trim(); if (!a) return 'Enter the amount'; if (!/^\d{1,9}(\.\d{1,2})?$/.test(a)) return 'Enter an amount like 150 or 150.50'; if (Number(a) <= 0) return 'The amount must be more than zero'; return ''; }
 function invItemLines(it) { return invTicked(it).map(function (k) { return { kind: k, amount: invR2(String(it[k].amount).replace(/,/g, '')) }; }); }
-function invSuggestsUpdate(x, it) { return !!x && (!x.pay || x.pay === 'Deposit due') && invTicked(it).some(function (k) { return k !== 'Extension payment' && k !== 'Other payment'; }); }
+/* the "also update the payment status" switch starts on when the status has not moved yet, or when this payment
+   brings a Deposit Received booking up to its whole total (it then becomes Full Payment Received) */
+function invSuggestsUpdate(x, it) {
+  if (!x) return false;
+  var t = invTicked(it);
+  if (!x.pay || x.pay === 'Deposit due') return t.some(function (k) { return k !== 'Extension payment' && k !== 'Other payment'; });
+  if (x.pay === 'Deposit Received') return t.some(function (k) { return RENT_LIKE_KINDS.indexOf(k) >= 0; }) && x.payable > 0 && invReceived(x.code) + invItemsTotal(it) >= x.payable - .99;
+  return false;
+}
 function invItemsFootText(it) { var n = invTicked(it).length; return [n ? plural(n, 'item') : 'Nothing ticked yet', 'Total ' + UI.fmt.money(invItemsTotal(it))]; }
 function invItemsHtml(st, x) {
   var by = x ? invPaidByKind(x.code) : {}, fromDep = st.method === 'Deposit adjustment', t = invTicked(st.items), fig = x ? invFigures(x, t) : {}, ft = invItemsFootText(st.items);
   return '<div class="inp full"><label>What is this payment for?</label><span class="help inv-it-help">Tick everything it paid for and check each amount.</span><div class="inv-items" role="group" aria-label="What is this payment for?">' + INV_KINDS.map(function (k) {
     var r = st.items[k], dis = fromDep && k === 'Security deposit', prob = st.itemsChecked ? invItemProblem(r) : '';
-    var hint = dis ? 'A deposit cannot be paid from a deposit' : [fig[k] > 0 ? 'Booking says ' + UI.fmt.money(fig[k]) : '', by[k] ? UI.fmt.money(by[k]) + ' paid so far' : ''].filter(Boolean).join(' · ');
+    var hint = dis ? 'A deposit cannot be paid from a deposit' : [fig[k] > 0 ? 'Still due ' + UI.fmt.money(fig[k]) : by[k] && fig[k] != null ? 'Paid in full' : '', by[k] ? UI.fmt.money(by[k]) + ' paid so far' : ''].filter(Boolean).join(' · ');
     return '<div class="inv-it' + (r.on ? ' on' : '') + (dis ? ' dis' : '') + '"><label class="cb inv-it-l"><input type="checkbox" data-it="' + esc(k) + '"' + (r.on ? ' checked' : '') + (dis ? ' disabled' : '') + '><span class="box">' + i('check') + '</span><span class="inv-it-t"><b>' + esc(k) + '</b>' + (hint ? '<small>' + esc(hint) + '</small>' : '') + '</span></label>' +
       (r.on ? '<div class="inv-it-a"><div class="ui-affix"><span>RM</span><input type="text" inputmode="decimal" autocomplete="off" data-ita="' + esc(k) + '" value="' + esc(r.amount) + '" placeholder="0.00" aria-label="' + esc(k) + ' amount (RM)"></div>' + (prob ? '<span class="ui-err">' + esc(prob) + '</span>' : '') + '</div>' : '') + '</div>';
   }).join('') + '<div class="inv-it-f"><span class="b2" data-it-n>' + esc(ft[0]) + '</span><b data-it-tot>' + esc(ft[1]) + '</b></div></div>' +
@@ -622,6 +646,7 @@ function invPayWire(el, getSt, redraw) {
     if (!k) return;
     var st = getSt(t); if (!st) return;
     st.items[k].amount = t.value; st.items[k].touched = true;
+    if (!st.updTouched) { var xb = st.booking ? findBooking(st.booking) : null, nu = invSuggestsUpdate(xb, st.items); if (nu !== st.update) { st.update = nu; var sw = cardOf(t).querySelector('input[data-key="upd"]'); if (sw) sw.checked = nu; } }
     var box = t.closest('.inv-items'), ft = invItemsFootText(st.items);
     if (box) { box.querySelector('[data-it-n]').textContent = ft[0]; box.querySelector('[data-it-tot]').textContent = ft[1]; }
     var card = cardOf(t), ac = card.querySelector('[data-after]');
@@ -709,7 +734,7 @@ function invRecordPayment(code) {
       if (!dup) UI.toast('Payment of ' + UI.fmt.money(done.payment.amount) + ' recorded');
       dl.setTitle(dup ? 'Already recorded' : 'Payment recorded', x.code + ' · ' + x.cust.name); redraw();
     };
-    var over = invOverLines(lines, invFigures(x, lines.map(function (l) { return l.kind; })));
+    var over = invOverAll(x, lines);
     if (over.length) { invOverAsk(over, x.code + ' · ' + x.cust.name).then(function (y) { if (y) go(); }); return false; }
     go(); return false;
   };
@@ -975,7 +1000,7 @@ function invUploadSlips() {
     c.error = '';
     var lines = invItemLines(c.items), o = { booking: x.code, items: lines, method: c.method, depositedTo: c.depositedTo, at: c.at, ref: c.ref, note: (c.note || '').trim(), afterCharge: c.method === 'Card' ? c.afterValue : null, slips: [Object.assign({}, c.file, { at: NOW(), by: me().name })], receipt: c.receipt && can('billing.issue_receipt'), updateStatus: c.update };
     var go = function () { var dup = invRecentDup(o); c.result = dup ? { payment: dup, receipt: dup.receipt ? byId(D().receipts, dup.receipt) : null, dup: true } : invDoRecord(o); c.status = 'done'; return true; };
-    var over = invOverLines(lines, invFigures(x, lines.map(function (l) { return l.kind; })), { 'Rental payment': .99 });
+    var over = invOverAll(x, lines, { 'Rental payment': .99 });
     if (over.length) return invOverAsk(over, 'Slip ' + (cards.indexOf(c) + 1) + ' · ' + x.code + ' · ' + x.cust.name).then(function (y) { if (y) return go(); c.status = 'attention'; c.error = 'Not recorded: check the amounts against the booking.'; return false; });
     return Promise.resolve(go());
   }

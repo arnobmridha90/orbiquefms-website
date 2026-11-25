@@ -1,10 +1,9 @@
 /* ===================================================================
    Page: Availability Checker (#page=availability)   Owner: builder 3
    Pick a period and see at once which cars are free, which are close (risky turnaround) and which are booked.
-   Address: #page=availability&from=2026-10-19T17:00&to=2026-10-22T17:00  (&demo=offline|error shows the warning and error states)
+   Address: #page=availability&from=2026-10-19T17:00&to=2026-10-22T17:00  (&demo=offline|error shows the warning and error states, for builders only: no menu offers them)
    =================================================================== */
 var AV_LENS = [[1, '1 day'], [2, '2 days'], [3, '3 days'], [4, '4 days'], [5, '5 days'], [7, '1 week']];
-var AV_GAP = 3 * 36e5;
 var AV_FREE = ['Cancelled', 'Completed'];
 
 function avLenText(ms) {
@@ -15,7 +14,7 @@ function avWhen(d) { return WD[d.getDay()] + ', ' + UI.fmt.dt(d); }
 /* sort every car into available / check / booked for one period */
 function avCheck(from, to, d) {
   d = d || D();
-  var out = { free: [], check: [], booked: [] };
+  var out = { free: [], check: [], booked: [] }, gapMs = turnaroundH(d) * 36e5;
   d.cars.forEach(function (c) {
     var bs = d.bookings.filter(function (x) { return x.car === c && AV_FREE.indexOf(x.status) < 0; });
     var over = bs.filter(function (x) { return x.start < to && x.end > from; });
@@ -29,11 +28,11 @@ function avCheck(from, to, d) {
     }
     var notes2 = [];
     bs.forEach(function (x) {
-      if (x.end <= from && from - x.end < AV_GAP) {
+      if (x.end <= from && from - x.end < gapMs) {
         var gap = from - x.end, back = x.status === 'Car Returned' || x.end <= NOW();
         notes2.push({ icon: 'arrow-back-up', code: x.code, text: (back && x.status === 'Car Returned' ? 'Returned at ' : 'Back at ') + tm(x.end) + ', ' + (gap ? mtDur(gap) + ' before your start' : 'exactly at your start') + ' (' + x.code + ')' });
       }
-      if (x.start >= to && x.start - to < AV_GAP) {
+      if (x.start >= to && x.start - to < gapMs) {
         var gap2 = x.start - to;
         notes2.push({ icon: 'arrow-forward-up', code: x.code, text: (x.startOpt && x.startOpt.indexOf('Delivery') === 0 ? 'Goes out at ' : 'Next booking at ') + tm(x.start) + ', ' + (gap2 ? mtDur(gap2) + ' after your end' : 'exactly at your end') + ' (' + x.code + ')' });
       }
@@ -58,7 +57,7 @@ PAGES['availability'] = {
     var save = function () { ctx.setParams({ from: UI.isoDateTime(st.from), to: UI.isoDateTime(st.to) }, true); };
 
     root.innerHTML = '<div class="pg-h"><div><h1>Availability checker</h1><p>Pick a period to see at once which cars are free, which are close and which are booked.</p></div><div class="acts">' +
-      UI.btn('Open the calendar', { kind: 'o', icon: 'calendar', attrs: { 'data-av': 'cal' } }) + UI.iconBtn('dots-vertical', 'More', { attrs: { 'data-av': 'more' } }) + '</div></div>' +
+      UI.btn('Open the calendar', { kind: 'o', icon: 'calendar', attrs: { 'data-av': 'cal' } }) + '</div></div>' +
       '<div class="card av-pick"><div id="av-form"></div></div><div id="av-res" aria-live="polite"></div>';
     var form = root.querySelector('#av-form'), res = root.querySelector('#av-res');
 
@@ -85,11 +84,11 @@ PAGES['availability'] = {
         res.innerHTML = '<div class="card av-err">' + UI.empty({ icon: 'cloud-off', title: 'Could not load cars for this period.', text: 'Check your connection and try again.', action: UI.btn('Retry', { icon: 'refresh', attrs: { 'data-av': 'retry' } }) }) + '</div>'; return;
       }
       var r = avCheck(st.from, st.to), h = '';
-      if (p.demo === 'offline') { r.free = r.free.concat(r.check); r.check = []; h += UI.alert('Booking times could not be loaded, so cars returned or going out within 3 hours may not be flagged. Double-check before confirming.', 'warn'); }
+      if (p.demo === 'offline') { r.free = r.free.concat(r.check); r.check = []; h += UI.alert('Booking times could not be loaded, so cars returned or going out within ' + plural(turnaroundH(), 'hour') + ' may not be flagged. Double-check before confirming.', 'warn'); }
       h += '<div class="av-h ok">' + i('circle-check') + '<span>' + r.free.length + ' available</span></div>';
       h += r.free.length ? '<div class="av-grid">' + r.free.map(function (x) { return tile(x, 'free'); }).join('') + '</div>' :
         '<div class="card">' + UI.empty({ icon: 'car-off', title: D().cars.length ? 'No cars are free for the whole period' : 'No cars found', text: r.check.length ? 'Some cars below are close. Moving the times a little may free them.' : 'Try a shorter period or different times.' }) + '</div>';
-      if (r.check.length) h += '<div class="av-h warn">' + i('alert-triangle') + '<span>Check ' + plural(r.check.length, 'car') + '</span></div><p class="muted av-p">They have bookings ending within 3 hours of your start time or starting within 3 hours of your end time.</p><div class="av-grid">' + r.check.map(function (x) { return tile(x, 'check'); }).join('') + '</div>';
+      if (r.check.length) h += '<div class="av-h warn">' + i('alert-triangle') + '<span>Check ' + plural(r.check.length, 'car') + '</span></div><p class="muted av-p">They have bookings ending within ' + plural(turnaroundH(), 'hour') + ' of your start time or starting within ' + plural(turnaroundH(), 'hour') + ' of your end time (the gap between rentals in Settings).</p><div class="av-grid">' + r.check.map(function (x) { return tile(x, 'check'); }).join('') + '</div>';
       h += '<div class="av-h bad">' + i('circle-x') + '<span class="grow">' + r.booked.length + ' booked</span>' + UI.switch({ key: 'avshow', label: 'Show', checked: st.show, attrs: { 'data-av': 'show' } }) + '</div>';
       if (st.show) h += r.booked.length ? '<div class="av-grid">' + r.booked.map(function (x) { return tile(x, 'booked'); }).join('') + '</div>' : '<p class="muted av-p">No car is booked or in the workshop in this period.</p>';
       res.innerHTML = h;
@@ -114,14 +113,6 @@ PAGES['availability'] = {
     UI.on(res, 'click', '[data-open]', function (ev, el) { ctx.api.openCar(el.getAttribute('data-open')); });
     UI.on(res, 'click', '[data-bk]', function (ev, el) { ctx.api.openBooking(el.getAttribute('data-bk')); });
     UI.on(root, 'click', '[data-av="cal"]', function () { ctx.go('calendar', { date: UI.isoDate(st.from) }); });
-    UI.on(root, 'click', '[data-av="more"]', function (ev, el) {
-      UI.menu(el, [{ header: 'Preview other states' },
-        { label: 'Booking times could not be loaded', icon: 'alert-triangle', onClick: function () { p.demo = 'offline'; ctx.setParams({ demo: 'offline' }); drawRes(); } },
-        { label: 'Cars could not be loaded', icon: 'cloud-off', onClick: function () { p.demo = 'error'; ctx.setParams({ demo: 'error' }); drawRes(); } },
-        { label: 'Normal view', icon: 'circle-check', disabled: !p.demo, onClick: function () { p.demo = null; ctx.setParams({ demo: null }); drawRes(); } },
-        { divider: true },
-        { label: 'Open the calendar', icon: 'calendar', onClick: function () { ctx.go('calendar', { date: UI.isoDate(st.from) }); } }]);
-    });
   },
   search: [{ label: 'Check which cars are free tomorrow', icon: 'calendar-search', run: function (ctx) { var n = NOW(), f = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1, 10, 0); go('availability', { from: UI.isoDateTime(f), to: UI.isoDateTime(new Date(f.getTime() + DAY)) }); } }]
 };

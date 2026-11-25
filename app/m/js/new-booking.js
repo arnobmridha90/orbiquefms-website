@@ -171,6 +171,9 @@ function nbProblems() {
     }
     if (NB.car && !(e <= s)) { var m = calcBooking(nbTemp()); if (m.discount > m.rent + m.coverTotal + m.delivery + m['return'] + m.others) add('r_discount', 'price', 'The discount is more than the charges', 'Check the discount'); }
   }
+  /* the driver needs an address to deliver to or collect from */
+  if (nbParsePlace(NB.pick).kind === 'client' && !String(NB.pickNote || '').trim()) add('pickNote', 'places', 'Type the delivery address', 'Add the delivery address');
+  if (nbParsePlace(NB.ret).kind === 'client' && !String(NB.retNote || '').trim()) add('retNote', 'places', 'Type the collection address', 'Add the collection address');
   return out;
 }
 function nbErr(probs, key) { if (!NB.tried && ['end', 'car', 'price', 'access'].indexOf(key) < 0) return ''; var p = probs.filter(function (x) { return x.key === key; })[0]; return p ? '<span class="err">' + esc(p.text) + '</span>' : ''; }
@@ -190,11 +193,7 @@ function nbFold(key, title, sub, body) {
   var on = !!NB.open[key];
   return '<div class="nb-fold' + (on ? ' on' : '') + '" id="nbfold_' + key + '"><button type="button" class="nb-fold-h" data-fold="' + key + '" aria-expanded="' + on + '"><span class="grow"><b>' + esc(title) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + I('down') + '</button>' + (on ? '<div class="nb-fold-b">' + body + '</div>' : '') + '</div>';
 }
-function nbRepeatLine(c) {
-  var list = S.bookings.filter(function (b) { return b.cust === c.id && b.bookingStatus !== 'Cancelled' && new Date(b.start) < new Date(); }).sort(function (a, b) { return new Date(b.start) - new Date(a.start); });
-  if (!list.length) return '';
-  return 'Repeat customer: ' + list.length + ' rental' + (list.length === 1 ? '' : 's') + ', last on ' + dFull(list[0].start);
-}
+function nbRepeatLine(c) { return repeatText(c.id); } /* the same count and date as the booking page */
 /* red / amber / blue banner for a known customer, like the customer notes banner */
 function nbCustBanner(c) {
   if (!c) return '';
@@ -280,22 +279,23 @@ function nbDatesSection(probs) {
 }
 function nbCarSection(probs) {
   var s = new Date(NB.s), e = new Date(NB.e), ok = e > s, usable = S.cars.filter(function (c) { return c.status === 'active'; });
-  var free = ok ? usable.filter(function (c) { return isFree(c.id, s, e); }).length : 0, block;
+  var bzs = ok ? usable.map(function (c) { return busy(c.id, s, e); }) : [], free = bzs.filter(function (z) { return z.free; }).length, check = bzs.filter(function (z) { return z.free && z.soon; }).length, block;
   if (NB.car) {
     var cc = car(NB.car), bz = ok ? busy(cc.id, s, e) : { free: true };
-    block = '<button type="button" class="carfield picked-car' + (!bz.free ? ' nb-busy' : '') + '" id="nb_car"><span class="pk-car">' + carSVG(cc.color, cc.shape) + '</span><span class="grow"><span class="pk-plate">' + esc(cc.plate) + '</span><span class="pk-sub">' + esc(cc.make + ' ' + cc.model + ' · ' + cc.color) + (nbMoneyMode() !== 'hidden' ? ' · <span class="money">' + rm(cc.rate) + '</span> / day' : '') + '</span></span><span class="btn sm ghost">Change</span></button>' +
+    block = '<button type="button" class="carfield picked-car' + (!bz.free ? ' nb-busy' : '') + '" id="nb_car"><span class="pk-car">' + carSVG(cc.color, cc.shape) + '</span><span class="grow"><span class="pk-plate">' + esc(cc.plate) + '</span><span class="pk-sub">' + esc(cc.make + ' ' + cc.model + ' · ' + cc.color) + '</span>' + (nbMoneyMode() !== 'hidden' ? '<span class="pk-sub nb-rate"><span class="money">' + rm(cc.rate) + '</span> a day</span>' : '') + '</span><span class="btn sm ghost">Change</span></button>' +
       (!bz.free ? '<div class="banner red nb-carbad">' + I('warn') + '<div><b>This car is not available for the selected dates:</b> ' + esc(bz.reason.replace(/^Booked: /, 'Booked ')) + '</div></div>' : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '');
   } else block = '<button type="button" class="carfield empty-car' + nbBad(probs, 'car') + '" id="nb_car">' + I('search') + '<span class="grow">Search a car by plate, model or colour</span>' + I('chev') + '</button>' + (NB.tried ? nbErr(probs, 'car') : '');
   return '<div class="formcard" id="nbs_car"><h3><span class="stepn">3</span>Car</h3><div class="field" id="nbf_car">' + block +
-    '<div class="nb-freeline"><span class="small muted">' + (ok ? free + ' of ' + usable.length + ' cars free for these dates' : 'Fix the dates to see free cars') + '</span><a class="btn link sm" href="' + hashWith('availability', { start: NB.s, end: NB.e }) + '">' + I('cal') + 'Check availability</a></div></div></div>';
+    '<div class="nb-freeline"><span class="small muted">' + (ok ? free + ' of ' + usable.length + ' cars free' + (check ? ' (' + check + ' need' + (check === 1 ? 's' : '') + ' a check)' : '') + ' for these dates' : 'Fix the dates to see free cars') + '</span><a class="btn link sm" href="' + hashWith('availability', { start: NB.s, end: NB.e }) + '">' + I('cal') + 'Check availability</a></div></div></div>';
 }
 function nbPlaceSel(end) {
   var sel = end === 'pick' ? NB.pick : NB.ret, money = nbMoneyMode() !== 'hidden';
   var opts = '<option value=""' + (!sel ? ' selected' : '') + '>Not chosen</option>' + placeChoices(end).map(function (o) { return '<option value="' + o.v + '"' + (o.v === sel ? ' selected' : '') + '>' + esc(o.label) + (o.fee && money ? ' (' + rm(o.fee) + ')' : '') + '</option>'; }).join('');
   var p = nbParsePlace(sel), note = end === 'pick' ? NB.pickNote : NB.retNote;
   var noteLabel = p.kind === 'client' ? (end === 'pick' ? 'Delivery address' : 'Collection address') : 'Note';
-  return '<label class="field"><span>' + (end === 'pick' ? 'Start of rental' : 'End of rental') + '</span><select class="inp" id="nb_' + end + '">' + opts + '</select></label>' +
-    '<label class="field nb-note"><span>' + noteLabel + '</span><input class="inp" id="nb_' + end + 'note" value="' + esc(note) + '" autocomplete="off" placeholder="' + (p.kind === 'client' ? 'Street, area, landmark' : 'Optional, for example flight number') + '"></label>';
+  var err = NB.tried && p.kind === 'client' && !String(note || '').trim() ? '<span class="err">Type the ' + (end === 'pick' ? 'delivery' : 'collection') + ' address</span>' : '';
+  return '<label class="field"><span>' + (end === 'pick' ? 'Pick-up place' : 'Return place') + '</span><select class="inp" id="nb_' + end + '">' + opts + '</select></label>' +
+    '<label class="field nb-note" id="nbf_' + end + 'Note"><span>' + noteLabel + '</span><input class="inp' + (err ? ' bad' : '') + '" id="nb_' + end + 'note" value="' + esc(note) + '" autocomplete="off" placeholder="' + (p.kind === 'client' ? 'Street, area, landmark' : 'Optional, for example flight number') + '">' + err + '</label>';
 }
 function nbPlacesSection() {
   return '<div class="formcard" id="nbs_places"><h3><span class="stepn">4</span>Places</h3>' + nbPlaceSel('pick') + '<div class="nb-sep"></div>' + nbPlaceSel('ret') + '</div>';
@@ -460,7 +460,7 @@ function nbWire() {
       } else { NB.ret = v; NB.r['return'] = money2(nbPlaceFee(v, 'ret')); }
       nbRe();
     });
-    on('#nb_' + end + 'note', 'input', function () { if (end === 'pick') NB.pickNote = this.value; else NB.retNote = this.value; nbSaveDraft(); });
+    on('#nb_' + end + 'note', 'input', function () { if (end === 'pick') NB.pickNote = this.value; else NB.retNote = this.value; nbSaveDraft(); var er = this.parentNode.querySelector('.err'); if (er && this.value.trim()) { er.remove(); this.classList.remove('bad'); } if (NB.tried) nbPaint(); });
   });
   /* cover */
   $$('[data-cov]').forEach(function (b) { b.onclick = function () { var v = b.dataset.cov; if (v.indexOf('pkg:') === 0) { NB.cover.mode = 'pkg'; NB.cover.pkg = v.slice(4); } else NB.cover.mode = v; nbRe(); }; });
@@ -564,7 +564,7 @@ function nbOpenPapers() {
 
 /* ---------- save ---------- */
 function nbFocusProblem(p) {
-  var map = { cust: 'nbs_cust', dates: 'nbs_dates', car: 'nbs_car', price: 'nbs_price', cover: 'nbs_cover', top: 'nbs_cust' };
+  var map = { cust: 'nbs_cust', dates: 'nbs_dates', car: 'nbs_car', price: 'nbs_price', cover: 'nbs_cover', places: 'nbs_places', top: 'nbs_cust' };
   var el = $('#nbf_' + p.key) || $('#' + map[p.sec]);
   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('nb-flash'); setTimeout(function () { el.classList.remove('nb-flash'); }, 1400); var i = el.querySelector && el.querySelector('input:not([disabled])'); if (i && p.sec === 'cust') setTimeout(function () { try { i.focus({ preventScroll: true }); } catch (e) {} }, 350); }
 }
@@ -651,7 +651,7 @@ function nbCommit(n) {
 }
 function nbFormText(b) {
   var c = cust(b.cust), k = car(b.car) || {};
-  return 'Hi ' + firstName(c.name) + ', thank you for booking with ' + B().name + '.\n\nBooking ' + b.code + ': ' + (k.make ? k.make + ' ' + k.model + ' (' + k.plate + ')' : '') + '\n' + dLong(b.start) + ', ' + hm(b.start) + ' to ' + dLong(b.end) + ', ' + hm(b.end) +
+  return 'Hi ' + callName(c.name) + ', thank you for booking with ' + B().name + '.\n\nBooking ' + b.code + ': ' + (k.make ? k.make + ' ' + k.model + ' (' + k.plate + ')' : '') + '\n' + dLong(b.start) + ', ' + hm(b.start) + ' to ' + dLong(b.end) + ', ' + hm(b.end) +
     '\n\nPlease fill in and sign your booking form here:\n' + Links.form(b);
 }
 function nbAfterSave(b) {
@@ -663,7 +663,7 @@ function nbAfterSave(b) {
     row('nba_wa', 'wa', 'Send booking form on WhatsApp', esc(c.phone)) + row('nba_sign', 'edit', 'Let the customer sign on this phone', 'Hand the phone to the customer') + '</div>' +
     '<div class="sheet-foot"><button type="button" class="btn" id="nba_done">Done</button></div></div>', function (sh) {
       var d = $('#nba_dep', sh); if (d) d.onclick = function () { Pay.open(b.id, { kinds: ['Security deposit'], amount: m.deposit }); };
-      $('#nba_wa', sh).onclick = function () { Share.wa(c.phone, nbFormText(b)); bLog(b, 'Booking form sent on WhatsApp'); save(); say('Opening WhatsApp'); };
+      $('#nba_wa', sh).onclick = function () { Share.wa(c.phone, nbFormText(b)); markFormSent(b, 'on WhatsApp'); if (route().name === 'booking') render(false, true); say('Opening WhatsApp'); };
       $('#nba_sign', sh).onclick = function () { nbSignHere(b); };
       $('#nba_done', sh).onclick = function () { closeSheet(); };
     });

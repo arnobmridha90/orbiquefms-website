@@ -19,7 +19,7 @@ function kindShort(k) { return { 'Security deposit': 'Deposit', 'Rental payment'
 function payMethodText(p) {
   if (!p) return '';
   if (p.method === 'Deposit adjustment') { var o = p.depositOf && bk(p.depositOf); return 'From the deposit' + (o ? ' of ' + o.code : ''); }
-  if (p.method === 'Cash') return 'Cash' + (p.cashTo ? ' to ' + who(p.cashTo) : '');
+  if (p.method === 'Cash') return p.cdm ? 'Cash deposit (bank machine)' : 'Cash' + (p.cashTo ? ' to ' + who(p.cashTo) : '');
   if (p.method === 'Card') return 'Card' + (p.afterCharge != null ? ', ' + rm(p.afterCharge) + ' after charge' : '');
   return 'Transfer';
 }
@@ -30,7 +30,10 @@ var Docs = (function () {
   function invoiceOf(b) { return (S.invoices || []).filter(function (x) { return x.booking === b.id && !x.voided; })[0] || null; }
   function receiptOf(b) { return (S.receipts || []).filter(function (x) { return x.booking === b.id && !x.voided && x.kind !== 'summons'; })[0] || null; }
   function paysOfReceipt(r) { var b = bk(r.booking); if (!b) return []; return (b.payments || []).filter(function (p) { return (r.lines || []).indexOf(p.id) >= 0; }); }
-  function receiptTotal(r) { return paysOfReceipt(r).filter(function (p) { return !p.voided; }).reduce(function (s, p) { return s + payTotal(p); }, 0); }
+  /* money that came in: a payment taken from the deposit is not new money, it is listed apart */
+  function fromDep(p) { return p.method === 'Deposit adjustment'; }
+  function receiptTotal(r) { return paysOfReceipt(r).filter(function (p) { return !p.voided && !fromDep(p); }).reduce(function (s, p) { return s + payTotal(p); }, 0); }
+  function receiptFromDeposit(r) { return paysOfReceipt(r).filter(function (p) { return !p.voided && fromDep(p); }).reduce(function (s, p) { return s + payTotal(p); }, 0); }
   function noReceipt(b) { var live = (S.receipts || []).filter(function (r) { return r.booking === b.id && !r.voided; }); return activePays(b).filter(function (p) { return !live.some(function (r) { return (r.lines || []).indexOf(p.id) >= 0; }); }); }
 
   /* receipt bookkeeping, called by payments.js */
@@ -79,15 +82,15 @@ var Docs = (function () {
   }
   function receiptData(r) {
     var b = bk(r.booking) || {}, cu = cust(b.cust), pays = paysOfReceipt(r).filter(function (p) { return !p.voided; }).sort(function (x, y) { return new Date(x.at) - new Date(y.at); }), lines = [];
-    pays.forEach(function (p) { (p.items || []).forEach(function (it) { lines.push({ text: it.kind, sub: ({ 'Online Transfer': 'Bank transfer', 'Cash': 'Cash', 'Card': 'Card', 'Deposit adjustment': 'Taken from your deposit' }[p.method] || p.method) + ' · ' + dFull(p.at) + ', ' + hm(p.at) + (p.ref ? ' · Ref ' + p.ref : ''), amt: +it.amt || 0 }); }); });
+    pays.forEach(function (p) { (p.items || []).forEach(function (it) { lines.push({ text: it.kind, sub: ({ 'Online Transfer': 'Bank transfer', 'Cash': 'Cash', 'Card': 'Card', 'Deposit adjustment': 'Paid from your deposit' }[p.method] || p.method) + ' · ' + dFull(p.at) + ', ' + hm(p.at) + (p.ref ? ' · Ref ' + p.ref : ''), amt: +it.amt || 0 }); }); });
     return { no: r.no + (r.voided ? ' (VOID)' : ''), title: r.voided ? 'Receipt: VOID' : 'Receipt', date: r.at, booking: b.code, to: { name: cu.name, phone: cu.phone, extra: carExtra(b) },
-      lines: lines, totals: [{ label: 'Total received', amt: receiptTotal(r), big: true }],
+      lines: lines, totals: (receiptFromDeposit(r) > 0.004 ? [{ label: 'Paid from your deposit', amt: receiptFromDeposit(r) }] : []).concat([{ label: 'Total received', amt: receiptTotal(r), big: true }]),
       notes: 'Thank you. This receipt lists every payment received for booking ' + (b.code || '') + '.' + (r.voided ? '\nVOID: ' + (r.voidReason || '') : ''),
       shareText: shareText('receipt', r), link: billLink(r), stack: true };
   }
   function shareText(kind, doc) {
     var b = bk(doc.booking) || {}, cu = cust(b.cust), word = kind === 'invoice' ? 'your invoice' : 'your payment receipt';
-    return 'Hi ' + firstName(cu.name) + ', here is ' + word + ' ' + doc.no + ' from ' + B().name + ': ' + billLink(doc);
+    return 'Hi ' + callName(cu.name) + ', here is ' + word + ' ' + doc.no + ' from ' + B().name + ': ' + billLink(doc);
   }
   function previewInvoice(inv) { pdfDoc('invoice', invoiceData(inv)); }
   function previewReceipt(r) { pdfDoc('receipt', receiptData(r)); }
@@ -125,7 +128,7 @@ var Docs = (function () {
     h += '<div class="sec"><h2>Invoice</h2></div><div class="card dc-card">';
     if (inv) {
       var ch = changedSince(inv, b);
-      h += '<button type="button" class="dc-doc" data-act="view" data-k="invoice" data-id="' + inv.id + '">' + I('file') + '<span class="grow"><b>Preview ' + esc(inv.no) + '</b><small>Made ' + esc(dFull(inv.at)) + (inv.updatedAt ? ', updated ' + esc(dShort(inv.updatedAt)) : '') + ' by ' + esc(firstName(who(inv.by))) + '</small></span><span class="money">' + rm(inv.charges) + '</span></button>';
+      h += '<button type="button" class="dc-doc" data-act="view" data-k="invoice" data-id="' + inv.id + '">' + I('file') + '<span class="grow"><b>Preview ' + esc(inv.no) + '</b><small>Made ' + esc(dFull(inv.at)) + (inv.updatedAt ? ', updated ' + esc(dShort(inv.updatedAt)) : '') + ' by ' + esc(firstName(who(inv.by))) + (inv.deposit ? ' · includes ' + rm(inv.deposit) + ' deposit' : '') + '</small></span><span class="money">' + rm(inv.total) + '</span></button>';
       if (ch) h += '<div class="banner amber dc-changed">' + I('warn') + '<div class="grow">The booking changed since ' + esc(inv.no) + ': <b class="nowrap">' + rm(inv.charges) + '</b> to <b class="nowrap">' + rm(ch.charges) + '</b>' +
         (can('billing.issue_invoice') ? '<button type="button" class="btn sm" data-act="regen" data-id="' + inv.id + '">Update the invoice</button>' : '') + '</div></div>';
       h += sendRow('invoice', inv);
@@ -236,7 +239,7 @@ var Docs = (function () {
     ret.forEach(function (r) { lines.push({ text: 'Returned to the customer', sub: (r.method || '') + ' · ' + dFull(r.at) + (r.ref ? ' · Ref ' + r.ref : ''), amt: null }); });
     pdfDoc('deposit', { no: 'DEP-' + b.code, date: ret[0] ? ret[0].at : new Date(), booking: b.code, to: { name: cu.name, phone: cu.phone, extra: carExtra(b) }, lines: lines,
       totals: [{ label: 'Deposit received', amt: got }, { label: 'Returned', amt: back, big: true }], notes: 'Deposit statement for booking ' + b.code + '.', stack: true,
-      shareText: 'Hi ' + firstName(cu.name) + ', here is the deposit statement for ' + b.code + ' from ' + B().name + '.' });
+      shareText: 'Hi ' + callName(cu.name) + ', here is the deposit statement for ' + b.code + ' from ' + B().name + '.' });
   }
 
   return { open: open, addToReceipt: addToReceipt, dropPayment: dropPayment, receiptOf: receiptOf, invoiceOf: invoiceOf, receiptTotal: receiptTotal, paysOfReceipt: paysOfReceipt, noReceipt: noReceipt,
@@ -305,7 +308,7 @@ function ivRows() {
       var b = bk(d.booking); if (!b) return;
       if (!ivMatch(b, q, d.no)) return;
       out.push({ t: new Date(d.updatedAt || d.at).getTime(), html: '<button type="button" class="card2' + (d.voided ? ' muted' : '') + '" data-doc="' + d.id + '"><div class="c2-main"><div class="c2-t1">' + esc(d.no) + ' <span class="muted iv-d">· ' + dShort(d.at) + '</span></div><div class="c2-t2">' + esc(cust(b.cust).name) + ' · ' + esc(b.code) + '</div></div>' +
-        '<div class="c2-end"><span class="money">' + rm(inv ? d.charges : Docs.receiptTotal(d)) + '</span><small>' + (d.voided ? chip('Void', 'grey') : inv && Docs.changedSince(d, b) ? chip('Booking changed', 'amber') : d.sent ? chip('Sent', 'green') : chip(inv ? 'Not sent' : 'Ready', inv ? 'grey' : 'blue')) + '</small></div></button>' });
+        '<div class="c2-end"><span class="money">' + rm(inv ? d.total : Docs.receiptTotal(d)) + '</span><small>' + (d.voided ? chip('Void', 'grey') : inv && Docs.changedSince(d, b) ? chip('Booking changed', 'amber') : d.sent ? chip('Sent', 'green') : chip(inv ? 'Not sent' : 'Ready', inv ? 'grey' : 'blue')) + '</small></div></button>' });
     });
   } else {
     var liveRc = {}; (S.receipts || []).forEach(function (r) { if (!r.voided) liveRc[r.no] = 1; });

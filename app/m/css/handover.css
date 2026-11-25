@@ -94,3 +94,5 @@
 .fee-opt.on .fee-rad::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--brand); }
 .fee-opt.taken .fee-rad { border-style: dashed; }
 .banner .ho-bact .btn svg { color: currentColor; }
+.ho-depline.red { color: var(--t-red); font-weight: 700; border-bottom: 0; }
+.ho-sum > div.red b, .ho-sum > div.red span { color: var(--t-red); }

@@ -109,3 +109,10 @@
 .tsk-addrow > .btn{flex:0 0 auto;min-height:40px}
 .tsk-hrow{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--divider);border-radius:10px}
 @media (max-width:640px){.pg-tasks .pg-h .acts{flex-direction:row;flex-wrap:nowrap;gap:8px;align-items:center}.pg-tasks .pg-h .acts .btn{flex:1 1 auto}}
+/* booking picker and its open button on one row; the label shortens with an ellipsis inside the field */
+.tsk-bkrow{display:flex;align-items:flex-end;gap:8px;min-width:0;grid-column:1 / -1}
+.tsk-bkrow .tsk-pick{flex:1;min-width:0}
+.tsk-bkrow > .ib{flex:none;width:44px;height:44px}
+.tsk-pick .ui-cbx-val,.tsk-pick .ui-cbx-val b,.tsk-pick .ui-cbx-val small{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* remove buttons: a 40 px tap area around the small x */
+.tsk-x{min-width:40px;min-height:40px}

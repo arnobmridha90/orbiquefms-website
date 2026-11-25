@@ -35,7 +35,7 @@ window.INSTALMENTS_DUE_SOON = INSTALMENTS_DUE_SOON;
 function m4sum(list, f) { return Math.round(list.reduce(function (s, x) { return s + (+(f ? f(x) : x) || 0); }, 0) * 100) / 100; }
 function m4inRange(at, from, to) { var t = new Date(at).getTime(); return (from == null || t >= from.getTime()) && (to == null || t <= to.getTime()); }
 function m4kindShort(k) { return { 'Security deposit': 'Deposit', 'Rental payment': 'Rent', 'Delivery charge': 'Delivery', 'Return charge': 'Return', 'Damage coverage': 'Damage cover', 'Extension payment': 'Extension', 'Other payment': 'Other' }[k] || k; }
-function m4method(m) { return m === 'Online Transfer' ? 'Bank transfer' : m === 'Deposit adjustment' ? 'From deposit' : m; }
+function m4method(m) { return methodText(m); }
 function m4av(name, sm) { return '<span class="av' + (sm ? ' sm' : '') + '" style="background:' + avColor(name) + '">' + initials(name) + '</span>'; }
 /* periods: 'today', 'week' (from Monday), 'month', 'last' (last month), or {from, to} */
 function m4period(k) {
@@ -47,20 +47,16 @@ function m4period(k) {
   return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now, label: MO[now.getMonth()] + ' ' + now.getFullYear() };
 }
 
-/* ---------- cash held: cash payments to a person, less the cash deposits they handed back, less their bank-ins ---------- */
+/* ---------- cash held: one figure for "cash this person holds", the same as the closing balance on My money (staffEntries):
+   cash from customers + floats from the company - everyday expenses and handover fees paid from it - deposits handed back - bank-ins.
+   The oldest cash still held comes from the same entries: what went out is taken from the oldest money in first. ---------- */
 function cashHeld() {
-  var out = {}, get = function (id) { return out[id] = out[id] || { id: id, received: 0, refunded: 0, banked: 0, pays: [] }; };
-  S.bookings.forEach(function (b) { (b.payments || []).forEach(function (p) { if (!p.voided && p.method === 'Cash' && p.cashTo) { var g = get(p.cashTo), a = payTotal(p); g.received += a; g.pays.push({ at: p.at, amt: a }); } }); });
-  (S.refunds || []).forEach(function (r) { if (!r.voided && r.method === 'Cash' && +r.amt > 0) { var by = r.refundBy || r.by; if (by) get(by).refunded += +r.amt; } });
-  (S.bankIns || []).forEach(function (x) { if (!x.voided && x.staff) get(x.staff).banked += +x.amt || 0; });
-  Object.keys(out).forEach(function (id) {
-    var g = out[id], gone = g.refunded + g.banked;
-    g.held = Math.round((g.received - gone) * 100) / 100;
-    /* the oldest cash still held, oldest first: what was banked or handed back is taken from the oldest */
-    g.pays.sort(function (a, b) { return new Date(a.at) - new Date(b.at); });
-    var left = gone; g.count = 0; g.oldest = null;
-    g.pays.forEach(function (p) { if (left >= p.amt - 0.001) { left -= p.amt; return; } var rest = p.amt - Math.max(0, left); left = 0; if (rest > 0.009) { g.count++; if (!g.oldest) g.oldest = p.at; } });
-    delete g.pays;
+  var all = staffEntries(), out = {}, now = new Date();
+  Object.keys(all).forEach(function (id) {
+    var es = all[id].filter(function (e) { return new Date(e.at) <= now; }), f = staffFigures(es, null, null);
+    var g = out[id] = { id: id, received: f.cash_received, floats: f.from_owners, spent: f.expenses, fees: f.income, refunded: f.refunds_given, banked: f.handed_in, held: f.change, count: 0, oldest: null };
+    var ins = es.filter(function (e) { return e.side === 'in'; }), left = f.expenses + f.income + f.refunds_given + f.handed_in;
+    ins.forEach(function (e) { if (left >= e.amt - 0.001) { left -= e.amt; return; } var rest = e.amt - Math.max(0, left); left = 0; if (rest > 0.009) { if (e.part === 'cash_received') g.count++; if (!g.oldest) g.oldest = e.at; } });
   });
   return out;
 }
@@ -123,11 +119,16 @@ function m4outRows(per) {
   var rows = [];
   (S.expenses || []).forEach(function (e) { if (!e.voided && !e.toStaff && m4inRange(e.at, per.from, per.to) && new Date(e.at) <= new Date()) rows.push({ at: e.at, amt: +e.amt || 0, t1: e.kind, t2: (e.agentFee ? 'Handover fee · ' + who(e.by) : (e.paidTo || who(e.by))) + (e.car ? ' · ' + ((car(e.car) || {}).plate || '') : ''), kind: e.agentFee ? 'fee' : 'exp', link: e.booking ? '#booking/' + e.booking : '' }); });
   (S.refunds || []).forEach(function (r) { if (!r.voided && +r.amt > 0 && m4inRange(r.at, per.from, per.to)) { var b = bk(r.booking) || {}; rows.push({ at: r.at, amt: +r.amt, t1: 'Deposit returned', t2: (b.code || '') + ' · ' + (b.cust ? cust(b.cust).name : '') + ' · ' + r.method, kind: 'ref', link: b.id ? '#booking/' + b.id : '' }); } });
+  /* the card company keeps its charge: Money in counts the full card payment, so the charge goes out here and Net matches what reaches the bank */
+  S.bookings.forEach(function (b) { (b.payments || []).forEach(function (p) {
+    if (p.voided || p.method !== 'Card' || p.afterCharge == null || !m4inRange(p.at, per.from, per.to) || new Date(p.at) > new Date()) return;
+    var fee = Math.round((payTotal(p) - p.afterCharge) * 100) / 100; if (fee > 0.004) rows.push({ at: p.at, amt: fee, t1: 'Card charge', t2: b.code + ' · ' + cust(b.cust).name + ' · card payment ' + rm(payTotal(p)), kind: 'card', link: '#booking/' + b.id });
+  }); });
   return rows.sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
 }
 function m4figures(per) {
   var inn = moneyIn(per.from, per.to, true), out = m4outRows(per), outT = m4sum(out, function (r) { return r.amt; });
-  var due = S.bookings.filter(function (b) { if (b.bookingStatus === 'Cancelled') return false; var started = ['Car Delivered', 'Car Returned', 'Completed'].indexOf(b.bookingStatus) >= 0 || new Date(b.start) < new Date(Date.now() + 2 * DAY); return started && calcBooking(b).due > 0; });
+  var due = S.bookings.filter(BK_TESTS.collect); /* the same rule as Home's Balance to collect and #bookings/collect */
   var ix = Deposit.index(), held = [], give = [];
   S.bookings.forEach(function (b) {
     if (b.paymentStatus === 'Deposit Refunded') return;
@@ -164,7 +165,7 @@ VIEWS.money = function () {
     '<div class="sec"><h2>More</h2></div><div class="list m4-links">' +
     (can('deposits.view') ? '<a class="row" href="#deposits">' + I('bank') + '<div class="grow"><div class="t1">Deposits</div><div class="t2">Adjustments and refunds</div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5l7 7-7 7"/></svg></a>' : '') +
     '<a class="row" href="#cash">' + I('cash') + '<div class="grow"><div class="t1">Cash and bank-ins</div><div class="t2">Who holds cash, bank in cash</div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5l7 7-7 7"/></svg></a>' +
-    '<a class="row" href="#mymoney">' + I('user') + '<div class="grow"><div class="t1">My money</div><div class="t2">Balance at hand, income and expenses</div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5l7 7-7 7"/></svg></a>' +
+    '<a class="row" href="#mymoney">' + I('user') + '<div class="grow"><div class="t1">' + (can('expenses.staff_reports_all') ? 'Staff money' : 'My money') + '</div><div class="t2">Balance at hand, income and expenses</div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5l7 7-7 7"/></svg></a>' +
     (can('cars.see_instalment') ? '<a class="row" href="#instalments">' + I('cal') + '<div class="grow"><div class="t1">Instalments</div><div class="t2">Car loans due and paid</div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5l7 7-7 7"/></svg></a>' : '') +
     '</div></main>';
   return { html: html, keepScroll: true, after: function () {
@@ -186,12 +187,13 @@ function m4open(k, per, F) {
       '<div class="m4-meths">' + Object.keys(byM).map(function (m) { return '<span>' + esc(m) + ' <b class="money">' + rm(byM[m]) + '</b></span>'; }).join('') + '</div>' +
       '<div class="sec"><h2>' + rows.length + ' payment' + (rows.length === 1 ? '' : 's') + '</h2></div><div class="list">' + (rows.length ? rows.slice(0, 200).map(m4payCard).join('') : '<div class="empty">No payments in this period</div>') + '</div>';
   } else if (k === 'out' || k === 'net') {
-    var out = F.out, ex = m4sum(out.filter(function (r) { return r.kind === 'exp'; }), function (r) { return r.amt; }), fee = m4sum(out.filter(function (r) { return r.kind === 'fee'; }), function (r) { return r.amt; }), rf = m4sum(out.filter(function (r) { return r.kind === 'ref'; }), function (r) { return r.amt; });
+    var out = F.out, ex = m4sum(out.filter(function (r) { return r.kind === 'exp'; }), function (r) { return r.amt; }), fee = m4sum(out.filter(function (r) { return r.kind === 'fee'; }), function (r) { return r.amt; }), rf = m4sum(out.filter(function (r) { return r.kind === 'ref'; }), function (r) { return r.amt; }), cc = m4sum(out.filter(function (r) { return r.kind === 'card'; }), function (r) { return r.amt; });
     title = k === 'out' ? 'Money out' : 'Net';
     body = '<div class="card m4-sum">' + (k === 'net' ? '<div class="sumline"><span>Money in</span><span class="money">' + rm(F.inn.total) + '</span></div>' : '') +
       '<div class="sumline"><span>Expenses</span><span class="money">' + (k === 'net' ? '-' : '') + rm(ex) + '</span></div><div class="sumline"><span>Handover fees</span><span class="money">' + (k === 'net' ? '-' : '') + rm(fee) + '</span></div><div class="sumline"><span>Deposits returned</span><span class="money">' + (k === 'net' ? '-' : '') + rm(rf) + '</span></div>' +
+      (cc ? '<div class="sumline"><span>Card charges</span><span class="money">' + (k === 'net' ? '-' : '') + rm(cc) + '</span></div>' : '') +
       '<div class="sumline big"><span>' + (k === 'net' ? 'Net' : 'Total') + '</span><span class="money">' + rm(k === 'net' ? F.net : F.outT) + '</span></div></div>' +
-      (k === 'net' ? '<p class="small muted m4-note">Money in counts every payment received, deposits included. Money out counts expenses, handover fees and deposits given back.</p>' : '') +
+      (k === 'net' ? '<p class="small muted m4-note">Money in counts every payment received, deposits included. Money out counts expenses, handover fees, deposits given back and the charges the card company keeps.</p>' : '') +
       '<div class="sec"><h2>' + out.length + ' item' + (out.length === 1 ? '' : 's') + '</h2></div><div class="list">' + (out.length ? out.slice(0, 200).map(function (r) {
         return '<' + (r.link ? 'a href="' + r.link + '"' : 'div') + ' class="card2 m4-a"><div class="c2-main"><div class="c2-t1">' + esc(r.t1) + '</div><div class="c2-t2">' + esc(dShort(r.at)) + ' · ' + esc(r.t2) + '</div></div><div class="c2-end">' + rm(r.amt) + '</div></' + (r.link ? 'a' : 'div') + '>';
       }).join('') : '<div class="empty">Nothing paid out in this period</div>') + '</div>';
@@ -252,7 +254,7 @@ var BankIn = (function () {
       $('#biSave', sh).onclick = function () { grab(); save1(held); };
     };
     var err = function (k, t) { var el = $('#biErr_' + k, sh); if (el) el.textContent = t; return false; };
-    var save1 = function () {
+    var save1 = function (held, checked) {
       $$('.err', sh).forEach(function (e) { e.textContent = ''; });
       var ok = true, amt = parseMoney(keep.amt);
       if (!st.slip) ok = err('slip', 'Add a photo of the bank slip.');
@@ -269,6 +271,14 @@ var BankIn = (function () {
         else err('ref', 'This reference is already on ' + dupRef + '. The same slip cannot be recorded twice.');
         var de = $(dupPic ? '#biErr_slip' : '#biErr_ref', sh); if (de) de.scrollIntoView({ block: 'center', behavior: 'smooth' });
         say(dupPic ? 'This slip was already used' : 'This reference was already used'); return;
+      }
+      /* a typo (one digit too many) or an amount that is not what the slip says: ask before saving */
+      var warn = [];
+      if (held != null && amt > held + 0.009) warn.push(rm(amt) + ' is more than the ' + rm(Math.max(0, held)) + ' ' + (st.staff === S.me ? 'you hold' : firstName(who(st.staff)) + ' holds') + '.');
+      if (st.read && Math.abs(+st.read.amount - amt) >= 0.01) warn.push('The slip shows ' + rm(st.read.amount) + '.');
+      if (warn.length && !checked) {
+        confirm({ icon: 'warn', title: 'Check the amount', text: warn.join(' '), ok: 'Save anyway', cancel: 'Go back', primary: 'cancel' }).then(function (y) { if (y) save1(held, true); else { var a = $('#bi_amt', sh); if (a) a.focus(); } });
+        return;
       }
       var rec = { id: uid(), staff: st.staff, amt: amt, at: when.toISOString(), slip: st.slip, slipHash: st.hash, ref: keep.ref.trim(), note: keep.note.trim(), by: S.me, created: new Date().toISOString(), voided: false, voidReason: null };
       S.bankIns = S.bankIns || []; S.bankIns.push(rec);
@@ -318,14 +328,14 @@ VIEWS.cash = function () {
   var myBi = (S.bankIns || []).filter(function (x) { return x.staff === S.me; }).sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
   var html = topbar('Cash and bank-ins', { back: '#more' }) + '<main class="m4-main">' +
     '<div class="card m4-hero m4-cash"><div class="m4-hero-k">Cash I hold</div><div class="m4-hero-v money' + (my.held < 0 ? ' neg' : '') + '">' + rm(my.held) + '</div>' +
-    '<div class="m4-hero-note">' + (my.held > 0 && my.oldest ? 'Oldest cash from ' + esc(dFull(my.oldest)) + ' · ' + my.count + ' cash payment' + (my.count === 1 ? '' : 's') : my.held < 0 ? 'You banked in or handed back more than you took in cash.' : 'You hold no company cash right now.') + '</div>' +
+    '<div class="m4-hero-note">' + (my.held > 0 && my.oldest ? 'Oldest cash from ' + esc(dFull(my.oldest)) + (my.count ? ' · ' + my.count + ' cash payment' + (my.count === 1 ? '' : 's') : '') : my.held < 0 ? 'You paid out, banked in or handed back more than you took in cash.' : 'You hold no company cash right now.') + '</div>' +
     (mine ? '<button type="button" class="btn big m4-bibtn" id="cashBi">' + I('bank') + 'Bank in cash</button>' : '') + '</div>';
   if (all) {
     var people = Object.keys(ch).map(function (k) { return ch[k]; }).filter(function (g) { return Math.abs(g.held) > 0.009; }).sort(function (a, b) { return b.held - a.held; });
     var tot = m4sum(people.filter(function (g) { return g.held > 0; }), function (g) { return g.held; });
     html += '<div class="sec"><h2>Cash held by staff</h2><span class="small muted money">' + rm(tot) + '</span></div><div class="list">' + (people.length ? people.map(function (g) {
       var nm = who(g.id), old = g.oldest ? Math.floor((Date.now() - new Date(g.oldest)) / DAY) : 0;
-      return '<div class="card2 m4-person">' + m4av(nm) + '<div class="c2-main"><div class="c2-t1">' + esc(nm) + (g.id === S.me ? ' <span class="muted">(me)</span>' : '') + '</div><div class="c2-t2">' + (g.held > 0 ? g.count + ' payment' + (g.count === 1 ? '' : 's') + ' · since ' + esc(dShort(g.oldest)) : 'Banked in more than held') + '</div>' +
+      return '<div class="card2 m4-person">' + m4av(nm) + '<div class="c2-main"><div class="c2-t1">' + esc(nm) + (g.id === S.me ? ' <span class="muted">(me)</span>' : '') + '</div><div class="c2-t2">' + (g.held > 0 ? (g.count ? g.count + ' payment' + (g.count === 1 ? '' : 's') + ' · ' : '') + 'since ' + esc(dShort(g.oldest)) : 'Paid out more than held') + '</div>' +
         (g.held > 0 && old >= 7 ? '<div class="dep-chips">' + chip('Held ' + old + ' days', old >= 14 ? 'red' : 'amber') + '</div>' : '') + '</div>' +
         '<div class="m4-pend"><b class="money' + (g.held < 0 ? ' neg' : '') + '">' + rm(g.held) + '</b>' + (BankIn.office() || g.id === S.me ? '<button type="button" class="btn sm ghost" data-bifor="' + g.id + '">Bank in</button>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No cash is being held</div>') + '</div>';
@@ -336,7 +346,7 @@ VIEWS.cash = function () {
   var nVoid = (all ? S.bankIns || [] : myBi).filter(function (x) { return x.voided; }).length;
   html += '<div class="sec"><h2>' + (all ? 'Recent bank-ins' : 'My bank-ins') + '</h2>' + (nVoid ? '<button type="button" id="cashVoided">' + (moneyV.cash.voided ? 'Hide voided' : 'Show voided (' + nVoid + ')') + '</button>' : '') + '</div>' +
     '<div class="list">' + (list.length ? list.slice(0, 30).map(function (x) { return BankIn.row(x, all); }).join('') : '<div class="empty">No bank-ins yet. When you pay cash into the bank, record it here with the slip.</div>') + '</div>' +
-    '<p class="small muted m4-note">Cash held = cash payments taken, less deposits handed back in cash, less bank-ins. A bank-in is never an expense or income.</p></main>';
+    '<p class="small muted m4-note">Cash held = cash taken from customers and money from the company, less expenses and handover fees paid from it, deposits handed back in cash and bank-ins. It is the same as the balance at hand on ' + (can('expenses.staff_reports_all') ? 'Staff money' : 'My money') + '. A bank-in is never an expense or income.</p></main>';
   return { html: html, keepScroll: true, after: function () {
     var b = $('#cashBi'); if (b) b.onclick = function () { BankIn.open({ staff: S.me }); };
     $$('[data-bifor]').forEach(function (el) { el.onclick = function () { BankIn.open({ staff: el.dataset.bifor }); }; });
@@ -446,7 +456,9 @@ VIEWS.instalments = function () {
   if (!can('cars.see_instalment')) return { html: topbar('Instalments', { back: '#more' }) + '<main>' + noAccess('cars.see_instalment') + '</main>' };
   var V = moneyV.inst, today = toLocalInput(new Date());
   var rows = (S.instalments || []).filter(function (r) { var c = car(r.car); return c && (c.status !== 'sold' || r.paidAt); });
-  var inMonth = rows.filter(function (r) { return !V.month || r.due.slice(0, 7) === V.month; });
+  /* search by plate, make, model or bank (the same matching as the car lists) */
+  var q = String(V.q || '').trim(), hitQ = function (r) { if (!q) return true; var c = car(r.car) || {}; return normPlate(c.plate).indexOf(normPlate(q)) >= 0 || wordsMatch(q, [c.plate, c.make, c.model, (c.instalment || {}).bank].join(' ')); };
+  var inMonth = rows.filter(function (r) { return (!V.month || r.due.slice(0, 7) === V.month) && hitQ(r); });
   var cnt = function (f) { return inMonth.filter(function (r) { var s = instState(r, today); return f === 'all' || s === f || (f === 'unpaid' && s === 'overdue'); }).length; };
   var list = inMonth.filter(function (r) { var s = instState(r, today); return V.f === 'all' || s === V.f || (V.f === 'unpaid' && s === 'overdue'); })
     .sort(function (a, b) { return V.f === 'paid' ? (a.paidAt < b.paidAt ? 1 : -1) : (a.due < b.due ? -1 : a.due > b.due ? 1 : 0); });
@@ -454,18 +466,24 @@ VIEWS.instalments = function () {
   var unpaidT = m4sum(list.filter(function (r) { return !r.paidAt; }), function (r) { return r.amt; });
   var html = topbar('Instalments', { back: '#more', sub: S.cars.filter(function (c) { return c.instalment && c.status !== 'sold'; }).length + ' cars on a loan' }) + '<main class="m4-main">' +
     '<div class="m4-month"><button type="button" class="iconbtn" id="imPrev" aria-label="Previous month">' + I('back', 2.2) + '</button><button type="button" class="m4-mlabel" id="imAll">' + esc(mLabel) + (V.month ? '<small>Tap for all months</small>' : '<small>Use the arrows for one month</small>') + '</button><button type="button" class="iconbtn m4-next" id="imNext" aria-label="Next month">' + I('back', 2.2) + '</button></div>' +
+    '<label class="search m4-instq">' + I('search') + '<input id="imq" type="search" placeholder="Plate, model or bank" value="' + esc(V.q || '') + '" autocomplete="off" autocapitalize="characters" enterkeyhint="search"></label>' +
     m4chips(V.f, [['unpaid', 'Unpaid', cnt('unpaid')], ['overdue', 'Overdue', cnt('overdue')], ['paid', 'Paid', cnt('paid')], ['all', 'All', cnt('all')]], 'if') +
     (unpaidT && V.f !== 'paid' ? '<div class="m4-insttot small muted">Still to pay: <b class="money">' + rm(unpaidT) + '</b></div>' : '') +
     '<div class="list">' + (list.length ? list.map(function (r) {
       var c = car(r.car) || {}, s = instState(r, today), n = instDays(today, r.due), tone = s === 'paid' ? 'green' : s === 'overdue' ? 'red' : n <= 3 ? 'amber' : 'grey';
       return '<button type="button" class="card2 m4-inst" data-inst="' + r.id + '"><div class="c2-main"><div class="c2-t1">' + esc(c.plate) + ' · ' + esc(c.make + ' ' + c.model) + '</div><div class="c2-t2">Due ' + esc(instDay(r.due)) + ((c.instalment || {}).bank ? ' · ' + esc(c.instalment.bank) : '') + '</div><div class="dep-chips">' + chip(instWhen(r, today), tone) + '</div></div><div class="c2-end">' + rm(r.paidAt && r.paidAmt != null ? r.paidAmt : r.amt) + (r.paidAt && r.paidWith ? '<small>' + esc(r.paidWith) + '</small>' : '') + '</div></button>';
-    }).join('') : '<div class="empty">' + (V.f === 'paid' ? 'No paid instalments here yet.' : V.f === 'overdue' ? 'Nothing overdue. Well done.' : 'Nothing to show. Instalments appear for cars that have an instalment day and amount.') + '</div>') + '</div></main>';
+    }).join('') : '<div class="empty">' + (V.f === 'paid' ? 'No paid instalments here yet.' : q ? 'No instalment matches “' + esc(q) + '”.' : V.f === 'overdue' ? 'Nothing overdue. Well done.' : 'Nothing to show. Instalments appear for cars that have an instalment day and amount.') + '</div>') + '</div></main>';
   return { html: html, keepScroll: true, after: function () {
     $$('[data-if]').forEach(function (el) { el.onclick = function () { V.f = el.dataset.if; render(false, true); }; });
     var step = function (k) { var b = V.month ? new Date(+V.month.slice(0, 4), +V.month.slice(5, 7) - 1, 1) : new Date(new Date().getFullYear(), new Date().getMonth() - (k > 0 ? 1 : -1), 1); b.setMonth(b.getMonth() + k); V.month = b.getFullYear() + '-' + pad(b.getMonth() + 1); render(false, true); };
     $('#imPrev').onclick = function () { step(-1); }; $('#imNext').onclick = function () { step(1); };
     $('#imAll').onclick = function () { V.month = V.month ? null : toLocalInput(new Date()).slice(0, 7); render(false, true); };
     $$('[data-inst]').forEach(function (el) { el.onclick = function () { instSheet(el.dataset.inst); }; });
+    var qi = $('#imq'), tm = null;
+    if (qi) {
+      if (V.qFocus) { V.qFocus = false; qi.focus(); var n = qi.value.length; try { qi.setSelectionRange(n, n); } catch (e) {} }
+      qi.addEventListener('input', function () { V.q = qi.value; clearTimeout(tm); tm = setTimeout(function () { V.qFocus = document.activeElement === qi; render(false, true); }, 180); });
+    }
   } };
 };
 function instSheet(id) {

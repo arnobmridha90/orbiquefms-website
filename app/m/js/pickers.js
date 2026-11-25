@@ -1,7 +1,7 @@
 /* ---------------- PICKERS (core builder owns this file; nobody else edits it) ----------------
    Full-height searchable sheets, stacked over whatever is open, closed by the phone's Back button.
    Pickers.car({start, end, exceptId, selected, onPick, showBusy, title, all})
-   Pickers.booking({filter, onPick, title, selected})
+   Pickers.booking({filter, onPick, title, selected, first(b), firstLabel, sub(b)})  first: rank these on top; sub: html for the right side instead of status and due
    Pickers.customer({onPick, title, allowNew})
    Pickers.staff({multi, preferIds, selected, onPick, title, includeOff})
    onPick gets the picked object (car / booking / customer / staff, or an array of staff when multi). */
@@ -44,9 +44,13 @@ var Pickers = (function () {
       var recent = !term ? (S.recentCars || []) : [];
       var rank = function (r) { return r.bz.free ? (r.bz.soon ? 1 : 0) : 2; };
       rows.sort(function (a, b) { var ra = recent.indexOf(a.c.id), rb = recent.indexOf(b.c.id); if (ra >= 0 || rb >= 0) { if (ra < 0) return 1; if (rb < 0) return -1; if (rank(a) !== rank(b)) return rank(a) - rank(b); return ra - rb; } return rank(a) - rank(b) || a.c.plate.localeCompare(b.c.plate); });
-      var hidden = 0;
-      if (freeOnly) rows = rows.filter(function (r) { if (!r.bz.free && r.c.id !== o.selected) { hidden++; return false; } return true; });
-      var nFree = rows.filter(function (r) { return r.bz.free; }).length;
+      var hidden = 0, hiddenRows = [];
+      if (freeOnly) rows = rows.filter(function (r) { if (!r.bz.free && r.c.id !== o.selected) { hidden++; hiddenRows.push(r); return false; } return true; });
+      /* a search that only finds booked or blocked cars: show them straight away (greyed, with the reason) */
+      var onlyHidden = !!term && !rows.length && hiddenRows.length > 0;
+      if (onlyHidden) { rows = hiddenRows; hidden = 0; }
+      var nFree = rows.filter(function (r) { return r.bz.free; }).length, nCheck = rows.filter(function (r) { return r.bz.free && r.bz.soon; }).length;
+      var freeText = nFree + ' free' + (nCheck ? ' (' + nCheck + ' need' + (nCheck === 1 ? 's' : '') + ' a check)' : '');
       var html = '';
       var row = function (r) {
         var c = r.c, bz = r.bz, pickable = bz.free || o.showBusy, badge;
@@ -61,9 +65,10 @@ var Pickers = (function () {
       if (recent.length && !term) {
         var rec = rows.filter(function (r) { return recent.indexOf(r.c.id) >= 0; }), rest = rows.filter(function (r) { return recent.indexOf(r.c.id) < 0; });
         if (rec.length) html += '<div class="pk-sec">Recently picked</div>' + rec.map(row).join('');
-        if (rest.length) html += '<div class="pk-sec">' + (hasDates ? nFree + ' free' + (freeOnly ? '' : ' of ' + rows.length) : 'All cars') + '</div>' + rest.map(row).join('');
-      } else html += (term ? '<div class="pk-sec">' + rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for “' + esc(term) + '”</div>' : '<div class="pk-sec">' + (hasDates ? nFree + ' free' : rows.length + ' cars') + '</div>') + rows.map(row).join('');
-      if (!rows.length) html += '<div class="empty">No car matches' + (term ? ' “' + esc(term) + '”' : '') + (hidden ? '.<br>' + hidden + ' booked car' + (hidden > 1 ? 's are' : ' is') + ' hidden.' : '.') + '</div>';
+        if (rest.length) html += '<div class="pk-sec">' + (hasDates ? freeText + (freeOnly ? '' : ' of ' + rows.length) : 'All cars') + '</div>' + rest.map(row).join('');
+      } else if (onlyHidden) html += '<div class="pk-sec">No free car matches “' + esc(term) + '”. Busy for these dates:</div>' + rows.map(row).join('');
+      else html += (term ? '<div class="pk-sec">' + rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for “' + esc(term) + '”</div>' : '<div class="pk-sec">' + (hasDates ? freeText : rows.length + ' cars') + '</div>') + rows.map(row).join('');
+      if (!rows.length) html += '<div class="empty">No car matches' + (term ? ' “' + esc(term) + '”' : '') + '.</div>';
       if (hidden) html += '<button type="button" class="pk-more" id="pkshowbusy">' + hidden + ' booked or blocked car' + (hidden > 1 ? 's' : '') + ' hidden · Show them</button>';
       $('#pklist', sh).innerHTML = html;
       $$('#pklist [data-pick]', sh).forEach(function (b) { b.onclick = function () { var c = car(b.dataset.pick); remember('recentCars', c.id); closeSheet(); if (o.onPick) o.onPick(c); }; });
@@ -82,7 +87,8 @@ var Pickers = (function () {
     if (!term) return true;
     if (matchBookingCode(term, b)) return true;
     var c = cust(b.cust), k = car(b.car) || {};
-    if (tidySearch(term)) return phoneMatch(term, c.phone);
+    /* digits only: staff say the plate number without letters, so match the phone, the plate digits (the booking number matched above) */
+    if (tidySearch(term) && (phoneMatch(term, c.phone) || digits(k.plate).indexOf(digits(term)) >= 0)) return true;
     if (normPlate(term).length >= 3 && normPlate(k.plate).indexOf(normPlate(term)) >= 0) return true;
     return wordsMatch(term, [b.code, c.name, k.make, k.model, k.plate].join(' '));
   }
@@ -97,13 +103,13 @@ var Pickers = (function () {
       var term = q.value.trim(), now = Date.now();
       var list = S.bookings.filter(function (b) { return (showCancelled || b.bookingStatus !== 'Cancelled') && (!o.filter || o.filter(b)) && bookingMatches(b, term); });
       var recent = S.recentBookings || [];
-      var score = function (b) { if (recent.indexOf(b.id) >= 0 && !term) return -10 + recent.indexOf(b.id); if (b.bookingStatus === 'Car Delivered') return 0; return 1 + Math.abs(new Date(b.start) - now) / DAY / 1000; };
+      var score = function (b) { var f = o.first && o.first(b) ? -100 : 0; if (recent.indexOf(b.id) >= 0 && !term) return f - 10 + recent.indexOf(b.id); if (b.bookingStatus === 'Car Delivered') return f; return f + 1 + Math.abs(new Date(b.start) - now) / DAY / 1000; };
       list.sort(function (a, b) { return score(a) - score(b); });
       var total = list.length; list = list.slice(0, 60);
-      var html = '<div class="pk-sec">' + (term ? total + ' match' + (total === 1 ? '' : 'es') : 'Recent and out now first') + '</div>' + list.map(function (b) {
+      var html = '<div class="pk-sec">' + (term ? total + ' match' + (total === 1 ? '' : 'es') : o.firstLabel || 'Recent and out now first') + '</div>' + list.map(function (b) {
         var c = cust(b.cust), k = car(b.car) || {}, m = calcBooking(b);
         return '<button type="button" class="pk-row' + (b.id === o.selected ? ' on' : '') + '" data-pick="' + b.id + '"><span class="grow"><span class="pk-l1"><b>' + esc(b.code) + '</b> ' + esc(c.name) + '</span>' +
-          '<span class="pk-sub">' + esc(k.plate || '') + ' · ' + dShort(b.start) + ' to ' + dShort(b.end) + '</span></span><span class="pk-end">' + (payChip(b) || statusChip(b)) + (m.due && b.bookingStatus !== 'Cancelled' ? '<span class="bal due money">' + rm(m.due) + ' due</span>' : '') + '</span></button>';
+          '<span class="pk-sub">' + esc(k.plate || '') + ' · ' + dShort(b.start) + ' to ' + dShort(b.end) + '</span></span><span class="pk-end">' + (o.sub ? o.sub(b) : (payChip(b) || statusChip(b)) + (m.due && b.bookingStatus !== 'Cancelled' ? '<span class="bal due money">' + rm(m.due) + ' due</span>' : '')) + '</span></button>';
       }).join('') + (total > 60 ? '<div class="empty small">Showing 60 of ' + total + '. Type more to narrow it down.</div>' : '') + (!total ? '<div class="empty">No booking matches “' + esc(term) + '”.</div>' : '');
       $('#pklist', sh).innerHTML = html;
       $$('#pklist [data-pick]', sh).forEach(function (el) { el.onclick = function () { var b = bk(el.dataset.pick); remember('recentBookings', b.id); closeSheet(); if (o.onPick) o.onPick(b); }; });

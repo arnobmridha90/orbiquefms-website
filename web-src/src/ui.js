@@ -267,7 +267,12 @@ var UI = (function () {
     }
     var st = { open: false };
     el.addEventListener('input', function (ev) { var t = ev.target; if (t.matches('input[type="search"][data-f]')) { v[t.getAttribute('data-f')] = t.value; deb(t.getAttribute('data-f')); } });
-    el.addEventListener('change', function (ev) { var t = ev.target, k = t.getAttribute('data-f'); if (!k || t.type === 'search') return; v[k] = t.type === 'checkbox' ? t.checked : t.value; draw(); o.onChange && o.onChange(v, k); });
+    el.addEventListener('change', function (ev) {
+      var t = ev.target, k = t.getAttribute('data-f'); if (!k || t.type === 'search') return; v[k] = t.type === 'checkbox' ? t.checked : t.value;
+      /* an end day before the start day: swap them, so the range still means what the person picked */
+      o.fields.forEach(function (f) { if (f.type === 'daterange' && v[f.from] && v[f.to] && String(v[f.to]) < String(v[f.from])) { var a = v[f.from]; v[f.from] = v[f.to]; v[f.to] = a; U.toast('The end day was before the start day, so they were swapped.', { tone: 'info' }); } });
+      draw(); o.onChange && o.onChange(v, k);
+    });
     el.addEventListener('click', function (ev) {
       var t = ev.target, x;
       if ((x = t.closest('[data-fc]'))) { v[x.getAttribute('data-fc')] = x.getAttribute('data-v'); draw(); o.onChange && o.onChange(v, x.getAttribute('data-fc')); }
@@ -288,6 +293,90 @@ var UI = (function () {
     el.addEventListener('keydown', function (ev) { if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return; var bs = [].slice.call(el.querySelectorAll('[data-ui-tab]')), k = bs.indexOf(document.activeElement); if (k < 0) return; var n = bs[(k + (ev.key === 'ArrowRight' ? 1 : bs.length - 1)) % bs.length]; n.focus(); n.click(); });
     draw();
     return { set: function (v) { cur = v; draw(); }, value: function () { return cur; }, setItems: function (items) { o.items = items; draw(); } };
+  };
+
+  /* ---------------- Back button: each open drawer or dialog owns one browser history entry ----------------
+     Every entry this app writes carries {fms:1, pos:n}. Opening a layer pushes an entry; closing it by its own buttons
+     goes back over that entry; the browser or phone Back button closes the top layer (asking first when it has unsaved
+     changes). Page changes push an entry (shell.js writeHash). main.js listens to popstate and calls UI.hist.pop. */
+  var H = { pos: 0, layerAt: {}, stale: {}, want: 0, timer: null, skip: 0, skipT: null, queue: [], adopt: null };
+  function hBusy() { return !!(H.timer || H.skip); }
+  function hTrim() { Object.keys(H.layerAt).forEach(function (k) { if (+k > H.pos) delete H.layerAt[k]; }); Object.keys(H.stale).forEach(function (k) { if (+k > H.pos) delete H.stale[k]; }); }
+  function hPushLayer(ctrl) {
+    if (ctrl.closed) return;
+    if (hBusy()) { H.queue.push(function () { hPushLayer(ctrl); }); return; }
+    if (H.adopt != null && !H.layerAt[H.adopt]) { ctrl._hpos = H.adopt; H.layerAt[H.adopt] = ctrl; H.adopt = null; return; }
+    H.pos++; hTrim(); ctrl._hpos = H.pos; H.layerAt[H.pos] = ctrl;
+    try { history.pushState({ fms: 1, pos: H.pos, layer: 1 }, ''); } catch (err) { /* some viewers block it */ }
+  }
+  function hFlush() {
+    clearTimeout(H.skipT); H.skip = 0;
+    var q = H.queue; H.queue = [];
+    if (!q.some(function (f) { return f.isWrite; }) && typeof writeHash === 'function') writeHash();
+    q.forEach(function (f) { try { f(); } catch (err) { console.warn(err); } });
+  }
+  function hBack(n) {
+    H.want += n;
+    if (H.timer) return;
+    H.timer = setTimeout(function () {
+      var k = H.want; H.want = 0; H.timer = null;
+      if (!k) { if (H.queue.length) hFlush(); return; }
+      H.skip++; clearTimeout(H.skipT); H.skipT = setTimeout(hFlush, 700);
+      try { history.go(-k); } catch (err) { hFlush(); }
+    }, 0);
+  }
+  /* a layer closed by its own buttons: step back over its entry (and any entries of layers closed earlier under it) */
+  function hRelease(ctrl, keep) {
+    if (ctrl._hpos == null) { ctrl._hdead = true; return; }
+    var p = ctrl._hpos; ctrl._hpos = null;
+    if (H.layerAt[p] === ctrl) delete H.layerAt[p];
+    if (keep || ctrl._popped) return;
+    H.stale[p] = true;
+    var n = 0;
+    while (H.pos > 0 && H.stale[H.pos]) { delete H.stale[H.pos]; H.pos--; n++; }
+    if (n) hBack(n);
+  }
+  U.hist = {
+    busy: hBusy,
+    pos: function () { return H.pos; },
+    setPos: function (p) { H.pos = p || 0; },
+    /* shell.js writeHash: run later when a Back step is still on its way */
+    later: function (f) { f.isWrite = true; H.queue = H.queue.filter(function (g) { return !g.isWrite; }); H.queue.push(f); },
+    /* a page change: a new entry */
+    push: function (h) { H.pos++; hTrim(); try { history.pushState({ fms: 1, pos: H.pos }, '', h); } catch (err) { /* ignore */ } },
+    replace: function (h) { var st = history.state && history.state.fms ? history.state : { fms: 1, pos: H.pos }; try { history.replaceState(st, '', h); } catch (err) { /* ignore */ } },
+    /* the next layer that opens takes over the current entry (Forward onto a drawer, or a reload with one open) */
+    adopt: function (p) { H.adopt = p; setTimeout(function () { H.adopt = null; }, 80); },
+    /* popstate. Returns 'skip' (our own step back), 'layer' (a layer was closed or kept), or 'page' (the caller draws the page from the address) */
+    pop: function (state) {
+      if (H.skip) { H.skip--; hFlush(); return 'skip'; }
+      if (H.timer) { clearTimeout(H.timer); H.timer = null; H.want = 0; }
+      U.closePops();
+      if (!state || !state.fms) return 'external';
+      var np = state.pos || 0;
+      if (np > H.pos) { H.pos = np; return 'page'; }
+      var hit = stack.filter(function (s) { return s._hpos != null && s._hpos > np; });
+      Object.keys(H.stale).forEach(function (k) { if (+k > np) delete H.stale[k]; });
+      if (!hit.length) { H.pos = np; return 'page'; }
+      var top = stack[stack.length - 1];
+      var blocked = hit.some(function (s) { return s.isDirty() || s._fixed; }) || (top && top._hpos == null && top._fixed);
+      H.pos = np;
+      if (blocked) {
+        /* put the entries back and let the top layer ask ("Discard your changes?") or stay */
+        hit.forEach(function (s) { s._hpos = null; });
+        Object.keys(H.layerAt).forEach(function (k) { if (+k > np) delete H.layerAt[k]; });
+        hit.forEach(function (s) { hPushLayer(s); });
+        if (typeof writeHash === 'function') writeHash();
+        var t = hit[hit.length - 1];
+        if (!t._fixed) t.close();
+        return 'layer';
+      }
+      hit.slice().reverse().forEach(function (s) { s._popped = true; s.close(true); });
+      Object.keys(H.layerAt).forEach(function (k) { if (+k > np) delete H.layerAt[k]; });
+      return 'layer';
+    },
+    /* the address changed from outside (typed, or a link): forget the open layers' entries without stepping back */
+    forget: function () { stack.forEach(function (s) { s._hpos = null; }); H.layerAt = {}; H.stale = {}; H.queue = H.queue.filter(function (f) { return f.isWrite; }); }
   };
 
   /* ---------------- layers: drawer, dialog, confirm ---------------- */
@@ -319,7 +408,7 @@ var UI = (function () {
     ctrl.busy = function (on, label) { footEl.querySelectorAll('button').forEach(function (b) { b.disabled = !!on; }); if (on && label) { var last = footEl.querySelector('button:last-child'); if (last) last.textContent = label; } if (!on) ctrl.setFoot(o.foot); };
     ctrl.close = function (force) {
       if (ctrl.closed) return Promise.resolve(true);
-      var go = function () { ctrl.closed = true; stack.splice(stack.indexOf(ctrl), 1); wrap.classList.add('out'); setTimeout(function () { wrap.remove(); }, 160); lockScroll(); toastsAfterClose(ctrl); if (offData) offData(); if (o.onClose) o.onClose(ctrl); if (prev && prev.focus && document.contains(prev)) try { prev.focus({ preventScroll: true }); } catch (err) { /* ignore */ } return true; };
+      var go = function () { ctrl.closed = true; stack.splice(stack.indexOf(ctrl), 1); hRelease(ctrl, closingAll && keepHist); wrap.classList.add('out'); setTimeout(function () { wrap.remove(); }, 160); lockScroll(); toastsAfterClose(ctrl); if (offData) offData(); if (o.onClose) o.onClose(ctrl); if (prev && prev.focus && document.contains(prev)) try { prev.focus({ preventScroll: true }); } catch (err) { /* ignore */ } return true; };
       if (!force && o.dirty && o.dirty(ctrl)) return U.confirm({ title: o.dirtyTitle || 'Discard your changes?', text: 'What you typed here is not saved yet.', ok: 'Discard', cancel: 'Keep editing', danger: true }).then(function (y) { return y ? go() : false; });
       return Promise.resolve(go());
     };
@@ -335,7 +424,7 @@ var UI = (function () {
     });
     var offData = o.live ? on('data', function () { if (!ctrl.closed) ctrl.refresh(); }) : null;
     layer().appendChild(wrap);
-    ctrl.modal = true; stack.push(ctrl); lockScroll();
+    ctrl.modal = true; ctrl._fixed = o.dismissable === false; stack.push(ctrl); lockScroll(); hPushLayer(ctrl);
     ctrl.isDirty = function () { try { return !ctrl.closed && !!(o.dirty && o.dirty(ctrl)); } catch (err) { return false; } };
     ctrl.setBody(o.body);
     setTimeout(placeToasts, 0);
@@ -359,8 +448,9 @@ var UI = (function () {
       if (o.danger) d.el.classList.add('danger');
     });
   };
-  U.closeAll = function () { closingAll = true; try { stack.slice().reverse().forEach(function (s) { s.close(true); }); } finally { closingAll = false; } U.closePops(); };
-  var closingAll = false;
+  /* UI.closeAll() steps back over the layers' history entries; UI.closeAll({keepHistory:true}) leaves them (the address already moved) */
+  U.closeAll = function (o) { closingAll = true; keepHist = !!(o && o.keepHistory); try { stack.slice().reverse().forEach(function (s) { s.close(true); }); } finally { closingAll = false; keepHist = false; } U.closePops(); };
+  var closingAll = false, keepHist = false;
   /* true when an open drawer or dialog has changes that are not saved (its dirty() says so) */
   U.isDirty = function () { return stack.some(function (s) { return s.isDirty && s.isDirty(); }); };
   /* UI.leave(run): before a page change. With unsaved changes it asks first; run() only happens when the person agrees
@@ -760,6 +850,8 @@ var UI = (function () {
       if (phone) {
         dlg = U.dialog({ title: o.title || o.label || 'Choose', width: 'md', body: panelHtml(), onClose: function () { dlg = null; box = null; st.open = false; var b2 = el.querySelector('.ui-cbx-btn'); if (b2) { b2.setAttribute('aria-expanded', 'false'); try { b2.focus({ preventScroll: true }); } catch (err) { /* ignore */ } } } });
         dlg.el.classList.add('ui-cbx-sheet'); dlg.el.parentNode.classList.add('ui-cbx-sheet-ov');
+        /* a full-screen list: earlier messages ("Filled in ... details") would cover its lines, so they go */
+        U.clearToasts(0);
         wire(dlg.body.querySelector('.ui-cbx-p'));
       } else {
         var anchor = el.querySelector('.ui-cbx-f');
@@ -916,13 +1008,28 @@ var UI = (function () {
       for (var t = 0; t < 1440; t += step) { var h = Math.floor(t / 60), m = t % 60; if (hh === h && mm === m) found = true; opts.push([String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'), timeLabel(h, m), h * 60 + m]); }
       if (d && !found) { opts.push([String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'), timeLabel(hh, mm), hh * 60 + mm]); opts.sort(function (x, y) { return x[2] - y[2]; }); }
       var cur = d ? String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') : '';
-      time = '<span class="ui-dtf-tm"><select data-ui-dtf-time aria-label="' + e((o.label || o.aria || 'Date') + ', time') + '"' + (o.disabled ? ' disabled' : '') + '>' + (d ? '' : '<option value="">Time</option>') + opts.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === cur ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></span>';
+      var lim = dtfLimits(o.min, o.max, d);
+      time = '<span class="ui-dtf-tm"><select data-ui-dtf-time aria-label="' + e((o.label || o.aria || 'Date') + ', time') + '"' + (o.disabled ? ' disabled' : '') + '>' + (d ? '' : '<option value="">Time</option>') + opts.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === cur ? ' selected' : '') + (lim(x[2]) ? ' disabled' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></span>';
     }
-    return '<div class="inp ui-dtf' + (o.compact ? ' compact' : '') + (o.error ? ' bad' : '') + (o.full ? ' full' : '') + '" data-ui-dtf="' + (withTime ? 'dt' : 'd') + '"' + (o.style ? ' style="' + o.style + '"' : '') + '>' + lab(o, id) +
+    var mm2 = withTime ? (o.min ? ' data-min="' + e(U.isoDateTime(toDate(o.min))) + '"' : '') + (o.max ? ' data-max="' + e(U.isoDateTime(toDate(o.max))) + '"' : '') : '';
+    return '<div class="inp ui-dtf' + (o.compact ? ' compact' : '') + (o.error ? ' bad' : '') + (o.full ? ' full' : '') + '" data-ui-dtf="' + (withTime ? 'dt' : 'd') + '"' + mm2 + (o.style ? ' style="' + o.style + '"' : '') + '>' + lab(o, id) +
       '<div class="ui-dtf-row"><span class="ui-dtf-d"><span class="ui-dtf-show' + (d ? '' : ' ph') + '" aria-hidden="true">' + i('calendar') + '<span data-ui-dtf-txt data-ph="' + e(o.placeholder || 'Choose a day') + '">' + e(d ? U.fmt.date(d) : (o.placeholder || 'Choose a day')) + '</span></span>' +
       '<input type="date" id="' + id + '" class="ui-dtf-native" data-ui-dtf-native value="' + (d ? U.isoDate(d) : '') + '"' + (o.min ? ' min="' + e(String(o.min instanceof Date ? U.isoDate(o.min) : o.min).slice(0, 10)) + '"' : '') + (o.max ? ' max="' + e(String(o.max instanceof Date ? U.isoDate(o.max) : o.max).slice(0, 10)) + '"' : '') + (o.required ? ' required' : '') + (o.disabled ? ' disabled' : '') + (o.label ? '' : ' aria-label="' + e(o.aria || o.placeholder || 'Date') + '"') + '></span>' + time + '</div>' +
       (chips.length && !o.disabled ? '<div class="ui-dtf-chips">' + chips.map(function (c, k) { return '<button type="button" class="ui-fchip" data-ui-dtf-chip="' + k + '"' + (c.days != null ? ' data-days="' + c.days + '"' : '') + (c.run ? ' data-run="' + regChipRun(c.run) + '"' : '') + '>' + e(c.label) + '</button>'; }).join('') + '</div>' : '') +
       '<input type="hidden" data-key="' + e(o.key || '') + '" value="' + iso + '"' + U.attrs(o.attrs) + '>' + tail(o) + '</div>';
+  }
+  /* times outside min..max on the first or last allowed day are greyed out: lim(minutesOfDay) -> true when not allowed */
+  function dtfLimits(min, max, day) {
+    min = toDate(min); max = toDate(max);
+    var same = function (a) { return a && day && a.getFullYear() === day.getFullYear() && a.getMonth() === day.getMonth() && a.getDate() === day.getDate(); };
+    var lo = same(min) ? min.getHours() * 60 + min.getMinutes() : -1, hi = same(max) ? max.getHours() * 60 + max.getMinutes() : 1e9;
+    return function (t) { return t < lo || t > hi; };
+  }
+  /* after the day changes: grey out the times the field does not allow on that day */
+  function dtfTimeLimits(r, day) {
+    var sel = r && r.querySelector('[data-ui-dtf-time]'); if (!sel || (!r.getAttribute('data-max') && !r.getAttribute('data-min'))) return;
+    var lim = dtfLimits(r.getAttribute('data-min'), r.getAttribute('data-max'), day);
+    [].forEach.call(sel.options, function (op) { if (!op.value) return; var hm = op.value.split(':'); op.disabled = lim(+hm[0] * 60 + +hm[1]) && op.value !== sel.value; });
   }
   U.dateField = function (o) { return dtfHtml(o || {}, false); };
   U.dateTimeField = function (o) { return dtfHtml(o || {}, true); };
@@ -940,6 +1047,7 @@ var UI = (function () {
     nat.value = d ? U.isoDate(d) : '';
     txt.textContent = d ? U.fmt.date(d) : (txt.getAttribute('data-ph') || 'Choose a day'); txt.parentNode.classList.toggle('ph', !d);
     h.value = d ? (withTime ? U.isoDateTime(d) : U.isoDate(d)) : '';
+    if (withTime) dtfTimeLimits(r, d);
     if (!silent) { h.dispatchEvent(new Event('input', { bubbles: true })); h.dispatchEvent(new Event('change', { bubbles: true })); }
   };
   var dtfChipRun = {}, dtfChipN = 0;

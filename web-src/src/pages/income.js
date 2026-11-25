@@ -51,8 +51,9 @@ PAGES['income'] = {
     body.innerHTML = kh + (who && everyone ? '<button type="button" class="inv-link inc-back" data-pp="">' + i('arrow-left') + 'Everyone</button>' : '') +
       '<div class="inc-grid"><section><h4 class="inc-h">BY KIND</h4><div id="inc-kind"></div></section><section><h4 class="inc-h">HANDOVERS</h4><div id="inc-list"></div></section></div>';
     var emptyText = { icon: 'coins', title: 'No handover fees in this period', text: 'They are recorded on Expenses > Add expense.', action: ctx.can('expenses.add') ? UI.btn('Add expense', { kind: 'tonal', icon: 'plus', attrs: { 'data-add': '1' } }) : '' };
-    UI.table(body.querySelector('#inc-kind'), { rows: klist, rowKey: 'kind', density: 'compact', pageSize: false,
-      columns: [{ key: 'kind', label: 'Kind', render: function (k) { return esc(k.kind); } }, { key: 'n', label: 'Count', money: true, render: function (k) { return String(k.n); } }, { key: 'amount', label: 'Amount', money: true }],
+    /* a narrow table: the kind name wraps so the count and the amount always show (no sideways scroll) */
+    UI.table(body.querySelector('#inc-kind'), { rows: klist, rowKey: 'kind', density: 'compact', pageSize: false, minWidth: 300,
+      columns: [{ key: 'kind', label: 'Kind', render: function (k) { return '<span class="inc-kind">' + esc(k.kind) + '</span>'; } }, { key: 'n', label: 'Count', money: true, render: function (k) { return String(k.n); } }, { key: 'amount', label: 'Amount', money: true }],
       footer: klist.length ? function () { return '<tr><td><b>Total</b></td><td class="c"><b>' + rows.length + '</b></td><td class="c"><b>' + UI.money(total) + '</b></td></tr>'; } : null,
       card: function (k) { return '<div class="row gap10"><div class="grow"><b>' + esc(k.kind) + '</b><small class="inc-sm">' + plural(k.n, 'fee') + '</small></div><b>' + UI.money(k.amount) + '</b></div>'; },
       empty: { icon: 'coins', title: 'Nothing yet', text: '' } });

@@ -112,11 +112,13 @@ function tskDrawer(id, prefill, onDone) {
   function bookingLabel(x) { return x.code + ' · ' + x.cust.name + ' · ' + carModel(x.car) + ' ' + x.car.plate; }
   function body() {
     var x = f.booking ? findBooking(f.booking) : null, ro = !canEdit;
-    var agents = f.agents.map(function (aid) { var e = tskEmp(aid); return e ? '<span class="tsk-agent">' + UI.avatar(e.name) + '<span>' + esc(e.name) + '</span>' + (canAssign ? '<button type="button" class="tsk-x" data-act="unagent" data-v="' + aid + '" aria-label="Remove ' + esc(e.name) + '">' + i('x') + '</button>' : '') + '</span>' : ''; }).join('');
+    var agents = f.agents.map(function (aid) { var e = tskEmp(aid); return e ? '<span class="tsk-agent">' + UI.avatar(e.name) + '<span>' + esc(e.name) + '</span>' + '</span>' : ''; }).join('');
     var html = '<div class="tsk-form">' +
       '<div class="ovl">Assignment</div>' +
-      '<div class="inp full' + (err.agents ? ' bad' : '') + '"><label>Employees (Agents) <span class="ui-req">*</span></label><div class="tsk-agents">' + (agents || '<span class="faint b2">No agents yet</span>') + (canAssign ? '<button type="button" class="btn t sm" data-act="pickagent">' + i('user-plus') + 'Add agent</button>' : '') + '</div>' + (err.agents ? '<span class="ui-err">' + esc(err.agents) + '</span>' : '') + (!canAssign && canEdit ? '<span class="help">Your login cannot change who the task is given to.</span>' : '') + '</div>' +
-      '<div class="inp full"><label>Booking (optional)</label><div class="tsk-bk">' + (ro ? '<span class="tsk-bkv">' + (x ? esc(bookingLabel(x)) : '-') + '</span>' : '<button type="button" class="tsk-bkbtn" data-act="pickbooking">' + (x ? '<span class="grow ellip">' + esc(bookingLabel(x)) + '</span>' : '<span class="grow faint">Select booking...</span>') + i('chevron-down') + '</button>' + (x ? UI.iconBtn('x', 'No booking', { size: 'sm', attrs: { 'data-act': 'nobooking' } }) : '')) + (x ? UI.iconBtn('external-link', 'Open the booking', { size: 'sm', attrs: { 'data-act': 'openbooking' } }) : '') + '</div></div>';
+      /* who and which booking: the shared pickers (search by name; booking by code in any form, name, phone digits or plate) */
+      (canAssign ? '<div class="tsk-pick" data-tsk-agents></div>' : '<div class="inp full"><label>Employees (Agents)</label><div class="tsk-agents">' + (agents || '<span class="faint b2">No agents yet</span>') + '</div>' + (canEdit ? '<span class="help">Your login cannot change who the task is given to.</span>' : '') + '</div>') +
+      (ro ? '<div class="inp full"><label>Booking (optional)</label><div class="tsk-bkrow"><span class="tsk-bkv">' + (x ? esc(bookingLabel(x)) : '-') + '</span>' + (x ? UI.iconBtn('external-link', 'Open the booking', { size: 'sm', attrs: { 'data-act': 'openbooking' } }) : '') + '</div></div>'
+        : '<div class="tsk-bkrow"><div class="tsk-pick grow" data-tsk-bk></div>' + (x ? UI.iconBtn('external-link', 'Open the booking', { size: 'sm', attrs: { 'data-act': 'openbooking' } }) : '') + '</div>');
     if (t && t.agents.length) {
       html += '<div class="tsk-wabox"><div class="row"><b class="grow">' + i('brand-whatsapp') + ' WhatsApp Assignment Status</b>' + (canWa ? UI.btn('Resend All', { kind: 't', size: 'sm', icon: 'send', attrs: { 'data-act': 'resendall' } }) : '') + '</div>' +
         t.agents.map(function (aid) {
@@ -128,7 +130,7 @@ function tskDrawer(id, prefill, onDone) {
     }
     html += '<div class="ovl">Task info</div><div class="grid g2 tsk-g">' +
       UI.input({ key: 'name', label: 'Task Name', required: true, value: f.name, full: true, readonly: ro, error: err.name, attrs: ro ? { 'data-f': 'name' } : { 'data-f': 'name', autofocus: '' } }) +
-      UI.input({ key: 'at', label: 'Scheduled At', type: 'datetime-local', required: true, value: f.at ? UI.isoDateTime(f.at) : '', readonly: ro, error: err.at, attrs: { 'data-f': 'at' } }) +
+      UI.dateTimeField({ key: 'at', label: 'Scheduled At', required: true, value: f.at || '', step: 15, disabled: ro, error: err.at, help: !t && f.at && f.at < NOW() ? 'This is in the past. Check the day and time.' : '', attrs: { 'data-f': 'at' } }) +
       UI.select({ key: 'type', label: 'Task Type', required: true, options: LISTS.taskTypes.indexOf(f.type) < 0 && f.type ? LISTS.taskTypes.concat([f.type]) : LISTS.taskTypes, value: f.type, disabled: ro, attrs: { 'data-f': 'type' } }) +
       UI.select({ key: 'status', label: 'Status', required: true, options: LISTS.taskStatus, value: f.status, disabled: ro, full: true, attrs: { 'data-f': 'status' } }) +
       UI.textarea({ key: 'note', label: 'Note', rows: 3, value: f.note, readonly: ro, attrs: { 'data-f': 'note' } }) + '</div>';
@@ -142,6 +144,16 @@ function tskDrawer(id, prefill, onDone) {
   }
   function draw() {
     dr.setBody(body);
+    var ab = dr.body.querySelector('[data-tsk-agents]');
+    if (ab) UI.staffPicker(ab, { key: 'agents', label: 'Employees (Agents)', source: 'employees', multi: true, values: f.agents.slice(), required: true, error: err.agents, title: 'Choose agents', placeholder: 'Choose agents', full: true,
+      onChange: function (v) { readFields(); f.agents = (v || []).slice(); if (f.agents.length) delete err.agents; } });
+    var bb = dr.body.querySelector('[data-tsk-bk]');
+    if (bb) UI.bookingPicker(bb, { key: 'booking', label: 'Booking (optional)', value: f.booking || '', placeholder: 'Choose a booking', filter: function (x) { return x.status !== 'Cancelled'; },
+      onChange: function (code, x) {
+        readFields(); f.booking = code || '';
+        if (x && !t) { if (!f.at) f.at = x.start; if (!f.name) f.name = 'Deliver ' + carModel(x.car) + ' ' + x.car.plate + ' to ' + tskFirst(x.cust.name); if (f.type === 'General') f.type = taskTypeFor(x, 'start'); if (!f.note && x.delNote) f.note = x.delNote; }
+        draw();
+      } });
     var dz = dr.body.querySelector('.tsk-dz');
     if (dz) UI.dropzone(dz, { accept: 'image/*', multiple: true, camera: true, icon: 'photo-plus', label: 'Add Photos', hint: 'Drop pictures here, choose them or paste with Ctrl+V.', onFiles: function (files) {
       Promise.all(files.map(function (fl) { return UI.readImage(fl, { max: 1400 }).catch(function () { return null; }); })).then(function (list) {
@@ -186,40 +198,6 @@ function tskDrawer(id, prefill, onDone) {
       }).catch(function () { if (!settled) { settled = true; clearTimeout(tmo); fake(); } });
     } catch (e) { fake(); }
   }
-  function pickAgent(anchor) {
-    UI.popover(anchor, function (el, pop) {
-      var q = '';
-      var list = function () {
-        var emps = D().employees.filter(function (e) { return (e.active !== false || f.agents.indexOf(e.id) >= 0) && (!q || e.name.toLowerCase().indexOf(q) >= 0); });
-        return emps.length ? emps.map(function (e) { var on = f.agents.indexOf(e.id) >= 0; return '<button type="button" class="tsk-opt" data-emp="' + e.id + '" aria-pressed="' + on + '">' + UI.avatar(e.name) + '<span class="grow"><b>' + esc(e.name) + '</b><small>' + (e.wa ? esc(e.wa) : 'No WhatsApp number') + '</small></span>' + (on ? i('check') : '') + '</button>'; }).join('') : '<p class="b2 faint" style="padding:8px 12px">No agent matches.</p>';
-      };
-      el.innerHTML = '<div class="tsk-pop"><div class="inp srch">' + i('search') + '<input type="search" placeholder="Search agents..." aria-label="Search agents"></div><div class="tsk-opts">' + list() + '</div></div>';
-      var inp = el.querySelector('input'), box = el.querySelector('.tsk-opts');
-      inp.addEventListener('input', function () { q = inp.value.trim().toLowerCase(); box.innerHTML = list(); });
-      box.addEventListener('click', function (ev) { var b = ev.target.closest('[data-emp]'); if (!b) return; var aid = b.getAttribute('data-emp'), k = f.agents.indexOf(aid); if (k >= 0) f.agents.splice(k, 1); else f.agents.push(aid); delete err.agents; box.innerHTML = list(); readFields(); draw(); });
-      setTimeout(function () { inp.focus(); }, 30);
-    }, { width: 320, align: 'start' });
-  }
-  function pickBooking(anchor) {
-    UI.popover(anchor, function (el, pop) {
-      var q = '', now = +NOW();
-      var all = D().bookings.filter(function (x) { return x.status !== 'Cancelled'; }).slice().sort(function (a, b) { return Math.abs(a.start - now) - Math.abs(b.start - now); });
-      var list = function () {
-        var rows = all.filter(function (x) { return !q || (x.code + ' ' + x.cust.name + ' ' + x.car.plate + ' ' + carName(x.car)).toLowerCase().indexOf(q) >= 0; }).slice(0, 40);
-        return '<button type="button" class="tsk-opt" data-bk=""><span class="grow">-- None --</span>' + (!f.booking ? i('check') : '') + '</button>' + rows.map(function (x) { return '<button type="button" class="tsk-opt" data-bk="' + x.code + '" aria-pressed="' + (f.booking === x.code) + '"><span class="grow"><b>' + x.code + ' · ' + esc(x.cust.name) + '</b><small>' + esc(carModel(x.car) + ' ' + x.car.plate) + ' · ' + UI.fmt.date(x.start) + ' to ' + UI.fmt.date(x.end) + '</small></span>' + (f.booking === x.code ? i('check') : '') + '</button>'; }).join('') + (rows.length ? '' : '<p class="b2 faint" style="padding:8px 12px">No booking matches.</p>');
-      };
-      el.innerHTML = '<div class="tsk-pop"><div class="inp srch">' + i('search') + '<input type="search" placeholder="Booking ID, customer or plate" aria-label="Search bookings"></div><div class="tsk-opts">' + list() + '</div></div>';
-      var inp = el.querySelector('input'), box = el.querySelector('.tsk-opts');
-      inp.addEventListener('input', function () { q = inp.value.trim().toLowerCase(); box.innerHTML = list(); });
-      box.addEventListener('click', function (ev) {
-        var b = ev.target.closest('[data-bk]'); if (!b) return; readFields();
-        f.booking = b.getAttribute('data-bk'); var x = findBooking(f.booking);
-        if (x && !t) { if (!f.at) f.at = x.start; if (!f.name) f.name = 'Deliver ' + carModel(x.car) + ' ' + x.car.plate + ' to ' + tskFirst(x.cust.name); if (f.type === 'General') f.type = taskTypeFor(x, 'start'); if (!f.note && x.delNote) f.note = x.delNote; }
-        pop.close(); draw();
-      });
-      setTimeout(function () { inp.focus(); }, 30);
-    }, { width: 380, align: 'start' });
-  }
   function save() {
     readFields(); err = {};
     if (!f.agents.length) err.agents = 'Choose at least one agent.';
@@ -260,11 +238,7 @@ function tskDrawer(id, prefill, onDone) {
   dr.body.addEventListener('click', function (ev) {
     var el = ev.target.closest('[data-act]'); if (!el) return;
     var a = el.getAttribute('data-act'), v = el.getAttribute('data-v');
-    if (a === 'pickagent') pickAgent(el);
-    else if (a === 'unagent') { readFields(); f.agents.splice(f.agents.indexOf(v), 1); draw(); }
-    else if (a === 'pickbooking') pickBooking(el);
-    else if (a === 'nobooking') { readFields(); f.booking = ''; draw(); }
-    else if (a === 'openbooking') { if (f.booking) API.openBooking(f.booking); }
+    if (a === 'openbooking') { if (f.booking) API.openBooking(f.booking); }
     else if (a === 'resend') { readFields(); tskSend(t, [v]); var id1 = t.id; if ((t.wa || {})[v] === 'Template Sent') setTimeout(function () { tskReply(id1, v, d0); }, 9000); }
     else if (a === 'resendall') { readFields(); tskSend(t, t.agents.slice()); }
     else if (a === 'reply') { readFields(); tskReply(t.id, v); }
@@ -280,6 +254,14 @@ function tskDrawer(id, prefill, onDone) {
     else if (a === 'viewphoto') { readFields(); var p = f.photos[+v]; UI.dialog({ title: p.caption || p.name, width: 'lg', body: '<img class="tsk-big" src="' + tskPhoto(p, +v) + '" alt="' + esc(p.name) + '">', buttons: [{ label: 'Close' }] }); }
   });
   dr.body.addEventListener('input', function (ev) { if (ev.target.matches('[data-f="name"]') && t) dr.setTitle(title, ev.target.value || t.name); });
+  /* a new task set in the past: say so gently (it still saves) */
+  dr.body.addEventListener('change', function (ev) {
+    if (t || !ev.target.matches('[data-f="at"]')) return;
+    var r = ev.target.closest('[data-ui-dtf]'), at = ev.target.value ? UI.parseDate(ev.target.value) : null, h = r && r.querySelector('.help');
+    if (!r) return;
+    if (at && at < NOW()) { if (!h) { h = document.createElement('span'); h.className = 'help'; r.appendChild(h); } h.textContent = 'This is in the past. Check the day and time.'; }
+    else if (h) h.remove();
+  });
   return dr;
 }
 function tskClock(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }

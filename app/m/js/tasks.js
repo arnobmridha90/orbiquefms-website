@@ -137,7 +137,7 @@ VIEWS.tasks = function () {
     open.forEach(function (t) { var x = t.at ? new Date(t.at).getTime() : t0; if (x < t0) grp.late.push(t); else if (x < t0 + DAY) grp.today.push(t); else if (x < t0 + 2 * DAY) grp.tomorrow.push(t); else grp.later.push(t); });
     var done = mine.filter(function (t) { return t.status === 'Completed' && t.doneAt && new Date(t.doneAt).getTime() >= t0; });
     var sec = function (title, list, red) { return list.length ? '<div class="sc-sec' + (red ? ' red' : '') + '">' + title + '<span>' + list.length + '</span></div>' + list.map(function (t) { return tkCard(t, true); }).join('') : ''; };
-    body = sec('Today', grp.today) + sec('Late', grp.late, true) + sec('Tomorrow', grp.tomorrow) + sec('Later', grp.later.slice(0, 20)) + sec('Done today', done);
+    body = sec('Late', grp.late, true) + sec('Today', grp.today) + sec('Tomorrow', grp.tomorrow) + sec('Later', grp.later.slice(0, 20)) + sec('Done today', done);
     if (!open.length) body = '<div class="empty tk-empty">' + I('task') + '<div><b>No jobs for you right now.</b><br>New jobs given to you show here.</div></div>' + sec('Done today', done);
   } else {
     var q = tk.q.trim();
@@ -268,19 +268,25 @@ function tkCollect() {
 function tkRedraw() { tkCollect(); tkEd.dirty = true; render(false, true); }
 function tkEdWire() {
   var t = tkEd.t;
-  ['#tkName', '#tkNote', '#tkDate', '#tkTime', '#tkType'].forEach(function (s) { var el = $(s); if (el) el.addEventListener('input', function () { tkEd.dirty = true; }); });
+  ['#tkName', '#tkNote', '#tkDate', '#tkTime', '#tkType'].forEach(function (s) { var el = $(s); if (el) el.addEventListener('input', function () { tkEd.dirty = true; tkCollect(); if (s === '#tkDate' || s === '#tkTime') tkEd.touchedAt = true; if (s === '#tkType') tkEd.touchedType = true; if (s === '#tkName') tkEd.touchedName = true; }); });
+  ['#tkDate', '#tkTime'].forEach(function (s) { var el = $(s); if (el) el.addEventListener('change', function () { tkEd.touchedAt = true; }); });
   var ty = $('#tkType'); if (ty) ty.onchange = function () {
-    var b = t.booking ? bk(t.booking) : null; tkCollect();
+    var b = t.booking ? bk(t.booking) : null; tkCollect(); tkEd.touchedType = true;
+    if (tkEd.touchedAt) return;
     if (b && /^Return/.test(t.type)) { t.at = b.end; render(false, true); } else if (b && /^Delivery/.test(t.type)) { t.at = b.start; render(false, true); }
   };
-  $$('[data-at]').forEach(function (el) { el.onclick = function () { var b = bk(t.booking); tkCollect(); t.at = el.dataset.at === 'end' ? b.end : b.start; tkEd.dirty = true; render(false, true); }; });
+  $$('[data-cap]').forEach(function (el) { el.addEventListener('input', function () { tkEd.dirty = true; tkCollect(); }); });
+  $$('[data-at]').forEach(function (el) { el.onclick = function () { var b = bk(t.booking); tkCollect(); t.at = el.dataset.at === 'end' ? b.end : b.start; tkEd.dirty = true; tkEd.touchedAt = true; render(false, true); }; });
   var bkb = $('#tkBk'); if (bkb) bkb.onclick = function () {
     tkCollect();
     Pickers.booking({ title: 'Link a booking', selected: t.booking, onPick: function (b) {
-      if (!b) return; t.booking = b.id; var end = /^Return/.test(t.type) ? 'ret' : 'pick';
+      /* fill in only what the person has not set: their name, type and date stay as typed, and the time never moves into the past quietly */
+      if (!b) return; t.booking = b.id; var end = /^Return/.test(t.type) ? 'ret' : 'pick', auto = !t.name.trim() || !tkEd.touchedName;
+      if (auto && t.type === 'General' && !tkEd.touchedType) t.type = taskTypeFor(b, end = (b.bookingStatus === 'Car Delivered' ? 'ret' : 'pick'));
       if (!t.name.trim()) t.name = taskName(b, end);
-      if (t.type === 'General') t.type = taskTypeFor(b, end = (b.bookingStatus === 'Car Delivered' ? 'ret' : 'pick'));
-      t.at = end === 'ret' ? b.end : b.start; tkEd.dirty = true; render(false, true);
+      var to = end === 'ret' ? b.end : b.start;
+      if (!tkEd.touchedAt && auto) { if (new Date(to) >= new Date()) t.at = to; else say('The booking ' + (end === 'ret' ? 'end' : 'start') + ' time has passed, so the date was kept. Tap the time button to use it.'); }
+      tkEd.dirty = true; render(false, true);
     } });
   };
   var bx = $('#tkBkX'); if (bx) bx.onclick = function () { tkCollect(); t.booking = null; tkEd.dirty = true; render(false, true); };
@@ -296,7 +302,11 @@ function tkEdWire() {
   var stp = $('#tkStop'); if (stp) stp.onclick = function () { tkStopRec(false); };
   $$('[data-vdel]').forEach(function (el) { el.onclick = function () { tkCollect(); var i = +el.dataset.vdel, v = t.voice.splice(i, 1)[0]; tkEd.dirty = true; render(false, true); undoSnack('Voice note deleted', function () { if (tkEd && tkEd.t === t) { t.voice.splice(i, 0, v); render(false, true); } }); }; });
   tkWireWa();
-  var cn = $('#tkCancel'); if (cn) cn.onclick = function () { tkStopRec(true); tkEd = null; goBack('#tasks'); };
+  var cn = $('#tkCancel'); if (cn) cn.onclick = function () {
+    var leave = function () { tkStopRec(true); tkEd = null; goBack('#tasks'); };
+    if (!tkEd.dirty) { leave(); return; }
+    tkCollect(); tkAskDiscard().then(function (y) { if (y) leave(); });
+  };
   var sv = $('#tkSave'); if (sv) sv.onclick = tkSave;
   var dl = $('#tkDel'); if (dl) dl.onclick = function () {
     confirm({ icon: 'danger', title: 'Delete this task?', text: '“' + t.name + '” and its photos and voice notes will be removed.', ok: 'Delete task', cancel: 'Keep it', danger: true }).then(function (ok) {
@@ -365,4 +375,16 @@ function tkStopRec(drop) {
   if (!tkRec) return; var r = tkRec; r.drop = !!drop; if (r.iv) clearInterval(r.iv);
   try { if (r.mr.state !== 'inactive') r.mr.stop(); else { r.stream.getTracks().forEach(function (x) { x.stop(); }); tkRec = null; } } catch (e) { tkRec = null; }
 }
-window.addEventListener('hashchange', function () { if (route().name !== 'task') { tkStopRec(true); tkEd = null; } });
+function tkAskDiscard() { return confirm({ icon: 'warn', title: tkEd && tkEd.isNew ? 'Discard this task?' : 'Discard your changes?', text: 'What you typed, the photos and voice notes will be lost.', ok: 'Discard', cancel: 'Keep editing', primary: 'cancel' }); }
+/* leaving the editor with Back while it has changes: ask, and come back to it when the person keeps editing */
+window.addEventListener('hashchange', function (e) {
+  if (route().name === 'task' || !tkEd) return;
+  var held = tkEd, back = (e && e.oldURL && e.oldURL.indexOf('#') >= 0) ? e.oldURL.slice(e.oldURL.indexOf('#')) : '';
+  if (!held.dirty || !back || held.asking) { tkStopRec(true); tkEd = null; return; }
+  held.asking = true;
+  tkAskDiscard().then(function (y) {
+    held.asking = false;
+    if (y) { if (tkEd === held) tkEd = null; tkStopRec(true); return; }
+    tkEd = held; location.hash = back;
+  });
+});

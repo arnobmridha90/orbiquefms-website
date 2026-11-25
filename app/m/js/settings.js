@@ -34,12 +34,13 @@ VIEWS.settings = function () {
     '<div class="row st-feehead"><div class="grow"></div><span>Per day</span><span>Max</span></div>' +
     pk.map(function (p) { return '<button type="button" class="row st-tap" data-pkg="' + esc(p.id) + '"' + (owner ? '' : ' disabled') + '><div class="grow"><div class="t1">' + esc(p.name) + '</div>' + (p.default ? '<div class="st-chips">' + chip('Picked first', 'blue') + '</div>' : '') + '</div><span class="money">' + rm(p.daily) + '</span><span class="money">' + rm(p.max) + '</span></button>'; }).join('') + '</div>' +
 
-    stSec('Handover fees') + '<p class="small muted st-lead">What field staff earn for each trip. Tap one to change it or give someone a different rate.</p>' +
+    stSec('Handover fees') + '<p class="small muted st-lead">What field staff earn for each trip.' + (owner ? ' Tap one to change it or give someone a different rate.' : '') + '</p>' +
     [['delivery', 'Pick-ups and deliveries'], ['return', 'Returns and drop-offs'], ['companion', 'Companion']].map(function (g) {
       var rows = hf.filter(function (f) { return (f.group || f.feeGroup) === g[0]; }); if (!rows.length) return '';
       return '<div class="st-sub">' + g[1] + '</div><div class="list">' + rows.map(function (f) {
-        var rs = Object.keys(f.rates || {}).filter(function (id) { return staff(id); });
-        return '<button type="button" class="row st-tap" data-fee="' + esc(f.kind) + '"' + (owner ? '' : ' disabled') + '><div class="grow"><div class="t1 st-wrap">' + esc(f.kind) + '</div>' + (rs.length ? '<div class="st-chips">' + rs.map(function (id) { return chip(firstName(staff(id).name) + ' ' + rm(f.rates[id]), 'amber'); }).join('') + '</div>' : '') + '</div><span class="money st-amt">' + rm(f.amount) + '</span></button>';
+        /* personal rates: the owner sees everyone's, others only their own */
+        var rs = Object.keys(f.rates || {}).filter(function (id) { return staff(id) && (owner || id === S.me); });
+        return '<button type="button" class="row st-tap" data-fee="' + esc(f.kind) + '"' + (owner ? '' : ' disabled') + '><div class="grow"><div class="t1 st-wrap">' + esc(f.kind) + '</div>' + (rs.length ? '<div class="st-chips">' + rs.map(function (id) { return chip((id === S.me && !owner ? 'Your rate' : firstName(staff(id).name)) + ' ' + rm(f.rates[id]), 'amber'); }).join('') + '</div>' : '') + '</div><span class="money st-amt">' + rm(f.amount) + '</span></button>';
       }).join('') + '</div>';
     }).join('') +
 

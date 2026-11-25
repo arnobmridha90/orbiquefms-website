@@ -86,9 +86,18 @@ function writeHash() {
     if (S.sec === 'dash') { parts.push('page=' + S.page); Object.keys(S.params || {}).forEach(function (k) { if (S.params[k] !== '' && S.params[k] != null) parts.push(k + '=' + encodeURIComponent(S.params[k])); }); }
     if (S.sec === 'bf') parts.push('bf=' + S.bf.screen);
     var h = '#' + parts.join('&');
-    if (location.hash !== h) history.replaceState(null, '', h);
+    /* a Back step is still on its way: write the address once it has landed */
+    if (UI.hist.busy()) { UI.hist.later(writeHash); return; }
+    /* another page (or company, or booking form screen) is a new history entry so Back returns to it;
+       tabs, filters and other small changes only replace the address */
+    var key = navKey();
+    if (writeHash.key != null && key !== writeHash.key) UI.hist.push(h);
+    else if (location.hash !== h || !(history.state && history.state.fms)) UI.hist.replace(h);
+    writeHash.key = key;
   } catch (e) { /* the address cannot change inside some viewers; nothing depends on it */ }
 }
+writeHash.key = null;
+function navKey() { return S.sec + '|' + S.b + '|' + (S.sec === 'dash' ? S.page : '') + '|' + (S.sec === 'bf' ? S.bf.screen : ''); }
 var HASH_KEYS = ['b', 'sec', 'page', 'bf', 'pf', 'set', 'theme', 'drawer', 'full', 'rail', 'agreed', 'lang', 'user'];
 function readHash(h) {
   var params = {};

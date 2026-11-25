@@ -82,6 +82,9 @@
   .ui-fb.open .ui-fx{flex:1 1 100%}
   .ui-fsel{min-width:0}
   .ui-frange .inp{flex:1}
+  .ui-frange > .b2{flex-basis:100%}
+  .ui-fsearch{order:-2}
+  .ui-fmore,.ui-fclear{order:-1}
   .ui-frange .inp input{width:100%}
   .ui-fchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
   .ui-fchips::-webkit-scrollbar{display:none}

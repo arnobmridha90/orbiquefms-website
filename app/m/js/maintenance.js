@@ -56,7 +56,7 @@ var Maint = (function () {
     opts = opts || {}; var items = [], hid = opts.all ? {} : hidden();
     S.cars.forEach(function (c) {
       if (c.status !== 'active') return;
-      reminders(c).forEach(function (r) { if (r.level === 'ok') return; items.push({ key: 's:' + c.id + ':' + r.type, kind: 'service', car: c, title: r.type, words: dueWords(r.days, r.kmLeft), level: r.level, days: r.days == null ? (r.kmLeft < 0 ? -1 : 30) : r.days, type: r.type }); });
+      reminders(c).forEach(function (r) { if (r.level === 'ok') return; items.push({ key: 's:' + c.id + ':' + r.type, kind: 'service', car: c, title: r.type, words: dueWords(r.days, r.kmLeft), level: r.level, days: r.days == null ? (r.kmLeft < 0 ? -1 : 30) : r.days, type: r.type, kmOver: r.kmLeft != null && r.kmLeft < 0, dateOver: r.days != null && r.days < 0 }); });
       ['Road tax', 'Insurance', 'PUSPAKOM', 'Permit'].forEach(function (t) {
         var p = carPaper(c.id, t), s = M7.paperState(p); if (!p || (s.level !== 'overdue' && s.level !== 'soon')) return;
         items.push({ key: 'p:' + c.id + ':' + t, kind: 'paper', car: c, title: M7.PAPER_LABEL[t], words: s.text + ' (' + M7.ymd(p.until) + ')', level: s.level, days: s.days, type: t, paper: p });

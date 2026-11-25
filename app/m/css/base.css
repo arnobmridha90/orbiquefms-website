@@ -53,6 +53,8 @@ main.no-nav { padding-bottom: calc(var(--safe-b) + 110px); }
 .sec { margin: 18px 0 8px; display: flex; align-items: baseline; justify-content: space-between; }
 .sec h2 { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0; }
 .sec a, .sec button { font-size: 13.5px; font-weight: 600; color: var(--brand-ink); }
+/* text links in a section header: a 40px tap area without making the header taller */
+.sec > a, .sec > button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 8px; margin: -12px -8px -12px 0; }
 .card { background: var(--card); border-radius: var(--r); border: 1px solid var(--line); }
 .list { background: var(--card); border-radius: var(--r); border: 1px solid var(--line); overflow: hidden; }
 .row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-height: 56px; border-top: 1px solid var(--line); width: 100%; text-align: left; }
@@ -193,7 +195,7 @@ textarea.inp { height: 76px; padding: 10px 12px; resize: none; }
 
 /* switch */
 .sw { position: relative; width: 48px; height: 29px; flex: none; }
-.sw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.sw input { position: absolute; top: -6px; bottom: -6px; left: -4px; right: -4px; width: auto; height: auto; opacity: 0; margin: 0; cursor: pointer; z-index: 1; } /* 41px tap area */
 .sw i { position: absolute; inset: 0; border-radius: 15px; background: #D3D6DC; transition: .2s; }
 .sw i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 23px; height: 23px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: .2s; }
 .sw input:checked + i { background: var(--ok); }
@@ -222,7 +224,7 @@ textarea.inp { height: 76px; padding: 10px 12px; resize: none; }
 .composer .send svg { width: 20px; height: 20px; }
 .quick { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; max-width: 536px; margin: 0 auto 8px; }
 .quick::-webkit-scrollbar { display: none; }
-.quick button { flex: none; font-size: 13px; font-weight: 600; padding: 6px 11px; border-radius: 14px; background: var(--tint); color: var(--brand-ink); }
+.quick button { flex: none; font-size: 13px; font-weight: 600; padding: 6px 12px; min-height: 40px; border-radius: 20px; background: var(--tint); color: var(--brand-ink); }
 .banner { display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px; border-radius: 12px; background: var(--tint); color: #22324F; font-size: 13.5px; margin-bottom: 12px; }
 .banner svg { width: 20px; height: 20px; flex: none; color: var(--brand-ink); margin-top: 1px; }
 .banner.warn { background: var(--warn-bg); color: #6B3D0A; }
@@ -281,7 +283,8 @@ textarea.inp { height: 76px; padding: 10px 12px; resize: none; }
 .dt.on i { background: #fff; }
 .dt.on i.none { background: transparent; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.gtile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 4px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; text-align: center; color: var(--text); }
+.gtile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 4px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; text-align: center; color: var(--text); overflow-wrap: normal; word-break: keep-all; hyphens: manual; min-width: 0; }
+@media (max-width: 340px) { .gtile { font-size: 11px; letter-spacing: -.01em; } }
 .gtile .gi { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--tint); color: var(--brand-ink); }
 .gtile .gi svg { width: 21px; height: 21px; }
 .gtile:active { background: #F7F8FA; }
@@ -351,6 +354,7 @@ button.card2:active, a.card2:active { background: #F7F8FA; }
 .sheet.full { top: 0; max-height: none; height: 100vh; height: 100dvh; border-radius: 0; padding-top: calc(var(--safe-t) + 6px); display: flex; flex-direction: column; }
 .sheet.full .grab { display: none; }
 .confirm { text-align: center; padding-top: 4px; }
+.confirm .field { text-align: left; }
 .confirm .lead { margin: 6px 0 4px; font-size: 15px; color: #3B4250; }
 .confirm-ic { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; margin: 0 auto 10px; background: var(--t-amber-bg); color: var(--t-amber); }
 .confirm-ic.danger { background: var(--t-red-bg); color: var(--t-red); }
@@ -388,9 +392,17 @@ input[type=search]::-webkit-search-cancel-button { -webkit-appearance: none; dis
 /* date and time fields: the label on top always reads "19 Oct 2026" or "3:00 PM"; the native input underneath opens the picker (core dtfEnhance) */
 .dtf { position: relative; display: block; flex: 1 1 0; min-width: 0; }
 .dtf[hidden] { display: none; }
+/* the hidden attribute always wins over display rules like .field .err { display: block } */
+[hidden] { display: none !important; }
 .dtf > .dtf-i { width: 100%; color: transparent; -webkit-text-fill-color: transparent; }
 .dtf > .dtf-i::-webkit-datetime-edit { color: transparent; }
 .dtf > .dtf-l { position: absolute; left: 1px; top: 1px; bottom: 1px; right: 34px; display: flex; align-items: center; padding-left: 12px; font-size: 16px; color: var(--text); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dtf > .dtf-l.ph { color: var(--muted); }
 .dtf > .dtf-i:disabled + .dtf-l { color: var(--muted); }
 .dtf > .dtf-i::-webkit-calendar-picker-indicator { opacity: .55; }
+.pdfsize { position: relative; }
+.pdftap { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; cursor: zoom-in; }
+.pdfwrap.zoom { overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; flex: none; }
+.pdfwrap.zoom .pdftap { cursor: zoom-out; }
+.pdfhint { text-align: center; margin: 6px 0 0; }
+.pk-dep { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; } .pk-dep small { font-size: 11px; color: var(--muted); }

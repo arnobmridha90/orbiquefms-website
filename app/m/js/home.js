@@ -33,7 +33,7 @@ function installBanner() {
 var HOME = { updated: null };
 VIEW_STATE.push(function () { HOME.updated = null; });
 
-function hmHoursLate(t) { var h = Math.max(1, Math.floor((Date.now() - new Date(t)) / HOUR)); return h >= 48 ? Math.floor(h / 24) + ' days late' : h + (h === 1 ? ' hour late' : ' hours late'); }
+function hmHoursLate(t) { return lateInfo(t).text + ' late'; }
 function hmWait(n) { n = Math.max(0, n | 0); return n === 0 ? 'less than a day' : n + (n === 1 ? ' day' : ' days'); }
 function hmCount(n) { return n + (n === 1 ? ' booking' : ' bookings'); }
 function hmBkRow(b, right, sub) {
@@ -44,23 +44,23 @@ function hmBkRow(b, right, sub) {
 function needsYou() {
   var now = Date.now(), out = [], money = can('bookings.see_amounts') || can('billing.view'), live = S.bookings.filter(function (b) { return b.bookingStatus !== 'Cancelled' && b.bookingStatus !== 'Completed'; });
   if (can('bookings.view')) {
-    var late = live.filter(isLate).sort(function (a, b) { return new Date(a.end) - new Date(b.end); });
-    if (late.length) out.push({ key: 'late', title: 'Cars not back', tone: 'red', n: late.length, hint: 'Oldest ' + hmHoursLate(late[0].end), more: '#bookings/late', moreLabel: 'Open late bookings',
+    /* each group uses the same rule as the Bookings list it opens (BK_TESTS), so the numbers match */
+    var late = live.filter(BK_TESTS.notback).sort(function (a, b) { return new Date(a.end) - new Date(b.end); });
+    if (late.length) out.push({ key: 'late', title: 'Cars not back', tone: 'red', n: late.length, hint: 'Oldest ' + hmHoursLate(late[0].end), more: '#bookings/notback', moreLabel: 'See these in Bookings',
       rows: late.map(function (b) { return hmBkRow(b, chip(hmHoursLate(b.end), 'red'), 'due back ' + when(b.end)); }) });
-    var missed = live.filter(function (b) { return (b.bookingStatus === 'Confirmed' || b.bookingStatus === 'Agreement Signed') && new Date(b.start).getTime() < now; }).sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
-    if (missed.length) out.push({ key: 'missed', title: 'Missed pick-ups', tone: 'red', n: missed.length, hint: 'Booked to go out, not handed over', more: '#bookings/late', moreLabel: 'Open late bookings',
+    var missed = live.filter(BK_TESTS.missed).sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+    if (missed.length) out.push({ key: 'missed', title: 'Missed pick-ups', tone: 'red', n: missed.length, hint: 'Booked to go out, not handed over', more: '#bookings/missed', moreLabel: 'See these in Bookings',
       rows: missed.map(function (b) { return hmBkRow(b, chip(b.bookingStatus === 'Confirmed' ? 'Confirmed' : 'Signed', 'grey'), 'was due ' + when(b.start)); }) });
-    var unsigned = live.filter(function (b) { return b.bookingStatus === 'Agreement Sent' && new Date(b.end).getTime() >= now; }).sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
-    if (unsigned.length && (can('bookings.edit') || can('bookings.change_status'))) out.push({ key: 'unsigned', title: 'Agreement sent, not signed', tone: 'amber', n: unsigned.length, hint: 'Next pick-up ' + when(unsigned[0].start), more: '#bookings/unsigned', moreLabel: 'Open unsigned bookings',
+    var unsigned = live.filter(BK_TESTS.unsigned).sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+    if (unsigned.length && (can('bookings.edit') || can('bookings.change_status'))) out.push({ key: 'unsigned', title: 'Agreement sent, not signed', tone: 'amber', n: unsigned.length, hint: 'Next pick-up ' + when(unsigned[0].start), more: '#bookings/unsigned', moreLabel: 'See these in Bookings',
       rows: unsigned.map(function (b) { return hmBkRow(b, '<span class="small muted">' + esc(dayWord(b.start)) + '</span>', 'pick-up ' + when(b.start)); }) });
   }
   if (can('bookings.view') && money) {
-    var depNo = live.filter(function (b) { var m; if (['Confirmed', 'Agreement Sent', 'Agreement Signed', 'Car Delivered'].indexOf(b.bookingStatus) < 0 || new Date(b.start).getTime() > now + 2 * DAY || new Date(b.end).getTime() < now) return false; if (b.paymentStatus && b.paymentStatus !== 'Deposit Due') return false; m = calcBooking(b); return m.deposit > 0 && m.depositReceived + 0.99 < m.deposit; })
-      .sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
-    if (depNo.length) out.push({ key: 'deposit', title: 'Deposit not received', tone: 'amber', n: depNo.length, hint: 'Pick-up within 2 days or already started', more: '#bookings/upcoming', moreLabel: 'Open upcoming bookings',
+    var depNo = live.filter(BK_TESTS.depositdue).sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+    if (depNo.length) out.push({ key: 'deposit', title: 'Deposit not received', tone: 'amber', n: depNo.length, hint: 'Pick-up within 2 days or already started', more: '#bookings/depositdue', moreLabel: 'See these in Bookings',
       rows: depNo.map(function (b) { var m = calcBooking(b); return hmBkRow(b, '<span class="bal due money">' + rm(m.deposit - m.depositReceived) + '</span>', 'pick-up ' + when(b.start)); }) });
-    var due = live.filter(function (b) { return new Date(b.start).getTime() < now + 2 * DAY && calcBooking(b).due > 0.99; }).sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
-    if (due.length) out.push({ key: 'due', title: 'Balance to collect', tone: new Date(due[0].start).getTime() < now ? 'red' : 'amber', n: due.length, hint: rm(due.reduce(function (s, b) { return s + calcBooking(b).due; }, 0)) + ' within 48 hours', more: '#bookings/unpaid', moreLabel: 'Open money due',
+    var due = live.filter(BK_TESTS.collect).sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+    if (due.length) out.push({ key: 'due', title: 'Balance to collect', tone: new Date(due[0].start).getTime() < now ? 'red' : 'amber', n: due.length, hint: rm(due.reduce(function (s, b) { return s + calcBooking(b).due; }, 0)) + ' on cars out or back, or leaving within 2 days', more: '#bookings/collect', moreLabel: 'See these in Bookings',
       rows: due.map(function (b) { return hmBkRow(b, '<span class="bal due money">' + rm(calcBooking(b).due) + '</span>', (new Date(b.start).getTime() < now ? 'out since ' : 'pick-up ') + when(b.start)); }) });
   }
   if (can('deposits.view')) {
@@ -72,12 +72,15 @@ function needsYou() {
   }
   if (can('maintenance.view') && typeof Maint !== 'undefined') {
     var od = []; try { od = Maint.dueItems().filter(function (i) { return i.level === 'overdue'; }); } catch (e) { od = []; }
-    if (od.length) out.push({ key: 'maint', title: 'Papers or services overdue', tone: 'red', n: od.length, hint: od.slice(0, 2).map(function (i) { return i.car.plate + ' ' + i.title.toLowerCase(); }).join(', '), more: '#maintenance', moreLabel: 'Open Maintenance',
-      rows: od.map(function (i) { return '<a class="card2" href="#car/' + i.car.id + '"><div class="c2-main"><div class="c2-t1">' + esc(i.car.plate) + ' · ' + esc(i.title) + '</div><div class="c2-t2">' + esc(i.words || '') + '</div></div><div class="c2-end">' + chip('Overdue', 'red') + '</div></a>'; }) });
+    var byKm = function (i) { return i.kmOver && !i.dateOver; };
+    if (od.length) out.push({ key: 'maint', title: 'Papers or services overdue', tone: 'red', n: od.length, hint: od.slice(0, 2).map(function (i) { return i.car.plate + ' ' + i.title.toLowerCase() + (byKm(i) ? ' (over by km)' : ''); }).join(', '), more: '#maintenance', moreLabel: 'Open Maintenance',
+      rows: od.map(function (i) { return '<a class="card2" href="#car/' + i.car.id + '"><div class="c2-main"><div class="c2-t1">' + esc(i.car.plate) + ' · ' + esc(i.title) + '</div><div class="c2-t2">' + esc(i.words || '') + '</div></div><div class="c2-end">' + chip(byKm(i) ? 'Over by km' : 'Overdue', 'red') + '</div></a>'; }) });
   }
   if (typeof INSTALMENTS_DUE_SOON === 'function') {
     var ins = INSTALMENTS_DUE_SOON();
-    if (ins.length) out.push({ key: 'inst', title: 'Instalments due', tone: ins.some(function (r) { return r.overdueDays > 0; }) ? 'red' : 'amber', n: ins.length, hint: 'Within 3 days', more: '#instalments', moreLabel: 'Open Instalments',
+    var insOver = ins.filter(function (r) { return r.overdueDays > 0; }), insSoon = ins.length - insOver.length;
+    var insHint = [insOver.length ? insOver.length + ' overdue, oldest ' + Math.max.apply(null, insOver.map(function (r) { return r.overdueDays; })) + ' days' : '', insSoon ? insSoon + ' due within 3 days' : ''].filter(Boolean).join(' · ');
+    if (ins.length) out.push({ key: 'inst', title: 'Instalments due', tone: insOver.length ? 'red' : 'amber', n: ins.length, hint: insHint, more: '#instalments', moreLabel: 'Open Instalments',
       rows: ins.map(function (r) { return '<a class="card2" href="#instalments"><div class="c2-main"><div class="c2-t1">' + esc(r.plate || '') + '</div><div class="c2-t2">' + esc(r.text || dFull(r.due)) + '</div></div><div class="c2-end">' + rm(r.amt) + '</div></a>'; }) });
   }
   return out;
@@ -90,15 +93,18 @@ function hmNeedsOpen(key) {
 }
 
 /* the next handover still to do: mine first for field staff, then anyone's, up to 2 days ahead */
+function hmField() { return !!(me().isAgent || me().role === 'agent'); }
 function hmNextHandover() {
-  var now = Date.now(), ev = [];
+  var now = Date.now(), ev = [], field = hmField(), mineOf = function (b) { return typeof myJob === 'function' && myJob(b); };
   S.bookings.forEach(function (b) {
-    if (UPCOMING.indexOf(b.bookingStatus) >= 0 && b.bookingStatus !== 'Pending') { var t = new Date(b.start).getTime(); if (t > now - 6 * HOUR && t < now + 2 * DAY) ev.push({ b: b, at: t, type: 'out' }); }
-    if (b.bookingStatus === 'Car Delivered') { var e = new Date(b.end).getTime(); if (e > now - 6 * HOUR && e < now + 2 * DAY) ev.push({ b: b, at: e, type: 'in' }); }
+    /* someone's own overdue job stays their next handover however late it is; for everyone else, up to 6 hours back */
+    var own = field && mineOf(b), from = own ? -Infinity : now - 6 * HOUR;
+    if (UPCOMING.indexOf(b.bookingStatus) >= 0 && b.bookingStatus !== 'Pending') { var t = new Date(b.start).getTime(); if (t > from && t < now + 2 * DAY) ev.push({ b: b, at: t, type: 'out' }); }
+    if (b.bookingStatus === 'Car Delivered') { var e = new Date(b.end).getTime(); if (e > from && e < now + 2 * DAY) ev.push({ b: b, at: e, type: 'in' }); }
   });
-  ev.sort(function (a, b) { return a.at - b.at; });
-  var mine = typeof myJob === 'function' ? ev.filter(function (x) { return myJob(x.b); }) : [];
-  return (me().isAgent || me().role === 'agent') && mine.length ? { e: mine[0], mine: true } : ev.length ? { e: ev[0], mine: typeof myJob === 'function' && myJob(ev[0].b) } : null;
+  ev.sort(function (a, b) { return a.at - b.at; }); /* overdue (earlier) first */
+  var mine = ev.filter(function (x) { return mineOf(x.b); });
+  return field && mine.length ? { e: mine[0], mine: true } : ev.length ? { e: ev[0], mine: mineOf(ev[0].b) } : null;
 }
 function hmCountdown(t) {
   var m = Math.round((t - Date.now()) / MIN), late = m < 0; m = Math.abs(m);
@@ -109,7 +115,9 @@ function hmCountdown(t) {
 function hmStartHandover(id, dir) { if (typeof Handover !== 'undefined' && Handover.start) Handover.start(id, dir); else location.hash = '#booking/' + id; }
 
 VIEWS.home = function () {
-  var now = new Date(), today = handovers(now), b = B(), money = can('bookings.see_revenue') || can('billing.view');
+  var now = new Date(), field = hmField() && typeof myJob === 'function', b = B(), money = can('bookings.see_revenue') || can('billing.view');
+  /* field staff see their own jobs on Home; the full day is one tap away on Schedule */
+  var today = handovers(now).filter(function (h) { return !field || myJob(h.b); });
   if (!HOME.updated) HOME.updated = now.toISOString();
   var outs = today.filter(function (h) { return h.type === 'out'; }), ins = today.filter(function (h) { return h.type === 'in'; });
   var onRoad = S.bookings.filter(function (x) { return x.bookingStatus === 'Car Delivered'; }).length;
@@ -160,7 +168,7 @@ VIEWS.home = function () {
       '<div class="hm-next-when"><span class="hm-cd" data-at="' + e.at + '">' + esc(hmCountdown(e.at)) + '</span><small>' + esc((e.type === 'out' ? 'Pick-up ' : 'Return ') + when(e.at)) + '</small></div>' +
       '<div class="hm-next-who"><b>' + esc(cust(eb.cust).name) + '</b><span>' + esc((ec.plate || '') + ' · ' + (ec.make || '') + ' ' + (ec.model || '')) + '</span><span>' + I('pin') + esc(placeText(eb, e.type === 'out' ? 'pick' : 'ret')) + '</span></div></a>' +
       '<div class="hm-next-act">' + (nx.mine ? chip('Your job', 'blue') : '') + (money && eb.paymentStatus ? payChip(eb) : '') + '<span class="grow"></span>' +
-      (canStart ? '<button type="button" class="btn sm" onclick="hmStartHandover(\'' + eb.id + '\',\'' + e.type + '\')">' + I(e.type === 'out' ? 'key' : 'in') + 'Start handover</button>' : '') + '</div></div>';
+      (canStart ? '<button type="button" class="btn sm" onclick="hmStartHandover(\'' + eb.id + '\',\'' + e.type + '\')">' + I(e.type === 'out' ? 'key' : 'in') + (typeof hoDraftGet === 'function' && hoDraftGet(eb.id, e.type) ? 'Resume' : e.type === 'out' ? 'Hand over' : 'Take back') + '</button>' : '') + '</div></div>';
   }
 
   /* tiles */
@@ -172,13 +180,13 @@ VIEWS.home = function () {
       : '<a class="tile" href="#bookings/upcoming"><div class="k">' + I('list') + 'Upcoming</div><div class="v num">' + S.bookings.filter(function (x) { return UPCOMING.indexOf(x.bookingStatus) >= 0 && new Date(x.start) > now; }).length + '</div></a>') + '</div>';
 
   /* today board */
-  var board = '<div class="sec"><h2>Today</h2><a href="#schedule">All</a></div>' +
-    (today.length ? '<div class="list">' + today.map(hoRow).join('') + '</div>' : '<div class="list"><div class="empty">No pick-ups or returns today. Tomorrow has ' + handovers(new Date(now.getTime() + DAY)).length + '.</div></div>');
+  var board = '<div class="sec"><h2>' + (field ? 'My jobs today' : 'Today') + '</h2><a href="#schedule">' + (field ? 'Everyone' : 'All') + '</a></div>' +
+    (today.length ? '<div class="list">' + today.map(hoRow).join('') + '</div>' : '<div class="list"><div class="empty">No pick-ups or returns ' + (field ? 'for you ' : '') + 'today. Tomorrow has ' + handovers(new Date(now.getTime() + DAY)).filter(function (h) { return !field || myJob(h.b); }).length + '.</div></div>');
 
   var html = topbar(b.short, { sub: WD[now.getDay()] + ', ' + now.getDate() + ' ' + MO[now.getMonth()] }) + '<main class="hm-main"><div class="hm-ptr" id="hmPtr">' + I('reset', 2.2) + '<span>Pull to refresh</span></div>' + installBanner() +
-    '<div class="hm-hello"><div class="hm-hi">' + hi + ', ' + esc(firstName(myName())) + '</div><div class="muted small">' + (todo.length ? todo.length + ' handover' + (todo.length > 1 ? 's' : '') + ' still to do today' : 'All handovers done for today') + ' · Updated ' + hm(HOME.updated) + '</div></div>' +
+    '<div class="hm-hello"><div class="hm-hi">' + hi + ', ' + esc(firstName(myName())) + '</div><div class="muted small">' + (todo.length ? todo.length + (field ? ' of your' : '') + ' handover' + (todo.length > 1 ? 's' : '') + ' still to do today' : field ? 'All your handovers done for today' : 'All handovers done for today') + ' · Updated ' + hm(HOME.updated) + '</div></div>' +
     needs + (quick ? '<div class="sec"><h2>Quick actions</h2></div>' + quick : '') + (drafts ? '<div class="hm-drafts">' + drafts + '</div>' : '') + next + '<div class="sec"><h2>At a glance</h2></div>' + tiles + board +
-    '<div class="sec"><h2>Latest</h2><a href="#inbox">All</a></div><div class="list">' + (S.notifs.slice(0, 3).map(notifRow).join('') || '<div class="empty">No news yet</div>') + '</div>' +
+    '<div class="sec"><h2>Latest</h2><a href="#inbox">All</a></div><div class="list">' + (myNotifs().slice(0, 3).map(notifRow).join('') || '<div class="empty">No news yet</div>') + '</div>' +
     '<p class="demo-note">Demo with made-up data · saved on this phone only</p></main>';
   return { html: html, after: function () {
     $$('[data-need]').forEach(function (el) { el.onclick = function () { hmNeedsOpen(el.dataset.need); }; });

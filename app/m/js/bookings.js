@@ -20,8 +20,11 @@ function bkWhen(d) { return dLong(d) + ' ' + hm(d); }
 function bkWhenNw(d) { return '<span class="nowrap">' + dLong(d) + '</span> <span class="nowrap">' + hm(d) + '</span>'; }
 var BK_CHIPS = [
   ['upcoming', 'Upcoming'], ['out', 'Going out today'], ['back', 'Coming back today'], ['road', 'Out now'], ['late', 'Late'],
-  ['unpaid', 'Money due'], ['unsigned', 'Agreement not signed'], ['done', 'Returned'], ['all', 'All'], ['cancelled', 'Cancelled']
+  ['unpaid', 'Money due'], ['unsigned', 'Sent, not signed'], ['notsent', 'Form not sent'], ['done', 'Returned'], ['all', 'All'], ['cancelled', 'Cancelled']
 ];
+/* lists that Home's 'Needs you' opens: same rule, same count. Shown as a chip only while open. */
+var BK_EXTRA = { notback: 'Cars not back', missed: 'Missed pick-ups', depositdue: 'Deposit not received', collect: 'Balance to collect' };
+function bkLive(b) { return b.bookingStatus !== 'Cancelled' && b.bookingStatus !== 'Completed'; }
 var BK_TESTS = {
   upcoming: function (b) { return UPCOMING.indexOf(b.bookingStatus) >= 0; },
   out: function (b) { return UPCOMING.indexOf(b.bookingStatus) >= 0 && sameDay(b.start, new Date()); },
@@ -29,7 +32,17 @@ var BK_TESTS = {
   road: function (b) { return b.bookingStatus === 'Car Delivered'; },
   late: function (b) { return isLate(b) || isMissedPickup(b); },
   unpaid: function (b) { return b.bookingStatus !== 'Cancelled' && calcBooking(b).due > 0; },
-  unsigned: function (b) { return EARLY.indexOf(b.bookingStatus) >= 0 && !b.submitted; },
+  unsigned: function (b) { return b.bookingStatus === 'Agreement Sent' && new Date(b.end).getTime() >= Date.now(); },
+  notsent: function (b) { return (b.bookingStatus === 'Pending' || b.bookingStatus === 'Confirmed') && !b.submitted && new Date(b.end).getTime() >= Date.now(); },
+  notback: function (b) { return isLate(b); },
+  missed: function (b) { return (b.bookingStatus === 'Confirmed' || b.bookingStatus === 'Agreement Signed') && new Date(b.start).getTime() < Date.now(); },
+  depositdue: function (b) {
+    var now = Date.now(), m;
+    if (['Confirmed', 'Agreement Sent', 'Agreement Signed', 'Car Delivered'].indexOf(b.bookingStatus) < 0 || new Date(b.start).getTime() > now + 2 * DAY || new Date(b.end).getTime() < now) return false;
+    if (b.paymentStatus && b.paymentStatus !== 'Deposit Due') return false;
+    m = calcBooking(b); return m.deposit > 0 && m.depositReceived + 0.99 < m.deposit;
+  },
+  collect: function (b) { return bkLive(b) && new Date(b.start).getTime() < Date.now() + 2 * DAY && calcBooking(b).due > 0.99; },
   done: function (b) { return b.bookingStatus === 'Car Returned' || b.bookingStatus === 'Completed'; },
   cancelled: function (b) { return b.bookingStatus === 'Cancelled'; },
   all: function () { return true; }
@@ -51,7 +64,7 @@ VIEWS.bookings = function (r) {
   var f = BK_TESTS[r.a] ? r.a : 'upcoming';
   var nUp = S.bookings.filter(BK_TESTS.upcoming).length, nRoad = S.bookings.filter(BK_TESTS.road).length;
   var html = topbar('Bookings', { sub: nUp + ' upcoming · ' + nRoad + ' on the road' }) + '<main class="bkpage">' +
-    '<div class="bk-tools"><label class="search bk-search">' + I('search') + '<input id="bkq" type="search" placeholder="Name, phone, plate or booking no." value="' + esc(bkSearch) + '" autocomplete="off" enterkeyhint="search">' +
+    '<div class="bk-tools"><label class="search bk-search">' + I('search') + '<input id="bkq" type="search" placeholder="Name, phone, plate, no." value="' + esc(bkSearch) + '" autocomplete="off" enterkeyhint="search">' +
     '<button type="button" class="bk-clear" id="bkclear" aria-label="Clear search"' + (bkSearch ? '' : ' hidden') + '>' + I('x', 2.2) + '</button></label>' +
     '<button type="button" class="bk-fbtn' + (bkFilterCount() ? ' on' : '') + '" id="bkfbtn" onclick="bkFilterSheet()">' + I('filter') + '<span>Filters</span>' + (bkFilterCount() ? '<b class="bk-badge">' + bkFilterCount() + '</b>' : '') + '</button></div>' +
     '<div class="bk-quick"><a href="#availability">' + I('car') + 'Free cars</a><a href="#calendar">' + I('cal') + 'Calendar</a></div>' +
@@ -80,7 +93,8 @@ function bkMaybeOpen(enter) {
 }
 function bkDraw(f) {
   var base = bkBase();
-  $('#bkchips').innerHTML = BK_CHIPS.map(function (l) {
+  var chipsNow = BK_EXTRA[f] ? [[f, BK_EXTRA[f]]].concat(BK_CHIPS) : BK_CHIPS;
+  $('#bkchips').innerHTML = chipsNow.map(function (l) {
     var n = base.filter(BK_TESTS[l[0]]).length;
     return '<a class="fchip ' + (f === l[0] ? 'on' : '') + '" href="#bookings/' + l[0] + '" onclick="bkGo(event,\'' + l[0] + '\')">' + l[1] + ' <span class="n">' + n + '</span></a>';
   }).join('');
@@ -89,7 +103,7 @@ function bkDraw(f) {
   $('#bkfon').innerHTML = nf ? '<div class="bk-fon">' + nf + ' filter' + (nf > 1 ? 's' : '') + ' on · <button type="button" onclick="bkClearFilters()">Clear</button></div>' : '';
   var list = base.filter(BK_TESTS[f]);
   var newest = f === 'done' || f === 'all' || f === 'cancelled';
-  list.sort(function (a, b) { return newest ? new Date(b.start) - new Date(a.start) : f === 'back' || f === 'road' || f === 'late' ? new Date(a.end) - new Date(b.end) : new Date(a.start) - new Date(b.start); });
+  list.sort(function (a, b) { return newest ? new Date(b.start) - new Date(a.start) : f === 'back' || f === 'road' || f === 'late' || f === 'notback' ? new Date(a.end) - new Date(b.end) : new Date(a.start) - new Date(b.start); });
   $('#bklist').innerHTML = bkList(list, f);
 }
 /* chip taps replace the hash: the chips are a view setting, not a Back step */
@@ -162,12 +176,7 @@ function bkNextStep(b) {
   if (st === 'Car Returned') return { label: 'Complete', icon: 'check', on: 'completeBk(' + id + ')', hint: b.paymentStatus === 'Refund Pending' ? 'The deposit is still waiting to be returned' : 'Closes the booking' };
   return null;
 }
-function bkRepeat(b) {
-  var past = S.bookings.filter(function (x) { return x.cust === b.cust && x.id !== b.id && (x.bookingStatus === 'Completed' || x.bookingStatus === 'Car Returned') && new Date(x.end) < new Date(b.start); });
-  if (!past.length) return '';
-  var lastEnd = past.reduce(function (m, x) { return new Date(x.end) > m ? new Date(x.end) : m; }, new Date(0));
-  return 'Repeat customer: ' + past.length + ' rental' + (past.length > 1 ? 's' : '') + ', last on ' + dShort(lastEnd);
-}
+function bkRepeat(b) { return repeatText(b.cust, b.id); }
 function bkCustBanner(b, cu) {
   var notes = (S.notes || []).filter(function (n) { return n.cust === cu.id; }).sort(function (a, z) { return (z.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || new Date(z.at) - new Date(a.at); });
   var lines = function (flag) { return notes.filter(function (n) { return n.flag === flag; }).slice(0, 2).map(function (n) { return n.text; }); };
@@ -197,10 +206,20 @@ function bkMoneyCard(b, p) {
     p.overpaid ? '<b>Paid in full, ' + rm(p.overpaid) + ' extra</b>' : p.settled || p.payable <= 0 ? '<b>Paid in full</b>' : '<span>Still due <b class="money">' + rm(p.due) + '</b></span>';
   return '<div class="list bk-money-card">' + line('Rent · ' + esc(p.duration), p.rent) +
     (p.coverTotal ? line(esc(b.cover.name) + ' · ' + p.coverDays + ' day' + (p.coverDays > 1 ? 's' : ''), p.coverTotal) : line('Damage cover', 0, false, 'faint')) +
-    (p.delivery ? line('Delivery', p.delivery) : '') + (p['return'] ? line('Return', p['return']) : '') + (p.others ? line('Others', p.others) : '') + (p.discount ? line('Discount', p.discount, true) : '') +
+    (p.delivery ? line('Delivery', p.delivery) : '') + (p['return'] ? line('Return', p['return']) : '') + (function () { var oc = Math.min(+b.overCharge || 0, p.others); return (p.others - oc > 0.004 ? line('Others', p.others - oc) : '') + (oc > 0.004 ? line('Kept over the deposit', oc) : ''); })() + (p.discount ? line('Discount', p.discount, true) : '') +
     line('Deposit (refundable)', p.deposit) + '<div class="sumline big"><span>Total payable</span><span class="money">' + rm(p.payable) + '</span></div>' +
-    line('Received', p.received, false, 'muted') + (p.extra ? line('Other payments (extension, extras)', p.extra, false, 'muted') : '') +
+    line('Received', p.received, false, 'muted') + (p.extra ? line('Other payments (extension, extras)', p.extra, false, 'muted') : '') + bkDepositLeftLine(b, p) +
     '<div class="bk-bar tone-' + p.tone + '" role="status">' + status + '</div></div>';
+}
+/* 'Deposit left RM 8.00 (RM 492.00 used for payments)' once part of the deposit received is used, kept or returned */
+function bkDepositLeftLine(b, p) {
+  if (!(p.depositReceived > 0) || b.bookingStatus === 'Cancelled' || !window.Pay || !Pay.depositLeft) return '';
+  var left = Pay.depositLeft(b); if (left >= p.depositReceived - 0.004) return '';
+  var ds = (S.deductions || []).filter(function (d) { return d.booking === b.id; }), sum = function (l) { return l.reduce(function (s, d) { return s + (+d.amt || 0); }, 0); };
+  var used = sum(ds.filter(function (d) { return d.kind === 'Used for a payment'; })), kept = sum(ds.filter(function (d) { return d.kind !== 'Used for a payment'; }));
+  var back = (S.refunds || []).filter(function (r) { return r.booking === b.id && !r.voided; }).reduce(function (s, r) { return s + (+r.amt || 0); }, 0);
+  var why = [used ? rm(used) + ' used for payments' : '', kept ? rm(kept) + ' kept' : '', back ? rm(back) + ' returned' : ''].filter(Boolean).join(', ');
+  return '<div class="sumline bk-depleft"><span>Deposit left' + (why ? '<small>' + esc(why) + '</small>' : '') + '</span><span class="money">' + rm(left) + '</span></div>';
 }
 function bkDocRow(b, kind, cu) {
   var url, title, sub, icon, ok = true;
@@ -215,7 +234,7 @@ function bkDocRow(b, kind, cu) {
     '<button class="iconbtn" aria-label="Copy link" onclick="bkShare(' + a + ',\'copy\')"' + dis + '>' + I('copy') + '</button></div></div>';
 }
 function bkShareText(b, kind) {
-  var cu = cust(b.cust), c = car(b.car) || {}, hi = 'Hi ' + firstName(cu.name) + ', ', co = B().name;
+  var cu = cust(b.cust), c = car(b.car) || {}, hi = 'Hi ' + callName(cu.name) + ', ', co = B().name;
   if (kind === 'form') return hi + 'here is your booking form for ' + b.code + ' with ' + co + ' (' + c.plate + ', ' + dShort(b.start) + ' to ' + dShort(b.end) + '). Please fill it in and sign: ' + Links.form(b);
   if (kind === 'pdf') return hi + 'here is your signed rental agreement for ' + b.code + ' with ' + co + ': ' + Links.pdf(b);
   if (kind === 'agent') return 'Inspection for ' + b.code + ' (' + c.plate + ', ' + cu.name + ', ' + when(b.start) + '). Take the photos here: ' + Links.agent(b);
@@ -227,23 +246,27 @@ function bkShareTo(b, kind) {
 }
 function bkShare(id, kind, how) {
   var b = bk(id), text = bkShareText(b, kind), url = { form: Links.form, pdf: Links.pdf, agent: Links.agent, customer: Links.customer }[kind](b);
+  if (kind === 'form') { bkFormSent(b, how); if (how === 'wa') Share.wa(bkShareTo(b, kind), text); else if (how === 'share') Share.native({ title: b.code, text: text.replace(url, '').trim(), url: url }); else Share.copy(url, 'Link copied'); return; }
   if (how === 'wa') { Share.wa(bkShareTo(b, kind), text); bLog(b, { form: 'Customer form', pdf: 'Agreement PDF', agent: 'Agent inspection link', customer: 'Customer inspection link' }[kind] + ' sent on WhatsApp'); save(); say('WhatsApp opened with the message'); return; }
   if (how === 'share') { Share.native({ title: b.code, text: text.replace(url, '').trim(), url: url }); return; }
   Share.copy(url, 'Link copied');
 }
-function bkSendAgreement(id) {
-  var b = bk(id);
-  if (b.bookingStatus === 'Pending' || b.bookingStatus === 'Confirmed') setBookingStatus(b, 'Agreement Sent', { text: 'Agreement sent to the customer' });
-  render(false, true); bkShareSheet(id, 'form');
+/* the form really left the phone: only now does the booking move to Agreement Sent */
+function bkFormSent(b, how) {
+  markFormSent(b, { wa: 'on WhatsApp', share: 'by share', copy: '(link copied)' }[how] || '');
+  if (route().name === 'booking' || route().name === 'bookings') render(false, true);
 }
+/* opens the send sheet; the status changes only when the form is sent, shared or its link copied */
+function bkSendAgreement(id) { bkShareSheet(id, 'form'); }
 function bkShareSheet(id, kind) {
   var b = bk(id), cu = cust(b.cust);
   sheet(sheetHead(kind === 'form' ? 'Send the booking form' : 'Send', cu.name + ' · ' + cu.phone) +
     '<label class="field"><span>Message</span><textarea class="inp bk-msg" id="bkmsg">' + esc(bkShareText(b, kind)) + '</textarea></label>' +
     '<div class="sheet-foot stack"><button class="btn" id="bkwa">' + I('wa') + 'Send on WhatsApp</button><div class="btnrow"><button class="btn ghost" id="bksh">' + I('share') + 'Share</button><button class="btn ghost" id="bkcp">' + I('copy') + 'Copy link</button></div></div>', function (sh) {
-      $('#bkwa', sh).onclick = function () { Share.wa(cu.phone, $('#bkmsg').value); bLog(b, 'Booking form sent on WhatsApp'); save(); closeSheet(); say('WhatsApp opened with the message'); };
-      $('#bksh', sh).onclick = function () { Share.native({ title: b.code, text: $('#bkmsg').value }); };
-      $('#bkcp', sh).onclick = function () { Share.copy(Links.form(b), 'Link copied'); };
+      var sent = function (how) { if (kind === 'form') bkFormSent(b, how); };
+      $('#bkwa', sh).onclick = function () { var t = $('#bkmsg').value; Share.wa(cu.phone, t); closeSheet(); if (kind === 'form') sent('wa'); else { bLog(b, 'Message sent on WhatsApp'); save(); } say('WhatsApp opened with the message'); };
+      $('#bksh', sh).onclick = function () { var t = $('#bkmsg').value; Share.native({ title: b.code, text: t }); sent('share'); };
+      $('#bkcp', sh).onclick = function () { Share.copy(Links.form(b), 'Link copied'); sent('copy'); };
     });
 }
 function bkMarkSigned(id) {
@@ -255,7 +278,20 @@ function bkMarkSigned(id) {
     notify('change', b.code + ' is signed', '', '#booking/' + id, { self: true }); render(false, true);
   });
 }
-function completeBk(id) { var b = bk(id); setBookingStatus(b, 'Completed', { text: 'Booking completed' }); notify('change', b.code + ' completed', '', '#booking/' + id, { self: true }); render(false, true); }
+function completeBk(id) {
+  var b = bk(id), m = calcBooking(b), open = [];
+  if (m.due > 0.99) open.push(rm(m.due) + ' still due');
+  if (b.paymentStatus === 'Refund Pending') open.push(m.depositReceived > 0 ? 'deposit of ' + rm(m.depositReceived) + ' not returned' : 'deposit not closed');
+  var go = function () {
+    var prev = b.bookingStatus, prevPay = b.paymentStatus || null;
+    setBookingStatus(b, 'Completed', { text: 'Booking completed' + (open.length ? ' with ' + open.join(', ') : '') });
+    render(false, true);
+    undoSnack(b.code + ' completed', function () { b.bookingStatus = prev; b.paymentStatus = prevPay; bLog(b, 'Complete undone, back to ' + prev, { bookingStatus: ['Completed', prev] }); save(); render(false, true); say('Booking is back to ' + prev); });
+  };
+  if (!open.length) { go(); return; }
+  var t = open.join(', '); t = t.charAt(0).toUpperCase() + t.slice(1);
+  confirm({ icon: 'warn', title: 'Complete ' + b.code + '?', text: t + '. Complete anyway?', ok: 'Complete anyway', cancel: 'Go back', primary: 'cancel' }).then(function (y) { if (y) go(); });
+}
 
 function bkThumb(src, label) { return src ? '<button type="button" class="thumb bk-thumb" onclick="bkZoom(this)" data-label="' + esc(label) + '"><img src="' + esc(imgSrc(src)) + '" alt="' + esc(label) + '"><span>' + esc(label) + '</span></button>' : ''; }
 function bkZoom(el) {
@@ -334,7 +370,7 @@ VIEWS.booking = function (r) {
     '<button class="act" onclick="Docs.open(\'' + b.id + '\')">' + I('receipt') + 'Invoice</button></div>' +
     '<div class="sec"><h2>Money</h2>' + dueTag + '</div>' + bkMoneyCard(b, p) + moneyBtns + bkDepositChip(b) +
     (pays.length && seeAmt ? '<div class="sec"><h2>Payments</h2><span class="small muted">Tap one to see or void it</span></div><div class="list">' + pays.map(function (x) {
-      return '<button class="card2' + (x.voided ? ' muted' : '') + '" onclick="Pay.open(\'' + b.id + '\',{voidId:\'' + x.id + '\'})"><div class="c2-main"><div class="c2-t1">' + esc((x.items || []).map(function (i) { return i.kind; }).join(', ')) + (x.voided ? ' · voided' : '') + '</div><div class="c2-t2">' + dShort(x.at) + ', ' + hm(x.at) + ' · ' + esc(String(x.method || '').replace('Online Transfer', 'Transfer')) + (x.cashTo ? ' to ' + esc(firstName(who(x.cashTo))) : '') + '</div></div><div class="c2-end money"' + (x.voided ? ' style="text-decoration:line-through"' : '') + '>' + rm(payTotal(x)) + '</div></button>';
+      return '<button class="card2' + (x.voided ? ' muted' : '') + '" onclick="Pay.open(\'' + b.id + '\',{voidId:\'' + x.id + '\'})"><div class="c2-main"><div class="c2-t1">' + esc((x.items || []).map(function (i) { return i.kind; }).join(', ')) + (x.voided ? ' · voided' : '') + '</div><div class="c2-t2">' + dShort(x.at) + ', ' + hm(x.at) + ' · ' + esc(methodText(x.method)) + (x.cashTo ? ' to ' + esc(firstName(who(x.cashTo))) : '') + '</div></div><div class="c2-end money"' + (x.voided ? ' style="text-decoration:line-through"' : '') + '>' + rm(payTotal(x)) + '</div></button>';
     }).join('') + '</div>' : '') +
     '<div class="sec"><h2>Customer</h2></div>' + bkCustCard(b, cu) +
     '<div class="sec" id="bkdocs"><h2>Documents</h2><span class="small ' + (b.submitted ? 'tone-green-text' : 'muted') + '">' + (b.submitted ? 'Form signed on ' + dShort(b.submittedAt || b.created) : 'Form not signed yet') + '</span></div><div class="list">' +
@@ -394,6 +430,8 @@ function editBk(id) {
   var carLine = function () { var c = car(d.car); return '<span class="pk-car">' + carSVG(c.color, c.shape) + '</span><span class="grow"><span class="pk-plate">' + esc(c.plate) + '</span><span class="pk-sub">' + esc(c.make + ' ' + c.model) + ' · <span class="money">' + rm(c.rate) + '</span> / day</span></span><span class="btn sm ghost">Change</span>'; };
   var amt = function (k, label) { return '<label class="field"><span>' + label + '</span><div class="rmfield"><input class="inp num" inputmode="decimal" data-rate="' + k + '" value="' + money2(d.rates[k]) + '"></div></label>'; };
   var pk = (B().packages || []);
+  /* a custom cover (or a package that is no longer offered) stays as it is unless staff pick something else */
+  var ownCover = !!(b.cover && (!b.cover.packageId || !pkg(b.cover.packageId)));
   var started = st === 'Car Delivered';
   sheet(sheetHead('Change booking', b.code + '. Changes are saved in the history.') +
     '<div class="bk-ext"><span class="small muted">Quick</span><button type="button" class="fchip" data-ext="1">Extend 1 day</button><button type="button" class="fchip" data-ext="2">Extend 2 days</button></div>' +
@@ -405,23 +443,25 @@ function editBk(id) {
     '<label class="field" id="e_ppn_w"' + (b.pickKind === 'client' ? '' : ' hidden') + '><span>Delivery address</span><input class="inp" id="e_ppn" value="' + esc(b.pickNote) + '" placeholder="Address or landmark"></label>' +
     '<label class="field"><span>Return</span>' + placeSelect('e_rp', 'ret', b.retKind, b.retLoc) + '</label>' +
     '<label class="field" id="e_rpn_w"' + (b.retKind === 'client' ? '' : ' hidden') + '><span>Collection address</span><input class="inp" id="e_rpn" value="' + esc(b.retNote) + '" placeholder="Address or landmark"></label>' +
-    '<label class="field"><span>Damage cover</span><select class="inp" id="e_cov"><option value="">No cover</option>' + pk.map(function (x) { return '<option value="' + x.id + '"' + (d.cover && d.cover.packageId === x.id ? ' selected' : '') + '>' + esc(x.name) + ' (' + rm(x.daily) + ' a day)</option>'; }).join('') + '</select></label>' +
+    '<label class="field"><span>Damage cover</span><select class="inp" id="e_cov"><option value="">No cover</option>' + (ownCover ? '<option value="custom" selected>' + esc(b.cover.name || 'Custom cover') + ' (' + rm(b.cover.daily) + ' a day)</option>' : '') + pk.map(function (x) { return '<option value="' + x.id + '"' + (!ownCover && d.cover && d.cover.packageId === x.id ? ' selected' : '') + '>' + esc(x.name) + ' (' + rm(x.daily) + ' a day)</option>'; }).join('') + '</select></label>' +
     (canAmt ? '<div class="bk-amts"><div class="two even">' + amt('daily', 'Daily rate') + amt('hourly', 'Hourly rate') + '</div><div class="two even">' + amt('deposit', 'Deposit') + amt('discount', 'Discount') + '</div><div class="two even">' + amt('delivery', 'Delivery') + amt('return', 'Return') + '</div>' + amt('others', 'Others') + '</div>' :
       seeAmt ? '<div class="card bk-locked">' + I('lock') + '<div class="grow small">Rates: <b class="money">' + rm(d.rates.daily) + '</b> a day, <b class="money">' + rm(d.rates.hourly) + '</b> an hour, deposit <b class="money">' + rm(d.rates.deposit) + '</b>' + (d.rates.discount ? ', discount <b class="money">' + rm(d.rates.discount) + '</b>' : '') + '<br><span class="muted">Ask the owner to change amounts</span></div></div>' : '') +
     '<label class="field"><span>Note for staff</span><textarea class="inp" id="e_note">' + esc(b.note) + '</textarea></label>' +
     '<div class="sheet-foot"><div id="e_prev" class="bk-prev"></div><button class="btn" id="e_save">Save changes</button></div>', function (sh) {
       var get = function () {
         var s = started ? new Date(b.start) : fromInputs($('#es_d').value, $('#es_t').value), e = fromInputs($('#ee_d').value, $('#ee_t').value);
-        var pp = parsePlace($('#e_pp').value), rp = parsePlace($('#e_rp').value), cov = pkg($('#e_cov').value);
-        return { s: s, e: e, pp: pp, rp: rp, cover: cov ? { packageId: cov.id, name: cov.name, daily: cov.daily, max: cov.max } : null };
+        var pp = parsePlace($('#e_pp').value), rp = parsePlace($('#e_rp').value), cv = $('#e_cov').value, cov = pkg(cv);
+        return { s: s, e: e, pp: pp, rp: rp, cover: cv === 'custom' ? b.cover : cov ? { packageId: cov.id, name: cov.name, daily: cov.daily, max: cov.max } : null };
       };
       var preview = function () {
         var v = get(), t = Object.assign({}, b, { start: v.s.toISOString(), end: v.e.toISOString(), rates: d.rates, cover: v.cover });
         var bad = !(v.e > v.s), bz = bad ? null : busy(d.car, v.s, v.e, b.id);
-        $('#e_bz').innerHTML = bad ? '<div class="banner red">' + I('warn') + '<div>Return must be after pick-up</div></div>' : !bz.free ? '<div class="banner red">' + I('warn') + '<div><b>' + esc(car(d.car).plate) + ' is not free:</b> ' + esc(bz.reason) + '. Pick other dates or another car.</div></div>' : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '';
+        $('#e_bz').innerHTML = bad ? '<div class="banner red">' + I('warn') + '<div>Return must be after pick-up</div></div>' : !bz.free ? '<div class="banner red">' + I('warn') + '<div><b>' + esc(car(d.car).plate) + ' is not free:</b> ' + esc(bz.reason) + '. ' + (bz.booking && started ? 'The car is out, so move ' + esc(bz.booking.code) + ' to another car first.' : 'Pick other dates or another car.') +
+          (bz.booking && can('bookings.edit') ? '<button type="button" class="btn sm ghost bk-openclash" data-open="' + bz.booking.id + '">Open ' + esc(bz.booking.code) + ' to give it another car</button>' : '') + '</div></div>' : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '';
         var was = calcBooking(b).payable, now = calcBooking(t).payable, diff = now - was;
         $('#e_prev').innerHTML = bad ? '' : seeAmt ? 'New total <b class="money">' + rm(now) + '</b> <span class="muted">(was ' + rm(was) + (Math.abs(diff) >= 0.01 ? ', ' + (diff > 0 ? '+' : '') + rm(diff) : ', no change') + ')</span> · ' + esc(durationText(v.s, v.e)) : esc(durationText(v.s, v.e));
         $('#e_save').disabled = bad || !bz.free;
+        var oc = $('.bk-openclash', sh); if (oc) oc.onclick = function () { var to = oc.dataset.open; closeAllSheets(); location.hash = '#booking/' + to; setTimeout(function () { if (route().a === to) editBk(to); }, 120); };
       };
       $('#es_t', sh).addEventListener('change', function () { if ($('#ee_d').value) $('#ee_t').value = $('#es_t').value; preview(); });
       $('#ee_d', sh).addEventListener('change', function () { if (!started) $('#ee_t').value = $('#es_t').value; preview(); });
@@ -454,7 +494,7 @@ function bkSaveEdit(id, v, d) {
   var pn = v.pp.kind === 'client' ? $('#e_ppn').value.trim() : '', rn = v.rp.kind === 'client' ? $('#e_rpn').value.trim() : '';
   if (v.pp.kind !== b.pickKind || v.pp.id !== (b.pickLoc || null) && v.pp.kind !== 'client' || pn !== (b.pickNote || '')) { set('pickKind', v.pp.kind); set('pickLoc', v.pp.id); set('pickNote', pn); ch.push('pick-up to ' + placeText(b, 'pick')); }
   if (v.rp.kind !== b.retKind || v.rp.id !== (b.retLoc || null) && v.rp.kind !== 'client' || rn !== (b.retNote || '')) { set('retKind', v.rp.kind); set('retLoc', v.rp.id); set('retNote', rn); ch.push('return to ' + placeText(b, 'ret')); }
-  if ((v.cover ? v.cover.packageId : '') !== (b.cover ? b.cover.packageId : '')) set('cover', v.cover, v.cover ? 'cover to ' + v.cover.name : 'cover removed');
+  if (JSON.stringify(v.cover || null) !== JSON.stringify(b.cover || null)) set('cover', v.cover, v.cover ? 'cover to ' + v.cover.name : 'cover removed');
   var r0 = b.rates || {}, rch = Object.keys(d.rates).filter(function (k) { return +(r0[k] || 0) !== +(d.rates[k] || 0); });
   if (rch.length) { set('rates', Object.assign({}, d.rates)); var RL = { daily: 'daily rate', hourly: 'hourly rate', deposit: 'deposit', discount: 'discount', delivery: 'delivery', 'return': 'return charge', others: 'others' };
     ch.push(rch.map(function (k) { return (RL[k] || k) + ' ' + rm(r0[k]) + ' to ' + rm(d.rates[k]); }).join(', ')); }
@@ -463,6 +503,8 @@ function bkSaveEdit(id, v, d) {
   if (!ch.length) { say('Nothing changed'); return; }
   var after = calcBooking(b).payable;
   bLog(b, 'Changed ' + ch.join('; ') + (Math.abs(after - before) >= 0.01 ? ' (total ' + rm(before) + ' to ' + rm(after) + ')' : ''), changes); save();
+  /* a paid booking that now costs more has money due again */
+  if (after > before + 0.99 && calcBooking(b).due > 0.99 && (b.paymentStatus === 'Full Payment Received' || b.paymentStatus === 'Extension Paid')) setPaymentStatus(b, 'Extension Due', 'the total went up by ' + rm(after - before));
   notify('change', b.code + ' changed', after > before + 0.99 ? rm(after - before) + ' more to collect' : '', '#booking/' + b.id, { self: true }); render(false, true);
 }
 function bkEditNote(id) {
@@ -510,7 +552,7 @@ function deleteBk(id) {
   var warn = holds ? '<p class="bk-delwarn">' + esc(b.code) + ' still holds a deposit of ' + rm(p.depositReceived) + ' that has not been returned. Deleting it removes its refund case from Deposit refunds.</p>' : '';
   confirm({ icon: 'danger', title: 'Delete booking?', text: 'Delete ' + b.code + '? This cannot be undone.', danger: true,
     html: warn + '<p class="hint" style="text-align:center">Invoices and receipts already issued stay on file, and so do the customer\'s documents (IC, licence, proof of address).</p>',
-    ok: holds ? 'Delete anyway' : 'Yes, Delete', cancel: 'Keep it' }).then(function (yes) {
+    ok: holds ? 'Delete anyway' : 'Delete booking', cancel: 'Keep it' }).then(function (yes) {
       if (!yes) return;
       S.bookings = S.bookings.filter(function (x) { return x.id !== id; });
       S.recentBookings = (S.recentBookings || []).filter(function (x) { return x !== id; });

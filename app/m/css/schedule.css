@@ -76,3 +76,5 @@
 .sc-mi b { display: block; font-weight: 650; }
 .sc-mi small { display: block; color: var(--muted); font-size: 12.5px; }
 .sc-card.done .sc-main { padding-bottom: 12px; }
+.sc-time small.sc-dw { color: var(--t-red); font-size: 10.5px; line-height: 1.15; }
+.sc-time small.sc-dw { color: var(--t-red); font-size: 10.5px; line-height: 1.15; }

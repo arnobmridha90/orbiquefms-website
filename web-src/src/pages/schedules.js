@@ -115,7 +115,7 @@ function scFlow(kind, code, onClose) {
         }).join('') +
         '<label class="sc-fl" for="sc-km">Odometer reading (km)</label><input id="sc-km" class="sc-in" type="number" inputmode="numeric" min="0" max="1500000" step="1" placeholder="' + (lo ? 'Last: ' + lo.km.toLocaleString('en-MY') : 'e.g. 45210') + '" value="' + esc(f.km) + '" data-f="km">' +
         '<div class="sc-kmw">' + (w ? '<div class="sc-err' + (w.bad ? '' : ' soft') + '">' + i('alert-triangle') + esc(w.t) + '</div>' : (lo ? '<p class="sc-help">Last reading ' + lo.km.toLocaleString('en-MY') + ' km, ' + UI.fmt.date(lo.at) + '.</p>' : '')) + '</div>' +
-        '<label class="sc-fl" for="sc-at">Handover time</label><input id="sc-at" class="sc-in" type="datetime-local" step="900" value="' + esc(f.at) + '" data-f="at">' +
+        '<div class="sc-dtf">' + UI.dateTimeField({ id: 'sc-at', key: 'sc-at', label: 'Handover time', value: f.at || '', step: 15, max: NOW(), chips: [{ label: 'Today', days: 0 }], attrs: { 'data-f': 'at' } }) + '</div>' +
         '<label class="sc-fl" for="sc-an">Notes (Optional)</label><textarea id="sc-an" class="sc-ta" rows="3" placeholder="Any additional notes about the handover?" data-f="notes">' + esc(f.notes) + '</textarea>' +
         (f.err ? '<div class="sc-err">' + i('alert-circle') + esc(f.err) + '</div>' : '') + pbtn(f.busy ? 'Submitting...' : 'Submit Verification (' + n + ' of ' + tot + ')', 'submit', { disabled: f.busy }) + '</div>';
     }

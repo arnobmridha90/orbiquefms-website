@@ -172,3 +172,5 @@
 .exp-cfa{display:flex;flex-direction:column;gap:6px}
 .exp-cfa p{margin:0}
 .exp-cfa .row{align-items:center}
+.pg-expenses .exp-float{display:flex;align-items:center;gap:6px}
+.pg-expenses .exp-float i{font-size:16px;color:var(--text3)}

@@ -372,7 +372,7 @@ function seedChats(d, R) {
   d.assistant = { on: true, by: S1, at: t(5000) };
   d.notifs = [
     { id: uid(), kind: 'wa', title: 'Faizal Hassan on WhatsApp', body: 'And do you deliver?', at: t(11), read: false, link: '#chat/wa/wa1' },
-    { id: uid(), kind: 'staff', title: 'Ravi in Team chat', body: d.staffChat[3].text, at: t(90), read: false, link: '#chat/staff' }
+    { id: uid(), kind: 'staff', title: 'Ravi in Team chat', body: d.staffChat[3].text, at: t(90), read: false, link: '#chat/staff', from: d.staffChat[3].from }
   ];
   var up = d.bookings.filter(function (b) { return UPCOMING.indexOf(b.bookingStatus) >= 0 && new Date(b.start) > now; }).sort(function (a, b) { return new Date(a.start) - new Date(b.start); })[0];
   if (up) d.notifs.push({ id: uid(), kind: 'new', title: 'New booking ' + up.code, body: nameOf(d.customers, up.cust) + ' · ' + carName(d.cars, up.car) + ' · ' + when(up.start), at: t(150), read: true, link: '#booking/' + up.id });

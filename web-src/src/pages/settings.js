@@ -502,12 +502,12 @@ SET_DRAW.fleet = function (el, ctx, redraw) {
 /* ---------- Booking assistant rules ---------- */
 SET_DRAW.assistant = function (el, ctx, redraw) {
   var co = ctx.data.company, a = co.assistant || (co.assistant = { hours: { from: '08:00', to: '22:00' }, deliveryTiers: [] });
-  var cur = { from: a.hours.from, to: a.hours.to, turnaroundH: a.turnaroundH, airportTurnaroundH: a.airportTurnaroundH, holdMin: a.holdMin, minNoticeH: a.minNoticeH, stayOutDays: a.stayOutDays, tiers: (a.deliveryTiers || []).map(function (t) { return { upToKm: t.upToKm, fee: t.fee }; }) };
+  var cur = { from: a.hours.from, to: a.hours.to, turnaroundH: turnaroundH(), airportTurnaroundH: a.airportTurnaroundH, holdMin: a.holdMin, minNoticeH: a.minNoticeH, stayOutDays: a.stayOutDays, tiers: (a.deliveryTiers || []).map(function (t) { return { upToKm: t.upToKm, fee: t.fee }; }) };
   setFormCard(el, ctx, redraw, 'assistant', cur, {
     title: 'Booking assistant rules', desc: 'What the WhatsApp booking assistant offers customers. It only offers cars that are free with these gaps, and works out delivery fees from these distances.',
     body: function (dr) {
       return '<div class="grid g2 set-form">' + UI.select({ key: 'from', label: 'Hand over cars from', value: dr.from, options: setTimes(30) }) + UI.select({ key: 'to', label: 'Until', value: dr.to, options: setTimes(30) }) +
-        UI.input({ key: 'turnaroundH', label: 'Gap between two rentals', type: 'number', min: 0, max: 24, step: '0.5', value: dr.turnaroundH, help: 'hours, to clean and check the car' }) + UI.input({ key: 'airportTurnaroundH', label: 'Gap after a return at another place', type: 'number', min: 0, max: 24, step: '0.5', value: dr.airportTurnaroundH, help: 'hours, when the car comes back at the airport or a station' }) +
+        UI.input({ key: 'turnaroundH', label: 'Gap between two rentals', type: 'number', min: 0, max: 24, step: '0.5', value: dr.turnaroundH, help: 'hours, to clean and check the car. Availability, the car picker and new bookings use it too.' }) + UI.input({ key: 'airportTurnaroundH', label: 'Gap after a return at another place', type: 'number', min: 0, max: 24, step: '0.5', value: dr.airportTurnaroundH, help: 'hours, when the car comes back at the airport or a station' }) +
         UI.input({ key: 'holdMin', label: 'Hold a chosen car for', type: 'number', min: 5, max: 240, value: dr.holdMin, help: 'minutes, then it is offered to others again' }) + UI.input({ key: 'minNoticeH', label: 'Earliest pick-up from now', type: 'number', min: 0, max: 72, value: dr.minNoticeH, help: 'hours' }) +
         UI.input({ key: 'stayOutDays', label: 'Stay out of chats for', type: 'number', min: 0, max: 90, value: dr.stayOutDays, help: 'days after a customer\'s booking ends (staff answer them)' }) + '</div>' +
         '<div class="set-tg">Delivery fees by distance</div><p class="b2">From the customer\'s location pin. Further than the last line, or a typed address: staff quote the fee.</p>' +
@@ -524,8 +524,9 @@ SET_DRAW.assistant = function (el, ctx, redraw) {
       return '';
     },
     save: function (dr) {
-      var ch = [].concat(setDiff('Hours from', a.hours.from, dr.from), setDiff('Hours to', a.hours.to, dr.to), setDiff('Gap between rentals', a.turnaroundH, dr.turnaroundH), setDiff('Gap after a return at another place', a.airportTurnaroundH, dr.airportTurnaroundH), setDiff('Hold minutes', a.holdMin, dr.holdMin), setDiff('Earliest pick-up', a.minNoticeH, dr.minNoticeH), setDiff('Stay out days', a.stayOutDays, dr.stayOutDays), setDiff('Delivery fees', (a.deliveryTiers || []).map(function (t) { return t.upToKm + ' km ' + t.fee; }).join(', '), dr.tiers.map(function (t) { return t.upToKm + ' km ' + t.fee; }).join(', ')));
-      co.assistant = { hours: { from: dr.from, to: dr.to }, turnaroundH: +dr.turnaroundH, airportTurnaroundH: +dr.airportTurnaroundH, holdMin: +dr.holdMin, minNoticeH: +dr.minNoticeH, stayOutDays: +dr.stayOutDays, deliveryTiers: dr.tiers.map(function (t) { return { upToKm: +t.upToKm, fee: setNum(t.fee) }; }).sort(function (x, y) { return x.upToKm - y.upToKm; }) };
+      var ch = [].concat(setDiff('Hours from', a.hours.from, dr.from), setDiff('Hours to', a.hours.to, dr.to), setDiff('Gap between rentals', turnaroundH(), dr.turnaroundH), setDiff('Gap after a return at another place', a.airportTurnaroundH, dr.airportTurnaroundH), setDiff('Hold minutes', a.holdMin, dr.holdMin), setDiff('Earliest pick-up', a.minNoticeH, dr.minNoticeH), setDiff('Stay out days', a.stayOutDays, dr.stayOutDays), setDiff('Delivery fees', (a.deliveryTiers || []).map(function (t) { return t.upToKm + ' km ' + t.fee; }).join(', '), dr.tiers.map(function (t) { return t.upToKm + ' km ' + t.fee; }).join(', ')));
+      co.turnaroundH = +dr.turnaroundH;
+      co.assistant = { hours: { from: dr.from, to: dr.to }, airportTurnaroundH: +dr.airportTurnaroundH, holdMin: +dr.holdMin, minNoticeH: +dr.minNoticeH, stayOutDays: +dr.stayOutDays, deliveryTiers: dr.tiers.map(function (t) { return { upToKm: +t.upToKm, fee: setNum(t.fee) }; }).sort(function (x, y) { return x.upToKm - y.upToKm; }) };
       return ch;
     },
     saved: 'Rules saved. The assistant uses them from its next message.',

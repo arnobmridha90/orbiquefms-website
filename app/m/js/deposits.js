@@ -54,6 +54,30 @@ var Deposit = (function () {
     return { m: m, cancelled: cancelled, received: received, agreed: agreed, notRecorded: notRecorded, basis: basis, adj: adj, used: used, adjTotal: adjTotal, usedTotal: usedTotal, takenOff: takenOff,
       net: net, over: takenOff > basis + 0.001, refund: refund, state: state, wait: wait, since: since };
   }
+  /* kept more than the deposit: the extra is a charge on the bill (in Others, tracked as b.overCharge) so the customer pays it */
+  function syncOver(b) {
+    if (b.bookingStatus === 'Cancelled') return 0;
+    var r = refundOf(b.id); if (r && !b.overCharge) return 0;
+    b.rates = b.rates || {};
+    var before = +b.overCharge || 0; b.overCharge = 0;
+    var x = info(b), over = Math.max(0, sen(x.takenOff - x.basis));
+    b.overCharge = over;
+    if (Math.abs(over - before) > 0.004) {
+      b.rates.others = Math.max(0, sen((+b.rates.others || 0) - before + over));
+      bLog(b, over > 0 ? 'Kept more than the deposit: ' + rm(over) + ' added to the bill' : 'Extra over the deposit taken off the bill');
+      if (over <= 0 && b.paymentStatus === 'Extension Due' && calcBooking(b).due <= 0.99) setPaymentStatus(b, 'Full Payment Received', 'extra over the deposit removed');
+    }
+    return over;
+  }
+  /* all of the deposit was kept: close it with nothing to return */
+  function closeKept(b, note) {
+    if (refundOf(b.id)) return;
+    var x = info(b); if (x.net > 0.004) return;
+    S.refunds = S.refunds || [];
+    S.refunds.push({ id: uid(), booking: b.id, amt: 0, method: '', slip: null, slipHash: null, ref: '', at: new Date().toISOString(), by: S.me, refundBy: null, note: note || '', voided: false, received: x.basis });
+    bLog(b, 'Deposit closed: nothing returned');
+    if (b.paymentStatus === 'Refund Pending') setPaymentStatus(b, 'Deposit Refunded', 'all of the deposit kept');
+  }
   function waitLabel(d) { return d <= 0 ? 'Waiting since today' : 'Waiting ' + d + (d === 1 ? ' day' : ' days'); }
   function waitChip(d) { return chip(waitLabel(d), d >= 7 ? 'red' : d >= 3 ? 'amber' : 'grey'); }
   function stateChip(x) {
@@ -138,7 +162,7 @@ var Deposit = (function () {
       } else {
         h += '<div class="card dep-net' + (x.over ? ' over' : '') + '"><div class="dep-net-row"><span>Amount to return</span><b class="money" id="depNet">' + rm(x.net) + '</b></div>' +
           '<div class="dep-calc small muted">' + rm(x.basis) + ' received' + (x.takenOff ? ' minus ' + rm(x.takenOff) + ' taken off' : '') + '</div>' +
-          (x.over ? '<div class="banner amber dep-over">' + I('warn') + '<div>The adjustments are more than the deposit, so nothing is returned.</div></div>' : '') + '</div>';
+          (x.over ? '<div class="banner amber dep-over">' + I('warn') + '<div><b>The customer still owes ' + rm(sen(x.takenOff - x.basis)) + '.</b> The adjustments are more than the deposit, so nothing is returned and the extra is on the bill.' + (can('payments.add') && typeof Pay !== 'undefined' && calcBooking(b).due > 0.99 ? '<div><button type="button" class="btn sm" id="depOverPay">' + I('cash') + 'Record payment</button></div>' : '') + '</div></div>' : '') + '</div>';
         if (x.state === 'hand') h += '<div class="banner blue">' + I('info') + '<div>This booking is marked Deposit Refunded, but no refund was recorded here. You can still record how it went back.</div></div>';
         if (x.state === 'used') h += '<div class="banner blue">' + I('info') + '<div>The whole deposit was used for payments, so nothing goes back.</div></div>';
       }
@@ -175,6 +199,7 @@ var Deposit = (function () {
       if ($('#depDoc', sh)) $('#depDoc', sh).onclick = function () { statement(b.id, { typed: st.typed }); };
       if ($('#depWa', sh)) $('#depWa', sh).onclick = function () { sendStatement(b); };
       if ($('#depReopen', sh)) $('#depReopen', sh).onclick = function () { reopenSheet(b, draw); };
+      if ($('#depOverPay', sh)) $('#depOverPay', sh).onclick = function () { var due = calcBooking(b).due; closeSheet(true); setTimeout(function () { Pay.open(b.id, { kinds: ['Rental payment'], amount: due }); }, 30); };
       if ($('#depSlip', sh)) $('#depSlip', sh).onclick = function () { viewPic(x.refund.slip, 'Refund slip'); };
       if (focus) { var el = $(focus, sh); if (el) setTimeout(function () { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60); }
     };
@@ -223,13 +248,13 @@ var Deposit = (function () {
         S.deductions.push({ id: uid(), booking: b.id, kind: st.kind, amt: amt, note: note, photo: st.photo, by: S.me, at: new Date().toISOString(), paymentId: null });
         bLog(b, 'Deposit adjustment added: ' + st.kind + ' ' + rm(amt) + (note ? ' (' + note + ')' : ''));
       }
-      save(); closeSheet(); say(d ? 'Adjustment saved' : 'Adjustment added'); done();
+      syncOver(b); save(); closeSheet(); say(d ? 'Adjustment saved' : 'Adjustment added'); done();
     };
     var del = $('#dlDel', sh);
     if (del) del.onclick = function () {
       var i = S.deductions.indexOf(d); if (i < 0) return;
-      S.deductions.splice(i, 1); bLog(b, 'Deposit adjustment removed: ' + d.kind + ' ' + rm(d.amt)); save(); closeSheet(); done();
-      undoSnack('Adjustment removed', function () { S.deductions.splice(Math.min(i, S.deductions.length), 0, d); bLog(b, 'Deposit adjustment put back: ' + d.kind + ' ' + rm(d.amt)); save(); done(); });
+      S.deductions.splice(i, 1); bLog(b, 'Deposit adjustment removed: ' + d.kind + ' ' + rm(d.amt)); syncOver(b); save(); closeSheet(); done();
+      undoSnack('Adjustment removed', function () { S.deductions.splice(Math.min(i, S.deductions.length), 0, d); bLog(b, 'Deposit adjustment put back: ' + d.kind + ' ' + rm(d.amt)); syncOver(b); save(); done(); });
     };
   }
 
@@ -367,6 +392,7 @@ var Deposit = (function () {
     if (!depPays.length) lines.push({ text: 'Security deposit', sub: 'The deposit payment was not recorded. Amount as agreed or as the customer gave.', amt: x.basis });
     x.adj.concat(x.used).forEach(function (d) { lines.push({ text: 'Kept: ' + d.kind, sub: d.note || '', amt: -(+d.amt || 0) }); });
     var totals = [{ label: x.cancelled ? 'Money paid' : 'Deposit received', amt: x.basis }, { label: 'Adjustments', amt: -x.takenOff }, { label: r ? 'Returned to you' : 'To return', amt: r ? r.amt : x.net, big: true }];
+    if (x.over) totals.push({ label: 'Still to pay', amt: sen(x.takenOff - x.basis), big: true });
     var notes = r ? (r.amt > 0 ? 'Returned on ' + dFull(r.at) + ' by ' + r.method.toLowerCase() + (r.ref ? ', reference ' + r.ref : '') + (r.method === 'Cash' && (r.refundBy || r.by) ? ', handed back by ' + who(r.refundBy || r.by) : '') + '.' : 'Nothing was returned: the adjustments used the whole deposit.') : 'This deposit is not returned yet.';
     if (r && r.note) notes += '\n' + r.note;
     pdfDoc('deposit', { no: 'DEP-' + b.code, title: 'Deposit statement', date: r ? r.at : new Date(), booking: b.code, to: { name: cu.name, phone: cu.phone, extra: (c.plate ? c.plate + ' · ' + c.make + ' ' + c.model + ' · ' : '') + dShort(b.start) + ' to ' + dShort(b.end) },
@@ -375,7 +401,7 @@ var Deposit = (function () {
   function statementLink(b) { return B().site + '/deposit/' + (b.formId || b.id); }
   function statementText(b, x) {
     var cu = cust(b.cust), r = x.refund;
-    var t = 'Hi ' + firstName(cu.name) + ', here is the deposit statement for booking ' + b.code + ' from ' + B().name + '. Deposit received ' + rm(x.basis);
+    var t = 'Hi ' + callName(cu.name) + ', here is the deposit statement for booking ' + b.code + ' from ' + B().name + '. Deposit received ' + rm(x.basis);
     if (x.takenOff) t += ', adjustments ' + rm(x.takenOff) + ' (' + x.adj.concat(x.used).map(function (d) { return d.kind.toLowerCase(); }).filter(function (k, i, a) { return a.indexOf(k) === i; }).join(', ') + ')';
     t += r ? (r.amt > 0 ? ', returned ' + rm(r.amt) + ' by ' + r.method.toLowerCase() + ' on ' + dFull(r.at) + '.' : ', nothing returned.') : ', to return ' + rm(x.net) + '.';
     return t + ' Statement: ' + statementLink(b) + ' Thank you for renting with us.';
@@ -394,7 +420,7 @@ var Deposit = (function () {
     $('#ssCp', sh).onclick = function () { Share.copy($('#ssTx', sh).value); };
   }
 
-  return { open: open, adjust: adjust, statement: statement, info: info, sync: sync, syncAll: syncAll, index: index, refundOf: refundOf, slipUsed: slipUsed,
+  return { syncOver: syncOver, closeKept: closeKept, open: open, adjust: adjust, statement: statement, info: info, sync: sync, syncAll: syncAll, index: index, refundOf: refundOf, slipUsed: slipUsed,
     left: function (bId) { var b = bk(bId); return b ? info(b).net : 0; }, waitChip: waitChip, waitLabel: waitLabel, stateChip: stateChip, viewPic: viewPic };
 })();
 

@@ -79,8 +79,10 @@ var Pay = (function () {
     var dup = (b.payments || []).filter(function (p) { return !p.voided && p.by === S.me && p.made && now - new Date(p.made).getTime() < 90000 && paySig(p.items || [], p.method, p.ref, p.note) === sig; })[0];
     if (dup) return { pay: dup, duplicate: true, receipt: Docs.receiptOf(b), status: null };
     var p = newPayment({ at: o.at || new Date().toISOString(), items: items, method: o.method, by: S.me, ref: String(o.ref || '').trim(), note: String(o.note || '').trim(),
-      cashTo: o.method === 'Cash' ? (o.cashTo || S.me) : null, afterCharge: o.method === 'Card' && o.afterCharge != null ? o.afterCharge : null, depositOf: o.method === 'Deposit adjustment' ? (o.depositOf || b.id) : null });
+      cashTo: o.method === 'Cash' && !o.cdm ? (o.cashTo === undefined ? S.me : o.cashTo) : null, afterCharge: o.method === 'Card' && o.afterCharge != null ? o.afterCharge : null, depositOf: o.method === 'Deposit adjustment' ? (o.depositOf || b.id) : null });
     p.made = new Date().toISOString();
+    /* cash paid into a bank machine (CDM) is money already in the bank: nobody holds it */
+    if (o.cdm && o.method === 'Cash') { p.cdm = true; if (!p.note) p.note = 'Cash deposit machine'; }
     if (o.slips && o.slips.length) { p.slips = o.slips.slice(0, 10); p.slip = p.slips[0].src; p.slipHash = p.slips[0].hash; }
     b.payments = b.payments || []; b.payments.push(p);
     var total = payTotal(p), what = items.map(function (i) { return i.kind + ' ' + rm(i.amt); }).join(', ');
@@ -110,7 +112,7 @@ var Pay = (function () {
       if (typeof Deposit !== 'undefined' && Deposit.sync) { try { if (Deposit.sync(ded.length ? ded[0].booking : (p.depositOf || b.id))) said.push('The deposit is waiting to be returned again'); } catch (e) { console.error(e); } }
     }
     bLog(b, 'Payment of ' + rm(payTotal(p)) + ' voided: ' + reason);
-    var st = depositDueAfterVoid(b); if (st) said.push('The booking is back to Deposit Due');
+    var st = statusAfterVoid(b); if (st != null) said.push(st ? 'The booking is back to ' + st : 'The payment status is cleared');
     save();
     return said;
   }
@@ -160,7 +162,7 @@ var Pay = (function () {
       if (can('bookings.see_amounts')) h += '<div class="pay-sum"><div><small>Booking total</small><b class="money">' + rm(m.payable) + '</b></div><div><small>Received</small><b class="money">' + rm(m.received) + '</b></div><div><small>' + (m.overpaid ? 'Extra' : 'To collect') + '</small><b class="money ' + (m.due ? 'tone-red-text' : '') + '">' + rm(m.due || m.overpaid) + '</b></div></div>';
       var chips = [];
       if (depL > 0 && !fromDep) chips.push('<button type="button" class="fchip" data-quick="dep">Deposit <b class="money">' + rm(depL) + '</b></button>');
-      if (rentL > 0) chips.push('<button type="button" class="fchip" data-quick="rent">Rent <b class="money">' + rm(rentL) + '</b></button>');
+      if (rentL > 0) chips.push('<button type="button" class="fchip" data-quick="rent">Rent and charges <b class="money">' + rm(rentL) + '</b></button>');
       if (depL > 0 && rentL > 0 && !fromDep) chips.push('<button type="button" class="fchip" data-quick="bal">Balance <b class="money">' + rm(depL + rentL) + '</b></button>');
       if (chips.length) h += '<div class="chiprow pay-quick">' + chips.join('') + '</div>';
       h += '<div class="pay-h">What is this payment for?</div><div class="small muted pay-hint">Tick everything it paid for and check each amount.</div>';
@@ -245,7 +247,8 @@ var Pay = (function () {
       $('#paygo', body).onclick = submit;
     }
     function pickOther() {
-      Pickers.booking({ title: 'Whose deposit pays this?', filter: function (x) { return x.id !== b.id && payDepositLeft(x) > 0; }, selected: st.other, onPick: function (x) { st.other = x.id; st.otherErr = ''; suggest(); draw(); } });
+      Pickers.booking({ title: 'Whose deposit pays this?', filter: function (x) { return x.id !== b.id && payDepositLeft(x) > 0; }, selected: st.other,
+        first: function (x) { return x.cust === b.cust; }, firstLabel: 'Same customer first', sub: function (x) { return '<span class="pk-dep"><small>Deposit left</small><b class="money">' + rm(payDepositLeft(x)) + '</b></span>'; }, onPick: function (x) { st.other = x.id; st.otherErr = ''; suggest(); draw(); } });
     }
     function submit() {
       st.checked = true; st.err = ''; st.afterErr = ''; st.otherErr = ''; st.atErr = '';
@@ -641,7 +644,7 @@ var Pay = (function () {
         else if (c.method === 'Card' && ll.after != null) { lines[0].after = ll.after; }
         payOverAsk(payOver(b, lines), 'Slip ' + (cards.indexOf(c) + 1) + ' · ' + b.code).then(function (go) {
           if (!go) { c.status = 'error'; c.msg = 'Not recorded: the amount is more than the booking says. Check it, then record again.'; drawCard(c); return next(); }
-          var res = record(b, { items: lines, method: c.method, cashTo: c.method === 'Cash' ? S.me : null, afterCharge: c.method === 'Card' ? ll.after : null, ref: c.ref, note: '', at: fromInputs(c.date, c.time).toISOString(),
+          var res = record(b, { items: lines, method: c.method, cashTo: null, cdm: c.method === 'Cash', afterCharge: c.method === 'Card' ? ll.after : null, ref: c.ref, note: '', at: fromInputs(c.date, c.time).toISOString(),
             slips: [{ src: c.src, hash: c.hash, at: new Date().toISOString(), by: S.me, name: c.name, note: c.note }], issueReceipt: can('billing.issue_receipt'), updateStatus: lines.some(function (l) { return l.kind !== 'Other payment'; }), fromSlip: true });
           c.status = 'done'; c.result = res; drawCard(c); next();
         });

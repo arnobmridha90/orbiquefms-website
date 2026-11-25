@@ -182,6 +182,9 @@ function buildData(B, seed) {
     return { n: B.startNo + n, code: B.code + '-' + String(B.startNo + n).padStart(5, '0'), car: r.car, cust: cust, start: r.start, end: r.end, days: r.days, rent: rent, dep: dep, deliv: deliv, ret: ret, dmg: dmg, disc: disc,
       payable: payable, received: received, status: st, pay: pay, agent: R() < .8 ? pick(B.staff) : '', pickup: loc, drop: R() < .7 ? loc : B.locations[0].n, created: new Date(r.start.getTime() - ri(1, 12) * DAY), inspected: st === 'Completed' || st === 'Car Returned' || st === 'Car Delivered' };
   });
+  /* nothing is created in the future: a booking made "n days before pick-up" that would be after today was made two or
+     three days ago instead (_c0 keeps the first figure only so the rest of the sample data stays the same) */
+  bookings.forEach(function (x) { x._c0 = x.created; if (x.created > TODAY) x.created = new Date(TODAY.getTime() - (2 * DAY + (x.n % 24) * 36e5)); });
   /* daily income (rent and charges, not the deposit) and expenses, this month and the same days of last month */
   function incomeOn(d) { var s = 0; bookings.forEach(function (b) { if (b.status !== 'Cancelled' && sameDay(b.start, d) && b.start <= TODAY) s += b.payable - b.dep; }); return s; }
   var days = [], prev = [], exp = [], cnt = [], util = [];
@@ -351,9 +354,9 @@ function extendData(B, d, seed) {
       warnDays: { 'Road tax': 30, 'Insurance': 30, 'PUSPAKOM': 14, 'Rental permit': 30, 'Car grant': 0, 'Other': 14 } },
     trackerPlatforms: ['Tracksolid Pro', 'Sample GPS Cloud', 'Other'],
     dashcamPlatforms: ['Dashcam app', 'Sample Cam Cloud', 'Other'],   /* the dashcam field on a car suggests these (Settings > Fleet) */
-    assistant: { hours: { from: '08:00', to: '22:00' }, turnaroundH: 2, airportTurnaroundH: 4, holdMin: 30, minNoticeH: 3,
+    assistant: { hours: { from: '08:00', to: '22:00' }, airportTurnaroundH: 4, holdMin: 30, minNoticeH: 3,
       deliveryTiers: [{ upToKm: 10, fee: 20 }, { upToKm: 25, fee: 40 }, { upToKm: 50, fee: 70 }], stayOutDays: 30 },
-    turnaroundH: 3,                             /* availability: warn when the car comes back less than this before the next start */
+    turnaroundH: 3,                             /* the gap between two rentals (hours): Availability, the car picker, the booking form and the assistant (Settings > Booking assistant) */
     expenseEditDays: 1,                         /* days people may change or delete their own expenses (null = no limit) */
     carsNotCounted: [],                         /* car ids left out of the main report and dashboard figures */
     refundLockDate: new Date(2026, 10, 1),      /* bookings ending on or after this day get Deposit Refunded only from Deposits */
@@ -442,7 +445,7 @@ function extendData(B, d, seed) {
     x.retNote = x.ret ? pick(['Same place as delivery', 'Office car park, level 2']) : '';
     x.signature = x.status === 'Pending' ? null : 'sig-1';
     x.filledByAdmin = k % 9 === 0; x.submitted = ['Pending', 'Confirmed', 'Agreement Sent'].indexOf(x.status) < 0;
-    x.submittedAt = x.submitted ? new Date(x.created.getTime() + ri(2, 30) * 36e5) : null;
+    x.submittedAt = x.submitted ? new Date(Math.max(x.created.getTime() + 6e5, Math.min(TODAY.getTime() - 15 * 6e4, x.created.getTime() + ri(2, 30) * 36e5))) : null;
     x.ip = x.submitted ? '10.' + ri(0, 255) + '.' + ri(0, 255) + '.' + ri(1, 254) : '';
     x.updated = new Date(Math.max(x.created.getTime(), Math.min(TODAY.getTime() - ri(4, 900) * 6e4, x.created.getTime() + ri(1, 9) * DAY)));
     x.agentIds = x.agent ? [byFirst(x.agent).id] : [];
@@ -467,7 +470,7 @@ function extendData(B, d, seed) {
   };
   d.bookings.forEach(function (x, k) {
     if (x.received <= 0) return;
-    var depPaid = Math.min(x.dep, x.received), rest = x.received - depPaid, t0 = new Date(x.created.getTime() + ri(2, 30) * 36e5);
+    var depPaid = Math.min(x.dep, x.received), rest = x.received - depPaid, t0 = new Date(x._c0.getTime() + ri(2, 30) * 36e5);
     addPay(x, 'Security deposit', depPaid, t0);
     if (rest > 0) {
       if (x.pay === 'Extension paid' || (x.pay === 'Extension due' && rest > x.car.rate)) { var ext = x.pay === 'Extension paid' ? x.car.rate : 0; addPay(x, 'Rental payment', rest - ext, new Date(x.start.getTime() - ri(1, 20) * 36e5)); if (ext) addPay(x, 'Extension payment', ext, new Date(x.start.getTime() + DAY)); }
@@ -478,26 +481,28 @@ function extendData(B, d, seed) {
   });
   d.payments.sort(function (a, b) { return a.at - b.at; });
   var rcp = 0, inv = 0, pad = function (n) { return String(n).padStart(5, '0'); };
+  /* sent some hours after it was issued, and never after today */
+  var ivSentAt = function (iv, h) { return new Date(Math.max(iv.issued.getTime(), Math.min(TODAY.getTime() - 10 * 6e4, iv.issued.getTime() + h * 36e5))); };
   d.payments.forEach(function (p, k) {
     if (k % 11 === 7 && p.at < new Date(TODAY.getTime() - 3 * DAY)) return;  /* some payments have no receipt yet */
-    var r = { no: 'RCP-' + Y + '-' + pad(++rcp), id: null, payment: p.id, booking: p.booking, issued: new Date(p.at.getTime() + 6e5), amount: p.amount, kind: p.kind, method: p.method, status: 'Issued', voidReason: '', sent: [] };
+    var r = { no: 'RCP-' + Y + '-' + pad(++rcp), id: null, payment: p.id, booking: p.booking, issued: new Date(Math.min(TODAY.getTime() - 6e4, p.at.getTime() + 6e5)), amount: p.amount, kind: p.kind, method: p.method, status: 'Issued', voidReason: '', sent: [] };
     r.id = r.no;
-    if (k % 3 === 0) r.sent.push({ channel: k % 2 ? 'WhatsApp' : 'Download', to: '', at: new Date(r.issued.getTime() + 36e5), by: p.by, ok: true });
+    if (k % 3 === 0) r.sent.push({ channel: k % 2 ? 'WhatsApp' : 'Download', to: '', at: new Date(Math.max(r.issued.getTime(), Math.min(TODAY.getTime() - 6e4, r.issued.getTime() + 36e5))), by: p.by, ok: true });
     p.receipt = r.no; d.receipts.push(r);
   });
   d.bookings.forEach(function (x, k) {
-    if (['Pending', 'Cancelled'].indexOf(x.status) >= 0 || x.created > TODAY || k % 10 === 3) return;
-    var lines = [{ desc: 'Car rental: ' + plural(x.days, 'day') + ' x RM ' + x.rate.toFixed(2), qty: x.days, unit: x.rate, amount: x.rent }];
+    if (['Pending', 'Cancelled'].indexOf(x.status) >= 0 || x._c0 > TODAY || k % 10 === 3) return;
+    var lines = [{ desc: 'Car rental: ' + plural(x.days, 'day') + ' x ' + rm2(x.rate), qty: x.days, unit: x.rate, amount: x.rent }];
     if (x.dmg) lines.push({ desc: 'Damage cover: Basic cover (' + x.days + ' days x RM 15.00)', qty: x.days, unit: 15, amount: x.dmg });
     if (x.deliv) lines.push({ desc: 'Delivery charge', qty: 1, unit: x.deliv, amount: x.deliv });
     if (x.ret) lines.push({ desc: 'Return charge', qty: 1, unit: x.ret, amount: x.ret });
     if (x.others) lines.push({ desc: 'Other charges', qty: 1, unit: x.others, amount: x.others });
     if (x.disc) lines.push({ desc: 'Discount', qty: 1, unit: -x.disc, amount: -x.disc });
     var charges = sum(lines.map(function (l) { return l.amount; }));
-    var iv = { no: 'INV-' + Y + '-' + pad(++inv), id: null, booking: x.code, issued: new Date(Math.min(TODAY.getTime(), x.created.getTime() + ri(1, 20) * 36e5)), lines: lines, charges: charges, deposit: x.dep, tax: 0, note: '', status: 'Issued', voidReason: '', sent: [] };
+    var iv = { no: 'INV-' + Y + '-' + pad(++inv), id: null, booking: x.code, issued: new Date(Math.max(x.created.getTime() + 18e5, Math.min(TODAY.getTime() - 3 * 36e5, x.created.getTime() + ri(1, 20) * 36e5))), lines: lines, charges: charges, deposit: x.dep, tax: 0, note: '', status: 'Issued', voidReason: '', sent: [] };
     iv.id = iv.no;
-    if (k % 7 === 2) iv.sent.push({ channel: 'WhatsApp', to: x.cust.phone, at: new Date(iv.issued.getTime() + 2 * 36e5), by: pick(staffNames), ok: k % 14 !== 2, error: k % 14 === 2 ? 'The number is not on WhatsApp.' : '' });
-    else if (k % 7 === 5) iv.sent.push({ channel: 'Email', to: x.cust.email, at: new Date(iv.issued.getTime() + 36e5), by: pick(staffNames), ok: true });
+    if (k % 7 === 2) iv.sent.push({ channel: 'WhatsApp', to: x.cust.phone, at: ivSentAt(iv, 2), by: pick(staffNames), ok: k % 14 !== 2, error: k % 14 === 2 ? 'The number is not on WhatsApp.' : '' });
+    else if (k % 7 === 5) iv.sent.push({ channel: 'Email', to: x.cust.email, at: ivSentAt(iv, 1), by: pick(staffNames), ok: true });
     d.invoices.push(iv);
   });
   /* a voided invoice and a voided payment */
@@ -509,6 +514,7 @@ function extendData(B, d, seed) {
   /* one deposit that has waited more than a week, so "Waiting 7 days or more" has something to show */
   var oldWait = d.bookings.filter(function (x) { return x.status === 'Completed' && x.pay === 'Deposit Refunded' && x.dep > 0 && TODAY - x.end > 8 * DAY && TODAY - x.end < 20 * DAY; })[0];
   if (oldWait) { oldWait.status = 'Car Returned'; oldWait.pay = 'Refund Pending'; }
+  d.bookings.forEach(function (x) { delete x._c0; });
   d.deposits = d.bookings.filter(function (x) { return x.pay === 'Refund Pending' || (x.pay === 'Deposit Refunded' && x.status !== 'Cancelled' && TODAY - x.end < 90 * DAY && x.dep > 0); }).map(function (x, k) {
     var ded = [];
     if (k % 4 === 1) ded.push({ kind: 'Fuel', amount: 25, note: 'Fuel gauge one bar lower than at pick-up' });
@@ -780,21 +786,28 @@ function extendData(B, d, seed) {
     log(x.created, who, 'Created', 'Booking', x.code, who + ' created booking ' + x.code + ' (' + x.car.plate + ')');
     var who2 = pick(staffNames); if (x.status !== 'Pending' && x.updated <= TODAY) log(x.updated, who2, 'Changed', 'Booking', x.code, who2 + ' changed booking ' + x.code, [{ f: 'Status', from: 'Pending', to: x.status }]);
   });
-  d.payments.filter(function (p) { return TODAY - p.at < 10 * DAY; }).forEach(function (p) { log(p.at, p.by, 'Created', 'Payment', p.id, p.by + ' recorded a payment of RM ' + p.amount.toFixed(2) + ' on ' + p.booking, [{ f: 'Type', from: '', to: p.kind }, { f: 'Method', from: '', to: p.method }]); });
-  d.expenses.filter(function (e) { return TODAY - e.at < 6 * DAY; }).slice(0, 12).forEach(function (e) { var u = d.users.filter(function (x) { return x.id === e.by; })[0]; var c = d.expenseCats.filter(function (x) { return x.id === e.cat; })[0]; log(e.at, u ? u.name : staffNames[0], 'Created', 'Expense', e.id, (u ? u.name : staffNames[0]) + ' recorded expense ' + c.name + ': RM ' + e.amount.toFixed(2)); });
+  d.payments.filter(function (p) { return TODAY - p.at < 10 * DAY; }).forEach(function (p) { log(p.at, p.by, 'Created', 'Payment', p.id, p.by + ' recorded a payment of ' + rm2(p.amount) + ' on ' + p.booking, [{ f: 'Type', from: '', to: p.kind }, { f: 'Method', from: '', to: p.method }]); });
+  d.expenses.filter(function (e) { return TODAY - e.at < 6 * DAY; }).slice(0, 12).forEach(function (e) { var u = d.users.filter(function (x) { return x.id === e.by; })[0]; var c = d.expenseCats.filter(function (x) { return x.id === e.cat; })[0]; log(e.at, u ? u.name : staffNames[0], 'Created', 'Expense', e.id, (u ? u.name : staffNames[0]) + ' recorded expense ' + c.name + ': ' + rm2(e.amount)); });
   d.users.forEach(function (u) { if (u.lastSignIn) log(u.lastSignIn, u.name, 'Signed in', 'Team member', u.id, u.name + ' signed in'); });
   log(at(1, 16, 5), staffNames[0], 'Exported', 'Booking', '', staffNames[0] + ' downloaded the bookings and income report');
   log(at(2, 11, 40), staffNames[0], 'Viewed a document', 'Car owner document', d.cars[0].id, staffNames[0] + ' opened the owner IC of ' + d.cars[0].plate);
   log(at(3, 10, 15), staffNames[0], 'Access change', 'Team member', d.users[2].id, staffNames[0] + ' gave ' + d.users[2].name + ' "Delete bookings"', [{ f: 'Delete bookings', from: 'Off', to: 'On' }]);
   log(at(4, 9, 0), staffNames[1] || staffNames[0], 'Failed sign-in', 'Team member', '', 'A sign-in with the username "admin" failed');
-  log(at(0, 13, 50), staffNames[2] || staffNames[0], 'Sent', 'Invoice', d.invoices.length ? d.invoices[d.invoices.length - 1].no : '', (staffNames[2] || staffNames[0]) + ' sent invoice ' + (d.invoices.length ? d.invoices[d.invoices.length - 1].no : '') + ' on WhatsApp');
+  /* the invoice send in the log is also on the invoice itself, so "Last sent" and the activity agree */
+  var lastIv = d.invoices[d.invoices.length - 1];
+  if (lastIv) {
+    var sender = staffNames[2] || staffNames[0], sentAt = at(0, 13, 50), ivx = findBooking(lastIv.booking, d);
+    if (lastIv.issued > sentAt) lastIv.issued = new Date(sentAt.getTime() - 2 * 36e5);
+    lastIv.sent.push({ channel: 'WhatsApp', to: ivx ? ivx.cust.phone : '', at: sentAt, by: sender, ok: true });
+    log(sentAt, sender, 'Sent', 'Invoice', lastIv.no, sender + ' sent invoice ' + lastIv.no + ' on WhatsApp');
+  }
   d.summons.filter(function (s) { return s.status === 'Paid'; }).forEach(function (s) { log(s.paidOn > TODAY ? at(1) : s.paidOn, staffNames[0], 'Changed', 'Summons', s.id, staffNames[0] + ' changed summons ' + s.authority + ' ' + s.notice + ' (' + s.plate + ')', [{ f: 'Status', from: 'charged', to: 'paid' }]); });
   d.activity.sort(function (a, b) { return b.at - a.at; });
   var nb = d.bookings.filter(function (x) { return x.status === 'Agreement Signed'; }).slice(-1)[0], late = d.bookings.filter(function (x) { return x.status === 'Car Delivered' && x.end < TODAY; })[0];
   d.notifications = [
     nb && { icon: 'signature', tone: 'ok', title: 'Agreement signed', text: nb.cust.name + ' signed the agreement for ' + nb.code + '.', page: 'bookings', params: { booking: nb.code }, at: new Date(TODAY.getTime() - 25 * 6e4) },
     { icon: 'receipt', tone: 'info', title: 'Payment slip uploaded', text: 'A customer sent a payment slip on WhatsApp. Record it on Invoices.', page: 'invoices', params: { tab: 'payments' }, at: new Date(TODAY.getTime() - 70 * 6e4) },
-    { icon: 'cash-banknote', tone: 'warn', title: 'Deposits waiting', text: d.deposits.filter(function (z) { return !z.refund && !z.markedByHand; }).length + ' deposits are waiting to be given back.', page: 'deposits', params: {}, at: new Date(TODAY.getTime() - 3 * 36e5) },
+    { icon: 'cash-banknote', tone: 'warn', title: 'Deposits waiting', text: (function () { var n = d.deposits.filter(function (z) { var x = findBooking(z.booking, d); return !z.refund && x && x.pay === 'Refund Pending'; }).length; return n === 1 ? '1 deposit is waiting to be given back.' : n + ' deposits are waiting to be given back.'; })(), page: 'deposits', params: {}, at: new Date(TODAY.getTime() - 3 * 36e5) },
     { icon: 'license', tone: 'warn', title: 'Road tax expiring', text: d.cars[2].plate + ' road tax runs out on ' + dFull(d.cars[2].tax) + '.', page: 'maintenance', params: { tab: 'documents' }, at: new Date(TODAY.getTime() - 5 * 36e5) },
     { icon: 'gavel', tone: 'bad', title: 'Summons with no booking', text: 'Nobody had the car at the time of one summons.', page: 'summons', params: { view: 'no-booking' }, at: new Date(TODAY.getTime() - 26 * 36e5) },
     { icon: 'calendar-dollar', tone: 'bad', title: 'Instalment overdue', text: 'A car instalment is past its due date.', page: 'instalments', params: {}, at: new Date(TODAY.getTime() - 30 * 36e5) },
@@ -821,6 +834,9 @@ function carById(id, d) { return byId((d || D()).cars, id); }
 function findBooking(code, d) { var l = (d || D()).bookings; for (var k = 0; k < l.length; k++) if (l[k].code === code) return l[k]; return null; }
 function userById(id, d) { return byId((d || D()).users, id); }
 function employeeById(id, d) { return byId((d || D()).employees, id); }
+/* a cash float given to staff (a "Payment to staff" kind) moves money to someone who then spends it: it is not spending
+   itself, so totals, kind breakdowns and profit leave it out (what staff then spend is recorded as expenses) */
+function isSpending(e, d) { var c = e && e.cat ? byId((d || D()).expenseCats, e.cat) : null; return !(c && c.paysStaff); }
 /* every expense in one list: recorded entries plus finished service jobs and papers with a cost */
 function allExpenses(d) {
   d = d || D();
@@ -951,12 +967,13 @@ function matchBookingCode(q, code) {
   return (!m[1] || m[1] === c[1]) && parseInt(m[2], 10) === parseInt(c[2], 10);
 }
 /* does a booking overlap a date range? A single date means that whole day. Range ends are whole days. */
+/* the gap between two rentals, in hours, from company settings (one value for every screen) */
+function turnaroundH(d) { var c = CO(d) || {}; return c.turnaroundH != null && !isNaN(c.turnaroundH) ? +c.turnaroundH : 3; }
+/* does a booking touch the days from..to? Only a start day means "from that day on"; only an end day means "up to that day" */
 function overlaps(b, from, to) {
   if (!from && !to) return true;
   var f = from ? new Date(from.getFullYear(), from.getMonth(), from.getDate()) : null, t = to ? new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999) : null;
-  if (f && !t) t = new Date(f.getFullYear(), f.getMonth(), f.getDate(), 23, 59, 59, 999);
-  if (t && !f) f = new Date(t.getFullYear(), t.getMonth(), t.getDate());
-  return b.end >= f && b.start <= t;
+  return (!f || b.end >= f) && (!t || b.start <= t);
 }
 /* cars that count in the main report and dashboard figures (Reports > Cars counted) */
 function isCounted(carId, d) { return (CO(d).carsNotCounted || []).indexOf(carId) < 0; }
@@ -998,6 +1015,10 @@ function applyStatusRules(before, patch) {
     var dep = out.dep != null ? Number(out.dep) : Number(b.dep || 0);
     out.pay = dep > 0 ? 'Refund Pending' : 'Deposit Refunded';
     notes.push(dep > 0 ? 'The car is back, so the deposit is now Refund Pending.' : 'The car is back and there is no deposit to give back, so the payment status is Deposit Refunded.');
+  }
+  /* a cancelled booking still holding the customer's deposit: the deposit is now waiting to go back */
+  if (status === 'Cancelled' && b.status !== 'Cancelled' && b.code && (pay === 'Deposit Received' || pay === 'Full Payment Received') && bookingPaid(b).deposit > 0) {
+    out.pay = pay = 'Refund Pending'; notes.push('The booking is cancelled, so its deposit is now Refund Pending.');
   }
   out.notes = notes;
   return out;
@@ -1061,7 +1082,7 @@ function busy(car, start, end, except, d) {
   }
   if (dts.length) return { free: false, kind: 'workshop', reason: dts[0].to ? 'In workshop until ' + fmtD(dts[0].to) : 'In workshop', booking: null, downtime: dts[0], soon: '' };
   if (start) {
-    var gap = ((CO(d) && CO(d).turnaroundH) || 3) * 36e5;
+    var gap = turnaroundH(d) * 36e5;
     var before = d.bookings.filter(function (x) { return x.car === c && x.code !== except && x.status !== 'Cancelled' && x.end <= s && s - x.end < gap; }).sort(function (a, b) { return b.end - a.end; })[0];
     if (before) { var hh = Math.round((s - before.end) / 36e5 * 10) / 10; res.soon = 'Back at ' + tm(before.end) + ', ' + (hh < 1 ? Math.round(hh * 60) + ' min' : hh + ' hr' + (hh === 1 ? '' : 's')) + ' before'; res.booking = before; }
   }

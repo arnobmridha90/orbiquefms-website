@@ -243,6 +243,31 @@ function staff(id) { return byId(S.staff, id); }
 function me() { return staff(S.me) || { id: S.me, name: 'Guest', role: 'readonly' }; }
 function myName() { return me().name; }
 function firstName(n) { return String(n || '').split(' ')[0]; }
+/* how to greet a customer in a message: the full name when it is 3 words or fewer ('Lim Chee Keong'), else the part before bin / binti / a/l / a/p,
+   else the first two words. Never just the first word: for many names that is the family name. */
+/* how late a return is: the same words and charged hours on every screen (15 min grace, then each part hour counts) */
+function lateInfo(end, at) {
+  var mins = Math.max(0, Math.floor((new Date(at || Date.now()) - new Date(end)) / MIN)), h = Math.floor(mins / 60), m = mins % 60;
+  var text = h >= 48 ? Math.floor(h / 24) + ' days' : h ? h + ' h' + (m ? ' ' + m + ' min' : '') : m + ' min';
+  return { mins: mins, chargeHours: mins > 15 ? Math.ceil(mins / 60) : 0, text: text };
+}
+function callName(n) {
+  var s = String(n || '').trim().replace(/\s+/g, ' '), w = s.split(' ');
+  if (w.length <= 3) return s;
+  var cut = s.search(/\s(bin|binti|bt|bte|a\/l|a\/p|s\/o|d\/o)\s/i);
+  if (cut > 0) return s.slice(0, cut);
+  return w.slice(0, 2).join(' ');
+}
+/* a customer's finished rentals (Car Returned or Completed, ended before now), newest first. Repeat-customer banners use this. */
+function pastRentals(custId, exceptId) {
+  var n = Date.now();
+  return S.bookings.filter(function (x) { return x.cust === custId && x.id !== exceptId && (x.bookingStatus === 'Completed' || x.bookingStatus === 'Car Returned') && new Date(x.end).getTime() < n; })
+    .sort(function (a, b) { return new Date(b.end) - new Date(a.end); });
+}
+function repeatText(custId, exceptId) {
+  var past = pastRentals(custId, exceptId); if (!past.length) return '';
+  return 'Repeat customer: ' + past.length + ' rental' + (past.length > 1 ? 's' : '') + ', last on ' + dFull(past[0].end);
+}
 /* a `by` field is a staff id for staff, or a plain label ('Website', 'Customer', 'Slip reader'). who() shows either. */
 function who(by) { var p = staff(by); return p ? p.name : (by || ''); }
 function loc(id) { return byId(B().locations, id); }
@@ -301,6 +326,8 @@ var RENT_LIKE = ['Rental payment', 'Delivery charge', 'Return charge', 'Damage c
 var PAY_METHODS = ['Cash', 'Card', 'Online Transfer', 'Deposit adjustment'];
 function activePays(b) { return (b.payments || []).filter(function (p) { return !p.voided; }); }
 function paidOf(b, kinds) { kinds = [].concat(kinds); return activePays(b).reduce(function (s, p) { return s + (p.items || []).reduce(function (t, it) { return t + (kinds.indexOf(it.kind) >= 0 ? +it.amt || 0 : 0); }, 0); }, 0); }
+/* a payment method in plain words, the same on every screen */
+function methodText(m) { return m === 'Online Transfer' ? 'Bank transfer' : m === 'Deposit adjustment' ? 'From deposit' : (m || ''); }
 function payTotal(p) { return (p.items || []).reduce(function (s, it) { return s + (+it.amt || 0); }, 0); }
 /* rent: under 24 h = hourly x exact hours; else full days x daily + remaining exact hours x hourly; whole RM.
    cover: daily x days (under 24 h = 1, part days round up). payable = rent + deposit + cover + delivery + return + others - discount, whole RM. */
@@ -344,9 +371,12 @@ function applyStatusRules(b, prevStatus) {
     }
   }
   if (b.bookingStatus === 'Car Returned' && prevStatus !== 'Car Returned' && b.paymentStatus !== 'Deposit Refunded') {
+    /* a deposit waits to go back only when one was really received; with nothing received the deposit (and anything else) is still due */
+    var mm = calcBooking(b), was = b.paymentStatus;
     if ((+(b.rates || {}).deposit || 0) <= 0) b.paymentStatus = 'Deposit Refunded';
-    else { b.paymentStatus = 'Refund Pending'; b.refundPendingAt = b.refundPendingAt || new Date().toISOString(); }
-    ch.push('payment status to ' + b.paymentStatus);
+    else if (mm.depositReceived > 0) { b.paymentStatus = 'Refund Pending'; b.refundPendingAt = b.refundPendingAt || new Date().toISOString(); }
+    else if (!b.paymentStatus) b.paymentStatus = 'Deposit Due';
+    if (b.paymentStatus !== was) ch.push('payment status to ' + b.paymentStatus);
   }
   if (b.bookingStatus === 'Agreement Signed' && prevStatus !== 'Agreement Signed') ON_SIGNED.forEach(function (fn) { try { fn(b); } catch (e) { console.error(e); } });
   return ch;
@@ -361,6 +391,11 @@ function setBookingStatus(b, status, opts) {
   bLog(b, (opts.text || 'Status changed from ' + prev + ' to ' + b.bookingStatus) + (ch.length ? ' (' + ch.join(', ') + ')' : ''), { bookingStatus: [prev, b.bookingStatus] });
   save(); return ch;
 }
+/* the booking form went to the customer (WhatsApp, share or copied link): Pending / Confirmed move to Agreement Sent. how: 'on WhatsApp', 'by share', 'as a link' */
+function markFormSent(b, how) {
+  if (b.bookingStatus === 'Pending' || b.bookingStatus === 'Confirmed') { setBookingStatus(b, 'Agreement Sent', { text: 'Agreement sent to the customer' + (how ? ' ' + how : '') }); return true; }
+  bLog(b, 'Booking form sent' + (how ? ' ' + how : '')); save(); return false;
+}
 function setPaymentStatus(b, status, why) {
   var prev = b.paymentStatus || null; if (prev === status) return;
   b.paymentStatus = status || null; bLog(b, 'Payment status changed from ' + (prev || 'None') + ' to ' + (status || 'None') + (why ? ' (' + why + ')' : ''), { paymentStatus: [prev, status || null] }); save();
@@ -373,17 +408,32 @@ function nextPaymentStatus(b, items, fromStatus) {
     var k = it.kind, t = null;
     if (k === 'Security deposit' && unset.indexOf(cur) >= 0 && coversDeposit) t = 'Deposit Received';
     else if (RENT_LIKE.indexOf(k) >= 0 && coversTotal && unset.concat(['Deposit Received']).indexOf(cur) >= 0) t = 'Full Payment Received';
-    else if (k === 'Extension payment' && unset.concat(['Deposit Received', 'Full Payment Received', 'Extension Due']).indexOf(cur) >= 0) t = 'Extension Paid';
+    /* an extension never hides a missing deposit or unpaid rent: Extension Paid only after full payment, or when everything is now covered */
+    /* money owed after the deposit ran out (Extension Due) is paid with a rent-like payment too */
+    else if (RENT_LIKE.indexOf(k) >= 0 && coversTotal && cur === 'Extension Due') t = 'Extension Paid';
+    else if (k === 'Extension payment' && (['Full Payment Received', 'Extension Due'].indexOf(cur) >= 0 || (unset.concat(['Deposit Received']).indexOf(cur) >= 0 && coversTotal && coversDeposit))) t = 'Extension Paid';
     if (t) cur = t;
   });
   return cur !== start ? cur : null;
 }
-/* after voiding a deposit payment: 'Deposit Received' goes back to 'Deposit Due' when the deposit recorded is no longer whole. Returns the new status or null. */
-function depositDueAfterVoid(b) {
-  var m = calcBooking(b);
-  if (b.paymentStatus !== 'Deposit Received' || m.deposit <= 0 || m.depositReceived >= m.deposit) return null;
-  setPaymentStatus(b, 'Deposit Due', 'a deposit payment was voided'); return 'Deposit Due';
+/* after a payment is voided or undone: step the payment status back when it no longer matches the money (Full Payment Received with money due,
+   Deposit Received without the whole deposit, Extension Paid without an extension payment). Sets it, and returns the new status ('' for none) or null. */
+function statusAfterVoid(b) {
+  var m = calcBooking(b), cur = b.paymentStatus || null, to;
+  var signed = !!b.submitted || ['Agreement Signed', 'Car Delivered', 'Car Returned', 'Completed'].indexOf(b.bookingStatus) >= 0;
+  var base = function () { /* the status the remaining payments give on their own */
+    var items = [].concat.apply([], activePays(b).map(function (p) { return p.items || []; }));
+    var ns = items.length ? nextPaymentStatus(b, items, '') : null;
+    return ns || (signed || m.received + m.extra > 0 ? 'Deposit Due' : null);
+  };
+  if (cur === 'Full Payment Received' && m.due > 0.99) to = m.deposit > 0 && m.depositReceived >= m.deposit ? 'Deposit Received' : (signed || m.received + m.extra > 0 ? 'Deposit Due' : null);
+  else if (cur === 'Deposit Received' && m.deposit > 0 && m.depositReceived < m.deposit) to = signed || m.received + m.extra > 0 ? 'Deposit Due' : null;
+  else if (cur === 'Extension Paid' && paidOf(b, 'Extension payment') <= 0) { to = base(); if (to === 'Full Payment Received' || (m.due > 0.99 && to === 'Deposit Received')) to = m.due > 0.99 ? 'Extension Due' : 'Full Payment Received'; }
+  else return null;
+  if ((to || null) === cur) return null;
+  setPaymentStatus(b, to, 'a payment was voided'); return to || '';
 }
+function depositDueAfterVoid(b) { return statusAfterVoid(b); } /* old name */
 /* Deposit Refunded can be picked by hand only for bookings that end before the lock date; after it, only recording the refund (deposits.js) sets it */
 function canPickRefunded(b) { if (b.paymentStatus === 'Deposit Refunded') return true; return new Date(b.end) < new Date((B().depositRefundLockFrom || '2026-11-01') + 'T00:00:00'); }
 
@@ -528,13 +578,31 @@ var KINDS = {
   service: { label: 'Service or paper due', desc: 'A service, road tax, insurance or inspection is due soon', icon: 'wrench' },
   alarm: { label: 'Tracker alarm', desc: 'A car tracker reports a power cut, tow or a move without a booking', icon: 'warn' }
 };
-/* opts: {self:true} for your own action (no toast, no inbox; a small say() snackbar), {silentToast:true} */
+/* The inbox is per person: a notification shows only to people whose role allows its kind (kindAllowed in notifs.js), never to the person
+   who caused it (n.from), and only to n.to when it is personal. Read and cleared are kept per person (readBy / hiddenFor). */
+function notifFor(n, id) {
+  id = id || S.me; if (!n) return false;
+  if (n.hiddenFor && n.hiddenFor[id]) return false;
+  if (n.from && n.from === id) return false;
+  if (n.to && n.to !== id) return false;
+  if (typeof kindAllowed === 'function' && id === S.me && !kindAllowed(n.kind)) return false;
+  return true;
+}
+function myNotifs() { return (S.notifs || []).filter(function (n) { return notifFor(n); }); }
+function notifRead(n) { return n.readBy ? !!n.readBy[S.me] : !!n.read; }
+function setNotifRead(n, v) {
+  if (!n.readBy) { n.readBy = {}; if (n.read) (S.staff || []).forEach(function (p) { n.readBy[p.id] = true; }); delete n.read; }
+  if (v) n.readBy[S.me] = true; else delete n.readBy[S.me];
+}
+function hideNotif(n, v) { n.hiddenFor = n.hiddenFor || {}; if (v) n.hiddenFor[S.me] = true; else delete n.hiddenFor[S.me]; }
+/* opts: {self:true} for your own action (no toast, no inbox; a small say() snackbar), {silentToast:true}, {from: staffId} (who caused it), {to: staffId} (personal) */
 function notify(kind, title, body, link, opts) {
   opts = opts || {};
   if (opts.self) { say(title); return; }
-  var n = { id: uid(), kind: kind, title: title, body: body, at: new Date().toISOString(), read: false, link: link || '' };
+  var n = { id: uid(), kind: kind, title: title, body: body, at: new Date().toISOString(), readBy: {}, link: link || '' };
+  if (opts.from) n.from = opts.from; if (opts.to) n.to = opts.to;
   S.notifs.unshift(n); S.notifs = S.notifs.slice(0, 60); save();
-  if (S.prefs && S.prefs[kind] === false) { refreshBadges(); return; }
+  if (!notifFor(n) || (S.prefs && S.prefs[kind] === false)) { refreshBadges(); return; }
   if (!opts.silentToast) toast(n);
   /* Android app (APK): hand it to the phone when the app is not on screen */
   if (ANDROID) { try { if (!FMSAndroid.inFront()) FMSAndroid.notify(title, body, n.link || '#inbox'); } catch (e) {} refreshBadges(); return; }
@@ -580,7 +648,7 @@ function toast(n) {
   el.className = 'toast'; el.type = 'button';
   el.innerHTML = '<div class="ic">' + MARKS[CO] + '</div><div style="min-width:0;flex:1"><b>' + esc(n.title) + '</b><span>' + esc(n.body) + '</span></div>';
   var hide = _showToastEl(el, 4800);
-  el.onclick = function () { if (el.dataset.swiped) return; n.read = true; save(); hide(); if (n.link) location.hash = n.link; else refreshBadges(); };
+  el.onclick = function () { if (el.dataset.swiped) return; setNotifRead(n, true); save(); hide(); if (n.link) location.hash = n.link; else refreshBadges(); };
   if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {}
 }
 function say(msg) { var el = document.createElement('div'); el.className = 'toast plain'; el.setAttribute('role', 'status'); el.textContent = msg; _showToastEl(el, 2600); }
@@ -592,7 +660,7 @@ function undoSnack(text, undoFn, ms) {
   $('.undo', el).onclick = function () { hide(); try { undoFn && undoFn(); } catch (e) { console.error(e); } };
   return hide;
 }
-function unreadCount() { return S.notifs.filter(function (n) { return !n.read; }).length; }
+function unreadCount() { return myNotifs().filter(function (n) { return !notifRead(n); }).length; }
 function chatUnread() { return S.wa.reduce(function (s, c) { return s + (c.unread || 0); }, 0) + (S.staffUnread || 0); }
 function refreshBadges() {
   var u = unreadCount(), bell = $('#bellDot'); if (bell) { bell.textContent = u; bell.style.display = u ? '' : 'none'; }
@@ -713,6 +781,9 @@ function sheet(html, after, opts) {
   try { if (replacing && history.state && history.state.fmsSheet === oldTopId) history.replaceState({ fmsSheet: id }, '', location.href); else history.pushState({ fmsSheet: id }, '', location.href); } catch (e) {}
   requestAnimationFrame(function () { requestAnimationFrame(function () { sc.classList.add('show'); sh.classList.add('show'); }); });
   fitSheets(); placeToasts();
+  /* a toast already on screen (an Undo snack, 'Deposit closed') moves once the sheet has slid in, so it never covers the sheet's footer */
+  setTimeout(placeToasts, 60); setTimeout(placeToasts, 340);
+  sh.addEventListener('transitionend', function (e) { if (e.target === sh) placeToasts(); });
   if (after) after(sh);
   if (!opts.noSwipe) {
     /* swipe down to close, from the top of the sheet */
@@ -912,10 +983,22 @@ function pdfDoc(kind, data) {
   data = data || {};
   var html = pdfHtml(kind, data), name = (data.no || kind).replace(/[^\w\-]+/g, '_') + '.html';
   sheet(sheetHead(data.no || data.title || 'Preview', data.to ? data.to.name : '') +
-    '<div class="pdfwrap noswipe"><iframe class="pdfframe" title="Preview" sandbox="allow-same-origin allow-modals"></iframe></div>' +
+    '<div class="pdfwrap noswipe"><div class="pdfsize"><iframe class="pdfframe" title="Preview" sandbox="allow-same-origin allow-modals"></iframe><button type="button" class="pdftap" aria-label="Zoom in"></button></div></div><p class="hint pdfhint">Tap the page to zoom in. Tap again to fit.</p>' +
     '<div class="sheet-foot"><div class="btnrow"><button type="button" class="btn ghost" id="pdfDl">' + I('install') + 'Download</button><button type="button" class="btn" id="pdfSh">' + I('share') + 'Share</button></div></div>', function (sh) {
       var fr = $('.pdfframe', sh); fr.srcdoc = html;
-      var fit = function () { var w = fr.parentNode.clientWidth, k = w / 794; fr.style.transform = 'scale(' + k + ')'; fr.parentNode.style.height = Math.round(1123 * k) + 'px'; };
+      /* the A4 page fits the width; a tap zooms to a readable size inside the preview (it scrolls there, never the page) */
+      var wrap = $('.pdfwrap', sh), size = $('.pdfsize', sh), tap = $('.pdftap', sh), zoom = false;
+      var fit = function () {
+        var w = wrap.clientWidth, k = zoom ? Math.max(w / 794, 0.9) : w / 794;
+        fr.style.transform = 'scale(' + k + ')'; size.style.width = Math.round(794 * k) + 'px'; size.style.height = Math.round(1123 * k) + 'px';
+        wrap.style.height = zoom ? Math.min(Math.round(1123 * k), Math.round(window.innerHeight * 0.62)) + 'px' : Math.round(1123 * (w / 794)) + 'px';
+        wrap.classList.toggle('zoom', zoom); tap.setAttribute('aria-label', zoom ? 'Fit the page' : 'Zoom in');
+      };
+      tap.onclick = function (e) {
+        var r = wrap.getBoundingClientRect(), fx = (e.clientX - r.left + wrap.scrollLeft) / size.offsetWidth, fy = (e.clientY - r.top + wrap.scrollTop) / size.offsetHeight;
+        zoom = !zoom; fit();
+        if (zoom) { wrap.scrollLeft = Math.max(0, fx * size.offsetWidth - wrap.clientWidth / 2); wrap.scrollTop = Math.max(0, fy * size.offsetHeight - wrap.clientHeight / 2); } else { wrap.scrollLeft = 0; wrap.scrollTop = 0; }
+      };
       setTimeout(fit, 30);
       $('#pdfDl', sh).onclick = function () { pdfDoc.print(html); };
       $('#pdfSh', sh).onclick = function () {
