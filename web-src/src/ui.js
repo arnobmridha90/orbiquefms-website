@@ -258,12 +258,20 @@ var UI = (function () {
       o.fields.forEach(function (f) {
         if (f.type === 'search') main += '<div class="inp srch ui-fsearch">' + i('search') + '<input type="search" data-f="' + e(f.key) + '" data-key="flt-' + e(f.key) + '" placeholder="' + e(f.placeholder || 'Search') + '" aria-label="' + e(f.placeholder || 'Search') + '" value="' + e(v[f.key] || '') + '"></div>';
         else if (f.type === 'select') main += '<div class="inp ui-fsel ui-fx"' + (f.width ? ' style="width:' + f.width + 'px"' : '') + '><select data-f="' + e(f.key) + '" aria-label="' + e(f.label || f.key) + '">' + (f.all !== false ? '<option value="">' + e(f.all || 'All') + '</option>' : '') + U.options(f.options, v[f.key]) + '</select></div>';
+        else if (f.type === 'combo') main += '<div class="ui-fcombo ui-fx" data-fcombo="' + e(f.key) + '"' + (f.width ? ' style="width:' + f.width + 'px"' : '') + '></div>';
         else if (f.type === 'date') main += '<div class="ui-fdate ui-fx">' + U.dateField({ key: 'flt-' + f.key, aria: f.label || f.key, value: v[f.key] || '', compact: true, chips: false, placeholder: f.label || 'Any day', attrs: { 'data-f': f.key } }) + '</div>';
         else if (f.type === 'daterange') main += '<div class="ui-frange ui-fx" role="group" aria-label="' + e(f.label || 'Dates') + '">' + (f.label ? '<span class="b2">' + e(f.label) + '</span>' : '') + U.dateField({ key: 'flt-' + f.from, aria: 'From', value: v[f.from] || '', compact: true, chips: false, placeholder: 'From', attrs: { 'data-f': f.from } }) + '<span class="faint">to</span>' + U.dateField({ key: 'flt-' + f.to, aria: 'To', value: v[f.to] || '', compact: true, chips: false, placeholder: 'To', min: v[f.from] || null, attrs: { 'data-f': f.to } }) + '</div>';
         else if (f.type === 'toggle') main += '<label class="ui-ftog ui-fx row gap6 b2"><span class="sw"><input type="checkbox" data-f="' + e(f.key) + '"' + (v[f.key] ? ' checked' : '') + '><span></span></span>' + e(f.label) + '</label>';
         else if (f.type === 'chips') chips += '<div class="ui-fchips" role="group" aria-label="' + e(f.label || f.key) + '">' + (f.label ? '<span class="b2">' + e(f.label) + '</span>' : '') + f.options.map(function (op) { var val = Array.isArray(op) ? op[0] : op, lb = Array.isArray(op) ? op[1] : op, n = Array.isArray(op) ? op[2] : null, tone = Array.isArray(op) ? op[3] : null; var on = String(v[f.key] == null ? (f.default != null ? f.default : (Array.isArray(f.options[0]) ? f.options[0][0] : f.options[0])) : v[f.key]) === String(val); return '<button type="button" class="ui-fchip' + (tone ? ' ' + tone : '') + '" data-fc="' + e(f.key) + '" data-v="' + e(val) + '" aria-pressed="' + on + '">' + e(lb) + (n != null ? '<span class="n">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>';
       });
       el.innerHTML = '<div class="ui-fb' + (st.open ? ' open' : '') + '"><div class="ui-frow">' + main + '<button type="button" class="btn o sm ui-fmore" data-fmore aria-expanded="' + !!st.open + '">' + i('filter') + 'Filters' + (count ? ' (' + count + ')' : '') + '</button>' + (any ? '<button type="button" class="btn t sm ui-fclear" data-fclear>' + i('x') + 'Clear filters</button>' : '') + (o.extra || '') + '</div>' + (chips ? '<div class="ui-frow">' + chips + '</div>' : '') + '</div>';
+      /* searchable filters (a long list of cars or kinds): the shared combo, with "All" as the empty value */
+      o.fields.forEach(function (f) {
+        if (f.type !== 'combo') return;
+        var box = el.querySelector('[data-fcombo="' + f.key + '"]'); if (!box) return;
+        U.combo(box, { key: 'flt-' + f.key, aria: f.label || f.key, placeholder: f.all || 'All', title: f.title || f.label || 'Choose', items: f.items, search: f.search, value: v[f.key] || '', searchPlaceholder: f.searchPlaceholder, emptyText: f.emptyText, noMatchHelp: f.noMatchHelp,
+          onChange: function (val) { v[f.key] = val || ''; draw(); o.onChange && o.onChange(v, f.key); } });
+      });
     }
     var st = { open: false };
     el.addEventListener('input', function (ev) { var t = ev.target; if (t.matches('input[type="search"][data-f]')) { v[t.getAttribute('data-f')] = t.value; deb(t.getAttribute('data-f')); } });
@@ -936,6 +944,15 @@ var UI = (function () {
     ctrl.car = function () { var v = ctrl.value(); return v ? carById(v) : null; };
     ctrl.busy = function () { var c = ctrl.car(); return c ? busy(c, opts.start || null, opts.end || null, opts.exceptId) : null; };
     return ctrl;
+  };
+
+  /* a searchable car filter for UI.filters: UI.carFilter({key:'car', label:'Car', all:'Any car', extra:[['none','Not tied to a car']], cars})
+     Type the plate with or without spaces, the model or the colour. */
+  U.carFilter = function (o) {
+    o = o || {};
+    return { type: 'combo', key: o.key || 'car', label: o.label || 'Car', all: o.all || 'Any car', title: o.title || 'Choose a car', searchPlaceholder: 'Plate, model or colour', noMatchHelp: 'Try the numbers of the plate, or the model.',
+      items: function () { return (o.extra || []).map(function (x) { return { value: x[0], label: x[1] }; }).concat((o.cars || D().cars).map(function (c) { return { value: c.id, label: c.plate, sub: carName(c) + ' · ' + c.color + (c.fleet && c.fleet !== 'Active' ? ' · ' + c.fleet : ''), kw: normPlate(c.plate) + ' ' + c.make + ' ' + c.model + ' ' + c.color, car: c }; })); },
+      search: function (it, q) { var np = normPlate(q); if (it.car && np && normPlate(it.car.plate) === np) return 10; if (it.car && np.length >= 2 && normPlate(it.car.plate).indexOf(np) >= 0) return 5; return U.wordsMatch(it.label + ' ' + (it.sub || '') + ' ' + (it.kw || ''), q) ? 1 : 0; } };
   };
 
   /* UI.bookingPicker(el, {key:'booking', label:'Booking', value (code), filter(b) -> bool, onChange(code, booking), showCancelled,

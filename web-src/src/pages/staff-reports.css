@@ -38,3 +38,4 @@
 .sr-biacts{flex:none;justify-content:center}
 @media (max-width:760px){.sr-biacts .ib{width:40px;height:40px}}
 .sr-bic{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}
+.sr-owed{display:block;font-size:12px;font-weight:600}

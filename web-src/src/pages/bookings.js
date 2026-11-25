@@ -1051,7 +1051,7 @@ PAGES['bookings'] = {
         { type: 'search', key: 'q', placeholder: 'Booking no., name, phone, plate' },
         { type: 'select', key: 'status', label: 'Status', options: LISTS.bookingStatus, all: 'All Statuses' },
         { type: 'select', key: 'pay', label: 'Payment Status', options: [['None', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s]; })), all: 'All Payment Statuses' },
-        { type: 'select', key: 'car', label: 'Car', options: d.cars.map(function (c) { return [c.id, bkCarLabel(c)]; }), all: 'All Cars', width: 220 },
+        Object.assign(UI.carFilter({ key: 'car', all: 'All Cars' }), { width: 220 }),
         { type: 'daterange', from: 'from', to: 'to', label: 'Rental dates' },
         { type: 'chips', key: 'quick', label: 'Quick', options: [['all', 'All', d.bookings.length], ['out', 'Out now', count(quick.out)], ['soon', 'Going out in 3 days', count(quick.soon)], ['back', 'Back in 3 days', count(quick.back)], ['late', 'Late', count(quick.late), 'bad'], ['due', 'Money due', count(quick.due)]] }
       ],

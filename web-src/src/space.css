@@ -144,3 +144,10 @@
 .brand-dark-accent .exp-chip[aria-pressed="true"],
 .brand-dark-accent .exp-ic[aria-pressed="true"],
 .brand-dark-accent .pg-reports .rpt-chip[aria-pressed="true"]{background:var(--focus);border-color:var(--focus);color:#fff;box-shadow:none}
+
+/* a page with a floating add button (Expenses on a phone): the back-to-top button and the toasts sit above it,
+   so the two round buttons never overlap and a message never covers the add button */
+@media (max-width:760px){
+  body:has(.exp-fab) .d-totop{bottom:calc(20px + env(safe-area-inset-bottom) + 56px + 12px);right:25px}
+  body:has(.exp-fab) #ui-toasts{bottom:calc(20px + env(safe-area-inset-bottom) + 56px + 12px)}
+}

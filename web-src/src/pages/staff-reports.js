@@ -77,18 +77,22 @@ function srModel(R, from, to, everyone) {
     var tin = sum(R.ledger.map(function (r) { return r.inn || 0; })), tout = sum(R.ledger.map(function (r) { return r.out || 0; }));
     m.sections.push({ title: 'Balance', sheet: 'Balance', noFormula: true, cols: [{ l: 'Date', t: 'date', w: 11 }, { l: 'Booking ID', w: 12 }, { l: 'Description', w: 38 }, { l: 'In', t: 'money', w: 12 }, { l: 'Out', t: 'money', w: 12 }, { l: 'Balance at hand', t: 'money', w: 14, strong: true }],
       rows: R.ledger.map(function (r) { return [r.date, r.booking || '', r.note ? { t: r.desc, s: r.note } : r.desc, r.inn == null ? '' : r.inn, r.out == null ? '' : r.out, r.balance]; }), total: ['Total, and balance at hand', '', '', tin, tout, who.closing] });
-    m.sections.push({ title: 'Staff-wise income (handover fees)', sheet: 'Staff-wise income', cols: ec, rows: rows('income'), total: ['Total', '', '', '', who.income], empty: 'No handover fees in this period.' });
-    m.sections.push({ title: 'Staff-wise expense (everyday kinds they paid)', sheet: 'Staff-wise expense', cols: ec, rows: rows('expenses', true), total: ['Total', '', '', '', who.expenses], empty: 'No expenses in this period.' });
+    m.sections.push({ title: 'Income (handover fees)', sheet: 'Income', cols: ec, rows: rows('income'), total: ['Total', '', '', '', who.income], empty: 'No handover fees in this period.' });
+    m.sections.push({ title: 'Expenses (everyday kinds they paid)', sheet: 'Expenses', cols: ec, rows: rows('expenses', true), total: ['Total', '', '', '', who.expenses], empty: 'No expenses in this period.' });
   } else {
     m.info = [['Staff', 'Everyone']];
     var t = function (k) { return sum(R.people.map(function (p) { return p[k]; })); };
-    m.kpis = [{ l: 'Balance at hand', raw: t('closing'), t: 'money', hero: true, note: 'Everyone together' }, { l: 'Income', raw: t('income'), t: 'money', note: 'Handover fees' }, { l: 'Expenses paid', raw: t('expenses'), t: 'money' }, { l: 'Staff', raw: R.people.length, t: 'int' }];
+    /* cash some staff hold and money the company owes others are two different things: never add them together */
+    var hold = sum(R.people.map(function (p) { return Math.max(0, p.closing); })), owed = -sum(R.people.map(function (p) { return Math.min(0, p.closing); }));
+    m.kpis = [{ l: 'Cash staff hold', raw: hold, t: 'money', hero: true, note: 'Company money to bank in' }, { l: 'Company owes staff', raw: owed, t: 'money', note: 'Pay it back to them' }, { l: 'Income', raw: t('income'), t: 'money', note: 'Handover fees' }, { l: 'Expenses paid', raw: t('expenses'), t: 'money' }, { l: 'Staff', raw: R.people.length, t: 'int' }];
     m.sections.push({ title: 'Everyone', sheet: 'Everyone', cols: [{ l: 'Staff', w: 16 }].concat(SR_PARTS.map(function (p) { return { l: p[1], t: 'money', w: 12 }; })), rows: R.people.map(function (p) { return [p.name].concat(SR_PARTS.map(function (q) { return p[q[0]]; })); }), total: ['Total'].concat(SR_PARTS.map(function (q) { return t(q[0]); })) });
   }
   m.notes = ['Income = the handover fees they recorded. Expenses = the everyday kinds they recorded and paid (not handover fees, not office and admin costs, which the office pays).', 'Balance at hand = cash from customers + money from the company - expenses paid - deposits handed back in cash - cash banked in - their handover fees. Positive: they hold company money. Negative: the company owes them.', 'Balance at start is the same sum for everything before the period.'];
   m.sheets = function () { return rptAutoBook(m); };
   return m;
 }
+/* a balance: what they hold, or "Owed RM 1,220.50" in red when the company owes them */
+function srBal(v) { return v < -0.004 ? '<b class="sr-neg">Owed ' + UI.money(-v) + '</b>' : '<b>' + UI.money(v) + '</b>'; }
 function srLedgerTable(el, rows, closing) {
   var neg = function (v) { return '<span class="' + (v < 0 ? 'sr-neg' : '') + '">' + UI.money(v) + '</span>'; };
   UI.table(el, { rows: rows.map(function (r, k) { return Object.assign({ k: k }, r); }), rowKey: 'k', density: 'compact', pageSize: false, minWidth: 760, maxHeight: '70vh',
@@ -132,11 +136,11 @@ PAGES['staff-reports'] = {
       body.innerHTML = '<div class="pg-reports sr-k">' + rptKpisHtml(m, true) + '</div>' + (who ? (everyone ? '<button type="button" class="inv-link sr-back" data-all>' + i('arrow-left') + 'Everyone</button>' : '') + '<div class="sr-tabs" id="sr-tabs"></div><div id="sr-tab"></div>' : '<h4 class="sr-h">EVERYONE</h4><div id="sr-all"></div><p class="b2 sr-tip">Tap a name for that person\'s details.</p>');
       if (!who) {
         UI.table(body.querySelector('#sr-all'), { rows: R.people, rowKey: 'id', density: 'compact', pageSize: false, minWidth: 1100, onRowClick: function (p) { st.person = p.id; st.tab = 'balance'; ctx.setParams({ person: p.id }); st.pp = p.id; ctx.refresh(); },
-          columns: [{ key: 'name', label: 'Staff', render: function (p) { return '<button type="button" class="inv-link" data-sp="' + esc(p.id) + '">' + esc(p.name) + '</button>'; } }].concat(SR_PARTS.map(function (q) { return { key: q[0], label: q[1], money: true, render: function (p) { var v = p[q[0]], h = UI.money(v); return q[0] === 'closing' ? '<b class="' + (v < 0 ? 'sr-neg' : '') + '">' + h + '</b>' : h; } }; })),
-          footer: function () { return '<tr><td><b>Total</b></td>' + SR_PARTS.map(function (q) { return '<td class="c"><b>' + UI.money(sum(R.people.map(function (p) { return p[q[0]]; }))) + '</b></td>'; }).join('') + '</tr>'; },
-          card: function (p) { return '<div class="sr-pc"><div class="row"><b class="grow">' + esc(p.name) + '</b><span class="sr-amt"><small>Balance at hand</small><b class="' + (p.closing < 0 ? 'sr-neg' : '') + '">' + UI.money(p.closing) + '</b></span></div><div class="sr-pg">' + SR_PARTS.slice(0, 7).map(function (q) { return '<span><small>' + esc(q[1]) + '</small>' + UI.money(p[q[0]]) + '</span>'; }).join('') + '</div></div>'; } });
+          columns: [{ key: 'name', label: 'Staff', render: function (p) { return '<button type="button" class="inv-link" data-sp="' + esc(p.id) + '">' + esc(p.name) + '</button>'; } }].concat(SR_PARTS.map(function (q) { return { key: q[0], label: q[1], money: true, render: function (p) { var v = p[q[0]]; return q[0] === 'closing' ? srBal(v) : UI.money(v); } }; })),
+          footer: function () { return '<tr><td><b>Total</b></td>' + SR_PARTS.map(function (q) { if (q[0] === 'closing') { var hd = sum(R.people.map(function (p) { return Math.max(0, p.closing); })), ow = -sum(R.people.map(function (p) { return Math.min(0, p.closing); })); return '<td class="c"><b>' + UI.money(hd) + '</b>' + (ow ? '<small class="sr-neg sr-owed">Owed ' + UI.money(ow) + '</small>' : '') + '</td>'; } return '<td class="c"><b>' + UI.money(sum(R.people.map(function (p) { return p[q[0]]; }))) + '</b></td>'; }).join('') + '</tr>'; },
+          card: function (p) { return '<div class="sr-pc"><div class="row"><b class="grow">' + esc(p.name) + '</b><span class="sr-amt"><small>Balance at hand</small>' + srBal(p.closing) + '</span></div><div class="sr-pg">' + SR_PARTS.slice(0, 7).map(function (q) { return '<span><small>' + esc(q[1]) + '</small>' + UI.money(p[q[0]]) + '</span>'; }).join('') + '</div></div>'; } });
       } else {
-        var tabs = [{ id: 'balance', label: 'Balance' }, { id: 'income', label: 'Staff-wise income', count: who.entries.filter(function (e) { return e.part === 'income'; }).length }, { id: 'expense', label: 'Staff-wise expense', count: who.entries.filter(function (e) { return e.part === 'expenses'; }).length }, { id: 'bankins', label: 'Bank-ins' }];
+        var tabs = [{ id: 'balance', label: 'Balance' }, { id: 'income', label: 'Income', count: who.entries.filter(function (e) { return e.part === 'income'; }).length }, { id: 'expense', label: 'Expenses', count: who.entries.filter(function (e) { return e.part === 'expenses'; }).length }, { id: 'bankins', label: 'Bank-ins' }];
         var drawTab = function () {
           var el = body.querySelector('#sr-tab');
           if (st.tab === 'balance') srLedgerTable(el, R.ledger, who.closing);

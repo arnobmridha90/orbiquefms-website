@@ -19,9 +19,9 @@ var MORE_GROUPS = function (bd) {
     ['Money', [
       ['#money', 'chart', 'Money', can('bookings.see_revenue') || can('billing.view')],
       ['#deposits', 'shield', 'Deposits', can('deposits.view'), bd.dep, 'amber'],
-      ['#cash', 'bank', 'Cash and bank-in', cashOk],
+      ['#cash', 'bank', 'Cash and bank-ins', cashOk],
       ['#mymoney', 'cash', can('expenses.staff_reports_all') ? 'Staff money' : 'My money', can('expenses.view') || can('expenses.add')],
-      ['#invoices', 'receipt', 'Invoices', can('billing.view')],
+      ['#invoices', 'receipt', 'Invoices and receipts', can('billing.view')],
       ['#instalments', 'cal', 'Instalments', can('cars.see_instalment')],
       ['#expenses', 'tag', 'Expenses', can('expenses.view') || can('expenses.add')],
       ['#reports', 'activity', 'Reports', can('reports.view')]]],
@@ -29,7 +29,7 @@ var MORE_GROUPS = function (bd) {
       ['#cars', 'car', 'Cars', can('cars.view')],
       ['#maintenance', 'wrench', 'Maintenance', can('maintenance.view'), bd.maint, 'red'],
       ['#summons', 'file', 'Summons', can('summons.view')],
-      ['#tracking', 'map', 'Where is it', can('tracking.view')]]],
+      ['#tracking', 'map', 'Where is it now', can('tracking.view')]]],
     ['People', [
       ['#customers', 'users', 'Customers', can('customers.view')],
       ['#team', 'user', 'Team', can('users.view') || can('employees.view')]]]

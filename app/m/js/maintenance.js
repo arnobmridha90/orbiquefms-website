@@ -1,6 +1,6 @@
 /* ---------------- MAINTENANCE (M7 builder owns this file) ----------------
    #maintenance[?tab=due|workshop|papers|log|vendors&q=plate]
-   Tiles: Due now, In the workshop, Papers expiring, Spent this month (maintenance.see_costs).
+   Tiles (also the tabs): Overdue with the soon count, In the workshop, Papers expiring, Spent this month (maintenance.see_costs).
    API: Maint.log({car, type, status ('done'|'planned'|'workshop'), jobId}), Maint.job(id), Maint.renew({car, type}), Maint.carBack(downtimeId),
         Maint.block({car}), Maint.serviceInfo(car) -> {next, words, level} | null, Maint.jobRow(job, compact) -> html, Maint.dueItems().
    Rules (from the company's maintenance rules): workshop time is S.downtime and blocks rentals through busy(); putting a car in the workshop over
@@ -93,12 +93,14 @@ var Maint = (function () {
     if (r.q && r.q.tab) { MT.tab = r.q.tab; MT.q = r.q.q || ''; if (MT.tab === 'log') MT.logF = 'all'; try { history.replaceState(history.state, '', location.pathname + location.search + '#maintenance'); } catch (e) {} }
     var due = dueItems(), ws = workshopNow(), now = Date.now(), wsNow = ws.filter(function (d) { return new Date(d.from).getTime() <= now; }).length;
     var papersDue = due.filter(function (i) { return i.kind === 'paper'; }).length;
-    var tile = function (tab, icon, k, v, tone) { return '<button type="button" class="tile mt-tile' + (MT.tab === tab ? ' on' : '') + '" data-tab="' + tab + '"><div class="k">' + I(icon) + esc(k) + '</div><div class="v' + (tone ? ' ' + tone : '') + '">' + v + '</div></button>'; };
-    var tiles = '<div class="tiles mt-tiles">' + tile('due', 'warn', 'Due now', due.length, due.some(function (i) { return i.level === 'overdue'; }) ? 'tone-red-text' : '') + tile('workshop', 'wrench', 'In the workshop', wsNow) +
+    /* the tiles are the tabs for To do, Workshop and Papers; the To do tile counts what is overdue (the same number as the More badge) */
+    var tile = function (tab, icon, k, v, tone, small) { return '<button type="button" class="tile mt-tile' + (MT.tab === tab ? ' on' : '') + '" data-tab="' + tab + '" aria-pressed="' + (MT.tab === tab) + '"><div class="k">' + I(icon) + esc(k) + '</div><div class="v' + (tone ? ' ' + tone : '') + '">' + v + '</div>' + (small ? '<small class="mt-tsub">' + esc(small) + '</small>' : '') + '</button>'; };
+    var nOver = due.filter(function (i) { return i.level === 'overdue'; }).length, nSoon = due.length - nOver;
+    var tiles = '<div class="tiles mt-tiles">' + tile('due', 'warn', 'Overdue', nOver, nOver ? 'tone-red-text' : '', nSoon ? nSoon + ' soon' : 'Nothing soon') + tile('workshop', 'wrench', 'In the workshop', wsNow) +
       tile('papers', 'file', 'Papers expiring', papersDue, papersDue ? 'tone-amber-text' : '') + (seeCost() ? '<div class="tile mt-tile"><div class="k">' + I('cash') + 'Spent this month</div><div class="v money mt-spent">' + rm(spentThisMonth()) + '</div></div>' : '') + '</div>';
-    var tabs = [['due', 'Due now'], ['workshop', 'Workshop'], ['papers', 'Papers'], ['log', 'Log'], ['vendors', 'Workshops']];
+    var tabs = [['log', 'Service log'], ['vendors', 'Workshops list']];
     var html = topbar('Maintenance', { back: '#more', sub: S.cars.filter(function (c) { return c.status === 'active'; }).length + ' active cars' }) + '<main class="mt-main">' + tiles +
-      '<div class="mt-tabs chiprow" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" class="mt-tab' + (MT.tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="mt-tabs chiprow">' + tabs.map(function (t) { return '<button type="button" class="mt-tab' + (MT.tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div id="mtbody"></div></main>' +
       (can('maintenance.create') ? '<button class="fab" onclick="Maint.log({})" aria-label="Log a service">' + I('wrench') + '</button>' : '');
     return { html: html, after: function () {
@@ -111,11 +113,13 @@ var Maint = (function () {
 
   /* Due now */
   function drawDue() {
-    var all = dueItems(), F = [['all', 'Everything'], ['service', 'Services'], ['paper', 'Papers'], ['job', 'Planned']];
+    var q = (MT.q || '').trim(), F = [['all', 'Everything'], ['service', 'Services'], ['paper', 'Renewals'], ['job', 'Planned']];
+    var all = dueItems().filter(function (i) { if (!q) return true; var c = i.car || {}; return normPlate(c.plate).indexOf(normPlate(q)) >= 0 || wordsMatch(q, [c.plate, c.make, c.model, i.title].join(' ')); });
     var list = all.filter(function (i) { return MT.f === 'all' || i.kind === MT.f; });
     var nh = Object.keys(hidden()).length;
-    var html = '<div class="chiprow mt-chips">' + F.map(function (f) { var n = all.filter(function (i) { return f[0] === 'all' || i.kind === f[0]; }).length; return '<button type="button" class="fchip' + (MT.f === f[0] ? ' on' : '') + '" data-f="' + f[0] + '">' + f[1] + ' <span class="n">' + n + '</span></button>'; }).join('') + '</div>';
-    if (!list.length) html += '<div class="empty card mt-empty">' + I('check') + '<div><b>Nothing due. Nice.</b><br>No service is late, no paper is about to expire and no job is waiting.</div></div>';
+    var html = searchBox('Plate or model') + '<div class="chiprow mt-chips">' + F.map(function (f) { var n = all.filter(function (i) { return f[0] === 'all' || i.kind === f[0]; }).length; return '<button type="button" class="fchip' + (MT.f === f[0] ? ' on' : '') + '" data-f="' + f[0] + '">' + f[1] + ' <span class="n">' + n + '</span></button>'; }).join('') + '</div>';
+    if (!list.length && q) html += '<div class="empty card mt-empty">Nothing due matches “' + esc(q) + '”.</div>';
+    else if (!list.length) html += '<div class="empty card mt-empty">' + I('check') + '<div><b>Nothing due. Nice.</b><br>No service is late, no paper is about to expire and no job is waiting.</div></div>';
     else {
       var od = list.filter(function (i) { return i.level === 'overdue'; }), sn = list.filter(function (i) { return i.level === 'soon'; });
       if (od.length) html += '<div class="sec"><h2>Overdue (' + od.length + ')</h2></div>' + od.map(dueCard).join('');
@@ -123,6 +127,7 @@ var Maint = (function () {
     }
     if (nh) html += '<button type="button" class="btn link mt-unhide" id="mtunhide">' + nh + ' hidden for now · Show them again</button>';
     body(html);
+    wireSearch(drawDue);
     $$('.mt-chips [data-f]').forEach(function (b) { b.onclick = function () { MT.f = b.dataset.f; drawDue(); }; });
     var u = $('#mtunhide'); if (u) u.onclick = function () { S.prefs.mtHide = {}; save(); drawDue(); render(false, true); };
     $$('[data-due]').forEach(function (b) {
@@ -283,7 +288,7 @@ var Maint = (function () {
       '<div id="mlblockbox"><label class="cr-switch"><span><b>Block this car for rentals</b><small>While it is in the workshop</small></span><span class="sw"><input type="checkbox" id="mlblock" checked><i></i></span></label>' +
       '<label class="field" id="mlbackf"><span>Expected back (optional)</span><input class="inp" type="date" id="mlback" min="' + toLocalInput(new Date()) + '"><small class="hint">Leave empty if you do not know yet</small></label><div id="mlclash"></div></div>' +
       M7.photoField('mlph', 'Invoice photo (optional)', null) +
-      '<div id="mlremindbox"><label class="cr-switch"><span><b>Remind me when the next one is due</b><small>Shows in Due now</small></span><span class="sw"><input type="checkbox" id="mlrem"' + (f.remind ? ' checked' : '') + '><i></i></span></label>' +
+      '<div id="mlremindbox"><label class="cr-switch"><span><b>Remind me when the next one is due</b><small>Shows on Maintenance when it is due</small></span><span class="sw"><input type="checkbox" id="mlrem"' + (f.remind ? ' checked' : '') + '><i></i></span></label>' +
       '<div class="mt-2" id="mlremf"><label class="field"><span>After how many km</span><input class="inp num" id="mlrkm" inputmode="numeric" value="' + esc(f.remindKm) + '" placeholder="10000"></label><label class="field"><span>Or after how many days</span><input class="inp num" id="mlrd" inputmode="numeric" value="' + esc(f.remindDays) + '" placeholder="180"></label></div></div>' +
       '<label class="field"><span>Note (optional)</span><textarea class="inp cr-ta" id="mlnote" rows="2" placeholder="What was done, what the mechanic said"></textarea></label>' +
       '<small class="err" id="mlerr" hidden></small>' +

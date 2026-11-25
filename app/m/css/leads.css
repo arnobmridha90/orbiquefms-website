@@ -36,7 +36,7 @@ body.kb-open .quick { display: none; }
 .ld-chev { color: var(--muted); display: grid; transition: transform .2s; flex: none; }
 .ld-chev svg { width: 18px; height: 18px; }
 .ld-pin.open .ld-chev { transform: rotate(180deg); }
-.ld-pin .ld-body { display: none; border-top: 1px solid var(--line); padding: 4px 12px 12px; max-height: 58vh; overflow-y: auto; overscroll-behavior: contain; }
+.ld-pin .ld-body { display: none; border-top: 1px solid var(--line); padding: 4px 12px 12px; max-height: 35vh; overflow-y: auto; overscroll-behavior: contain; }
 .ld-pin.open .ld-body { display: block; }
 body.kb-open .ld-pin .ld-body { display: none; }
 .ld-flat { padding: 2px 10px 8px; margin-top: 8px; color: var(--text); }
@@ -62,3 +62,6 @@ body.kb-open .ld-pin .ld-body { display: none; }
 .ld-booked .grow { flex: 1; min-width: 0; color: var(--text); }
 .ld-bkchip { height: 26px; font-size: 13px; padding: 0 9px; text-decoration: underline; }
 .nb-leadsum .ld-flat { background: rgba(255,255,255,.7); border-color: rgba(0,0,0,.06); }
+.ld-pin .ld-prim { margin: 0; padding: 0 12px 10px; }
+.ld-prim:has(> :only-child) { grid-template-columns: 1fr; }
+body.kb-open .ld-pin .ld-prim { display: none; }

@@ -341,7 +341,9 @@ function seedChats(d, R) {
     { id: uid(), from: S2, text: 'Ok boss', at: t(85) }
   ];
   var day = sod(new Date()).getTime(), sat = day + ((6 - new Date().getDay() + 7) % 7 || 7) * DAY;
-  var myvi = c.filter(function (x) { return x.model === 'Myvi'; })[0] || c[2], x50 = c.filter(function (x) { return x.model === 'X50'; })[0] || c[5];
+  /* the held car must really be free for the lead's dates (Sat 10:00 to Mon 10:00) */
+  var freeFor = function (x, s0, e0) { return x.status !== 'sold' && x.status !== 'inactive' && !d.bookings.some(function (b) { return b.car === x.id && b.bookingStatus !== 'Cancelled' && b.bookingStatus !== 'Completed' && new Date(b.start).getTime() < e0 && new Date(b.end).getTime() > s0; }); };
+  var myvi = c.filter(function (x) { return x.model === 'Myvi' && freeFor(x, sat + 10 * HOUR, sat + 2 * DAY + 10 * HOUR); })[0] || c.filter(function (x) { return freeFor(x, sat + 10 * HOUR, sat + 2 * DAY + 10 * HOUR); })[0] || c[2], x50 = c.filter(function (x) { return x.model === 'X50'; })[0] || c[5];
   var booked = d.bookings.filter(function (b) { return b.bookingStatus === 'Agreement Signed'; })[0];
   d.wa = [
     { id: 'wa1', name: 'Faizal Hassan', phone: fmtPhone('0127788123'), status: 'Lead', unread: 2, handled: 'bot', msgs: [
@@ -507,7 +509,8 @@ function seedExtras(d) {
       if (sm.status === 'Paid') sm.paidAt = iso(tt + 9 * DAY);
       d.summons.push(sm); b.summonsIds = (b.summonsIds || []).concat(sm.id);
     }
-    var idle = d.cars[1]; if (idle) d.summons.push({ id: uid(), car: idle.id, booking: null, authority: 'DBKL', notice: 'DBKL/' + ri(100000, 999999), plate: idle.plate, at: iso(base - 9 * DAY + 3 * HOUR), offence: 'Parking on a yellow line', amount: 50, status: 'No booking', photo: 'demo:summons:Notice', chargedAmt: null, chargedAt: null, paidAt: null, reason: '', by: 's1', created: iso(base - 2 * DAY) });
+    /* a car that really had no booking at that time */
+    var nbAt = base - 9 * DAY + 3 * HOUR, idle = d.cars.filter(function (x) { return !d.bookings.some(function (b) { return b.car === x.id && b.bookingStatus !== 'Cancelled' && new Date(b.start).getTime() <= nbAt && new Date(b.end).getTime() >= nbAt; }); })[0]; if (idle) d.summons.push({ id: uid(), car: idle.id, booking: null, authority: 'DBKL', notice: 'DBKL/' + ri(100000, 999999), plate: idle.plate, at: iso(base - 9 * DAY + 3 * HOUR), offence: 'Parking on a yellow line', amount: 50, status: 'No booking', photo: 'demo:summons:Notice', chargedAmt: null, chargedAt: null, paidAt: null, reason: '', by: 's1', created: iso(base - 2 * DAY) });
   }
   /* money: expenses, handover fees, bank-ins, instalments */
   if (!d.expenses) {

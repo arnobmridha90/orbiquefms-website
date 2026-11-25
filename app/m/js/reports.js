@@ -117,7 +117,7 @@ function rpModels(r) {
   var M = rpPayments(r);
   out.push({ id: 'money', title: 'Money in', icon: 'cash', desc: 'Every payment received in the period, newest first.',
     kpis: [{ l: 'Money in', v: M.total, t: 'money', hero: true, note: M.list.length + ' payment' + (M.list.length === 1 ? '' : 's'), split: [['Income', M.total - M.dep], ['Deposits received', M.dep], ['Taken in cash', M.cash]] }, { l: 'Income', v: M.total - M.dep, t: 'money', note: 'Rental and charges' }, { l: 'Deposits received', v: M.dep, t: 'money', note: 'Held, not income' }, { l: 'Void payments', v: M.voided, t: 'int', note: 'Left out' }],
-    rowsTitle: 'Payments', rows: M.list.map(function (x) { return { t1: x.b.code + ' · ' + cust(x.b.cust).name, t2: dShort(x.at) + ', ' + hm(x.at) + ' · ' + (x.p.items || []).map(function (i) { return i.kind; }).join(', ') + ' · ' + x.p.method, v: x.amt, link: '#booking/' + x.b.id }; }),
+    rowsTitle: 'Payments', rows: M.list.map(function (x) { return { t1: x.b.code + ' · ' + cust(x.b.cust).name, t2: dShort(x.at) + ', ' + hm(x.at) + ' · ' + (x.p.items || []).map(function (i) { return m4kindShort(i.kind); }).join(', ') + ' · ' + methodText(x.p.method), v: x.amt, link: '#booking/' + x.b.id }; }),
     totalRow: { l: 'Total money in', v: M.total },
     notes: ['Void payments are left out' + (M.voided ? ' (' + M.voided + ' in this period)' : '') + '. Payments made from a deposit already held are left out too' + (M.fromDep ? ' (' + M.fromDep + ')' : '') + ': no money came in.', 'Payments on Pending or Cancelled bookings are listed, because the money came in. Deposit refunds are not listed here.'] });
   var IO = rpInOut(r);
@@ -167,7 +167,7 @@ VIEWS.reports = function () {
   var html = topbar('Reports', { back: '#more', sub: r.err ? 'Choose a period' : r.label }) + '<main class="rp-main">' +
     '<div class="rp-per"><div class="chiprow rp-chips">' + RP_PER.map(function (p) { return '<button type="button" class="fchip' + (RPV.per === p[0] ? ' on' : '') + '" data-per="' + p[0] + '">' + esc(p[1]) + '</button>'; }).join('') + '</div>' +
     (RPV.per === 'custom' ? '<div class="rp-dates"><label class="field"><span>From</span><input type="date" class="inp' + (r.err && RPV.from ? ' bad' : '') + '" id="rpFrom" value="' + esc(RPV.from) + '"></label><label class="field"><span>To</span><input type="date" class="inp' + (r.err && RPV.to ? ' bad' : '') + '" id="rpTo" value="' + esc(RPV.to) + '"></label></div>' : '') +
-    (r.err ? '<p class="rp-err">' + I('warn', 2) + esc(r.err) + '</p>' : '<p class="rp-label">' + esc(r.label) + '</p>') + '</div>' +
+    (r.err ? '<p class="rp-err">' + I('warn', 2) + esc(r.err) + '</p>' : '') + '</div>' +
     (!can('reports.see_amounts') ? '<div class="banner amber">' + I('lock') + '<div>Amounts are hidden for your role. Ask the owner for <b>Report amounts</b> access to see them.</div></div>' : '') +
     (models.length ? '<div class="chiprow rp-jump">' + models.map(function (m) { return '<button type="button" class="fchip" data-jump="' + m.id + '">' + esc(m.title) + '</button>'; }).join('') + '</div>' + models.map(function (m) { return rpCard(m, r); }).join('') : '') +
     '<p class="demo-note">Made from this phone’s demo data. The big screen has the full reports and Excel files.</p></main>';

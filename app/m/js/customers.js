@@ -143,7 +143,7 @@ var Cust = (function () {
     var right = can('customers.edit') ? '<button class="iconbtn" type="button" onclick="Cust.edit(\'' + c.id + '\')" aria-label="Edit details">' + I('edit') + '</button>' : '';
     var html = topbar(c.name, { back: '#customers', sub: (c.nationality || '') + (c.created ? (c.nationality ? ' · ' : '') + 'customer since ' + MO[new Date(c.created).getMonth()] + ' ' + new Date(c.created).getFullYear() : ''), right: right }) + '<main class="cu-page">' +
       bannerHtml(g) +
-      '<div class="cu-hero card"><span class="av cu-av" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</span><div class="grow"><div class="cu-hname">' + esc(c.name) + '</div><div class="cu-hflags">' + (g.flags.length ? g.flags.map(fchip).join('') : '<span class="small muted">No flags</span>') + '</div></div></div>' +
+      '<div class="cu-hero card"><span class="av cu-av" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</span><div class="grow"><div class="cu-hname">' + esc(c.name) + '</div><div class="cu-hflags">' + (function () { var fl = g.flags.filter(function (f) { return f !== 'Repeat'; }); /* the banner below already says how many rentals */ return fl.length ? fl.map(fchip).join('') : '<span class="small muted">No flags</span>'; })() + '</div></div></div>' +
       (tel ? '<div class="cu-call"><a class="btn big" href="tel:' + esc(tel) + '">' + I('phone') + 'Call</a><button type="button" class="btn big cu-wa" onclick="Share.wa(\'' + esc(c.phone) + '\', \'\')">' + I('wa') + 'WhatsApp</button></div>' : '') +
       detailsHtml(c) + blacklistHtml(g) + notesHtml(g) + docsHtml(c) + bookingsHtml(g) + '</main>';
     return { html: html };
@@ -337,7 +337,9 @@ var Cust = (function () {
   }
   function bookAgain(id) {
     var g = groupOf(id); if (!g) return;
-    var go = function () { location.hash = hashWith('new', { cust: id }); };
+    /* start from the car they had last time; New booking shows a clash if it is not free */
+    var last = g.bookings.filter(function (b) { return b.bookingStatus !== 'Cancelled' && car(b.car); }).sort(function (a, b) { return new Date(b.start) - new Date(a.start); })[0];
+    var go = function () { location.hash = hashWith('new', last ? { cust: id, car: last.car } : { cust: id }); };
     if (g.flags.indexOf('Blacklisted') >= 0) confirm({ icon: 'danger', title: 'This customer is blacklisted', text: 'Check with the owner before you book a car for ' + g.c.name + '.', ok: 'Book anyway', cancel: 'Do not book', primary: 'cancel', danger: true }).then(function (ok) { if (ok) go(); });
     else go();
   }

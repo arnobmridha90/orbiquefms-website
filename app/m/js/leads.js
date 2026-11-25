@@ -75,13 +75,16 @@ var Leads = (function () {
     var w = wa(id); if (!w || !w.lead) return '';
     var l = w.lead, s = stateOf(w), inThread = opts.thread != null ? opts.thread : (route().name === 'chat' && route().a === 'wa');
     var c = l.car ? car(l.car) : null, pf = feeOf(l, 'pick'), rf = feeOf(l, 'ret'), b = l.bookingId ? bk(l.bookingId) : (w.bookingId ? bk(w.bookingId) : null);
-    var body = '';
+    var body = '', primRow = '';
     if (s === 'booked' && b) body += '<div class="ld-booked">' + I('check', 2.4) + '<span class="grow">Booked as <a class="chip tone-emerald ld-bkchip" href="#booking/' + b.id + '">' + esc(b.code) + '</a></span>' + statusChip(b) + '</div>';
     /* the customer's question is the line staff need most: it comes first, above the details */
     if (l.question && s !== 'booked' && s !== 'closed') body += '<div class="ld-q">' + I('chat') + '<div><b>Customer asks:</b> ' + esc(l.question) + '</div></div>';
     body += '<div class="ld-grid">';
     body += row('Dates', l.start ? esc(datesText(l)) : '<span class="muted">Not given yet</span>', l.start && l.end ? esc(durationText(l.start, l.end)) : '', true);
-    body += row('Car', c ? esc(c.make + ' ' + c.model) + ' <span class="muted">' + esc(c.plate) + '</span>' : '<span class="muted">Not chosen yet</span>', s !== 'booked' && s !== 'closed' ? holdChip(l, true) || (c && l.start && !l.holdUntil ? 'Not held' : '') : '', true);
+    /* a held car that got booked meanwhile: say so instead of the hold */
+    var clash = c && l.start && l.end && s !== 'booked' && s !== 'closed' ? busy(c.id, l.start, l.end) : null; if (clash && clash.free) clash = null;
+    body += row('Car', c ? esc(c.make + ' ' + c.model) + ' <span class="muted">' + esc(c.plate) + '</span>' : '<span class="muted">Not chosen yet</span>', clash ? '' : s !== 'booked' && s !== 'closed' ? holdChip(l, true) || (c && l.start && !l.holdUntil ? 'Not held' : '') : '', true);
+    if (clash) body += '<div class="banner red ld-clash">' + I('warn') + '<div class="grow"><b>Not free for these dates.</b> ' + esc(clash.reason) + '.' + (inThread && can('leads.manage') ? '<div><button type="button" class="btn sm" onclick="Leads.pickCar(\'' + id + '\')">' + I('car') + 'Pick another car</button></div>' : '') + '</div></div>';
     if (pf) body += row('Pick-up', esc(pf.text), esc(placeName(l, 'pick')) + (l.km && l.pickKind !== 'our' ? ' · about ' + l.km + ' km' : ''));
     if (rf) body += row('Return', esc(rf.text), esc(placeName(l, 'ret')) + (l.km && l.retKind !== 'our' ? ' · about ' + l.km + ' km' : ''));
     if (l.estimate != null && can('bookings.see_amounts')) {
@@ -93,20 +96,23 @@ var Leads = (function () {
     if (l.takenBy && (s === 'taken' || s === 'waiting' || s === 'booked')) body += '<div class="ld-by">' + I('user') + (l.takenBy === S.me ? 'You took it' : esc(who(l.takenBy)) + ' took it') + (l.takenAt ? ' ' + esc(ago(l.takenAt)) : '') + '</div>';
     if (s === 'closed' && l.closedAt) body += '<div class="ld-by">' + I('check') + 'Closed ' + esc(ago(l.closedAt)) + (l.takenBy ? ' by ' + esc(firstName(who(l.takenBy))) : '') + '</div>';
     if (inThread && can('leads.manage')) {
-      var btns = '';
+      var btns = '', prim = '';
       if (s !== 'closed' && s !== 'booked') {
-        if (!(l.takenBy === S.me && (s === 'taken' || s === 'waiting'))) btns += '<button type="button" class="btn sm ld-take" onclick="Leads.take(\'' + id + '\')">' + I('user') + 'I’ll take it</button>';
-        if (can('bookings.create')) btns += '<button type="button" class="btn sm ' + (l.takenBy === S.me ? '' : 'ghost') + ' ld-book" onclick="Leads.book(\'' + id + '\')">' + I('plus') + 'Make booking</button>';
+        if (!(l.takenBy === S.me && (s === 'taken' || s === 'waiting'))) prim += '<button type="button" class="btn sm ld-take" onclick="Leads.take(\'' + id + '\')">' + I('user') + 'I’ll take it</button>';
+        if (can('bookings.create')) prim += '<button type="button" class="btn sm ' + (l.takenBy === S.me ? '' : 'ghost') + ' ld-book" onclick="Leads.book(\'' + id + '\')">' + I('plus') + 'Make booking</button>';
         if (holdMin(l)) btns += '<button type="button" class="btn sm ghost ld-rel" onclick="Leads.release(\'' + id + '\')">Let go of the car</button>';
         btns += '<button type="button" class="btn sm ghost ld-close" onclick="Leads.close(\'' + id + '\')">Close lead</button>';
       } else if (s === 'closed') btns += '<button type="button" class="btn sm ghost" onclick="Leads.reopen(\'' + id + '\')">' + I('reset') + 'Open again</button>';
       if (btns) body = '<div class="ld-btns">' + btns + '</div>' + body;
+      if (prim) primRow = '<div class="ld-btns ld-prim">' + prim + '</div>';
     }
+    /* outside the thread there is no folding: the main buttons go back on top of the details */
+    if (primRow && !inThread) body = primRow + body;
     if (!inThread) return '<div class="ld-card ld-flat">' + body + '</div>';
-    var open = OPEN[id] != null ? OPEN[id] : (s === 'waiting' || s === 'taken');
+    var open = OPEN[id] === true; /* starts folded so the chat stays readable */
     var top = '<button type="button" class="ld-top" onclick="Leads.toggle(\'' + id + '\')" aria-expanded="' + open + '">' + stateChip(w) + (s !== 'booked' && s !== 'closed' ? holdChip(l) : '') +
-      '<span class="ld-tl">' + esc([shortDates(l), c ? c.model : ''].filter(Boolean).join(' · ') || 'Lead details') + '</span><span class="ld-chev">' + I('down', 2.2) + '</span></button>';
-    return '<div class="ld-card ld-pin' + (open ? ' open' : '') + '" id="ldcard">' + top + '<div class="ld-body">' + body + '</div></div>';
+      '<span class="ld-tl">' + esc((l.question && s !== 'booked' && s !== 'closed' && !open ? l.question : [shortDates(l), c ? c.model : ''].filter(Boolean).join(' · ')) || 'Lead details') + '</span><span class="ld-chev">' + I('down', 2.2) + '</span></button>';
+    return '<div class="ld-card ld-pin' + (open ? ' open' : '') + '" id="ldcard">' + top + primRow + '<div class="ld-body">' + body + '</div></div>';
   }
 
   /* ---------- actions ---------- */
@@ -135,6 +141,15 @@ var Leads = (function () {
     var w = wa(id); if (!w) return; var l = w.lead || {};
     if (can('leads.manage') && !l.takenBy && l.state !== 'booked') { l.takenBy = S.me; l.takenAt = new Date().toISOString(); if (l.state !== 'closed') l.state = 'taken'; w.handled = 'staff'; save(); }
     location.hash = hashWith('new', { lead: id });
+  }
+  /* swap the held car for one that is free on the lead's dates */
+  function pickCar(id) {
+    var w = wa(id); if (!w || !w.lead || !can('leads.manage')) return; var l = w.lead;
+    Pickers.car({ title: 'Pick another car', start: l.start, end: l.end, selected: l.car, onPick: function (c) {
+      if (!c) return; if (!isFree(c.id, l.start, l.end)) { say(c.plate + ' is not free for these dates'); return; }
+      var was = l.car ? (car(l.car) || {}).plate : ''; l.car = c.id; l.holdUntil = new Date(Date.now() + 30 * MIN).toISOString();
+      audit('Lead car changed' + (was ? ' from ' + was : '') + ' to ' + c.plate, { link: '#chat/wa/' + id }); done(c.plate + ' is held for 30 min');
+    } });
   }
   function toggle(id) { var el = $('#ldcard'); if (!el) return; var open = !el.classList.contains('open'); OPEN[id] = open; el.classList.toggle('open', open); var t = $('.ld-top', el); if (t) t.setAttribute('aria-expanded', open); }
   function setAssistant(on) {
@@ -179,6 +194,6 @@ var Leads = (function () {
   }, 15000);
 
   VIEWS.leads = function () { Leads.tab = 'waiting'; history.replaceState(history.state, '', location.pathname + location.search + '#chat'); return VIEWS.chat(route()); };
-  return { summary: summary, stateOf: stateOf, inTab: inTab, TABS: TABS, tab: 'all', listLine: listLine, stateChip: stateChip, holdChip: holdChip, holdMin: holdMin, datesText: datesText,
+  return { pickCar: pickCar, summary: summary, stateOf: stateOf, inTab: inTab, TABS: TABS, tab: 'all', listLine: listLine, stateChip: stateChip, holdChip: holdChip, holdMin: holdMin, datesText: datesText,
     take: take, release: release, close: close, reopen: reopen, book: book, toggle: toggle, setAssistant: setAssistant, simulateNew: simulateNew };
 })();

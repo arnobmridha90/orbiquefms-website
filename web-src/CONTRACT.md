@@ -128,6 +128,15 @@ UI.drawer({ title: 'Log a service', body: function (el) {
   switch, the address, signing out) goes through `UI.leave(run)`, which asks "Leave without saving?" first. So give
   drawers and dialogs with a form a `dirty` function, and the shell protects them.
 
+### 2.5b Back button (browser and phone)
+
+Every drawer and dialog owns one browser history entry, and every page change (another page, company or booking form
+screen) pushes one; tabs, filters and other `ctx.setParams` changes only replace the address. Back closes the top drawer
+or dialog first (its `dirty` function makes it ask "Discard your changes?"), then goes to the previous page; it never
+leaves the app while a form is dirty (`beforeunload` asks too). Pages do nothing for this: open layers with
+`UI.drawer` / `UI.dialog`, change pages with `go()`, and close with the layer's own close. `UI.closeAll()` steps back over
+the entries; `UI.closeAll({keepHistory: true})` is only for the shell when the address already moved.
+
 ### 2.6 Brand colours that look like warnings
 
 When the brand colour is close to red (Bara), focus rings, ticked rows and picked choices use the dark brand colour

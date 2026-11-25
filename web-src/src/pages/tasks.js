@@ -436,7 +436,7 @@ PAGES['tasks'] = {
     UI.filters(root.querySelector('.tsk-flt'), { values: st.f,
       fields: [{ type: 'search', key: 'q', placeholder: 'Search tasks, booking, plate...' }, { type: 'select', key: 'status', label: 'Status', options: LISTS.taskStatus, all: 'Status: All' },
         { type: 'select', key: 'type', label: 'Type', options: LISTS.taskTypes, all: 'Type: All' }, { type: 'select', key: 'emp', label: 'Employee', options: d.employees.map(function (e) { return [e.id, e.name]; }), all: 'All Employees' },
-        { type: 'select', key: 'car', label: 'Car', options: cars.map(function (c) { return [c.id, c.plate + ' · ' + carModel(c)]; }), all: 'All Cars' }, { type: 'daterange', from: 'cFrom', to: 'cTo', label: 'Created At' }, { type: 'daterange', from: 'sFrom', to: 'sTo', label: 'Scheduled At' }],
+        UI.carFilter({ key: 'car', all: 'All Cars', cars: cars }), { type: 'daterange', from: 'cFrom', to: 'cTo', label: 'Created At' }, { type: 'daterange', from: 'sFrom', to: 'sTo', label: 'Scheduled At' }],
       onChange: function () { tbl.setRows(rows()); }, extra: rowsSel });
     function rows() {
       var v = st.f, q = tidySearch(v.q || '').toLowerCase();

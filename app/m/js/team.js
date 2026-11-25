@@ -122,6 +122,8 @@ function tmActions(p) {
   if (p.hasLogin && can('users.reset_password')) a.push(['password', 'key', 'Reset password', 'Make up a new password and send it']);
   if (p.isAgent && (can('users.edit') || can('users.deactivate'))) a.push(p.active === false ? ['agentOn', 'user', 'Switch agent on', 'They can be given tasks again'] : ['agentOff', 'user', 'Switch agent off', 'They will not be given tasks']);
   if (p.hasLogin && can('users.manage_roles')) a.push(['role', 'users', 'Change role', 'Now ' + roleName(p.role)]);
+  if (can('users.edit')) a.unshift(['edit', 'edit', 'Edit details', 'Name, phone, email, emergency contact, blood group']);
+  if (!p.hasLogin && can('users.create')) a.push(['makeLogin', 'key', 'Give a login', 'They can sign in to this app']);
   return a;
 }
 function tmActionSheet(id) {
@@ -154,6 +156,63 @@ function tmDo(id, k) {
   }
   else if (k === 'agentOn') { p.active = true; audit(nm + ' switched on as a field agent', { changes: { 'field agent': ['Off', 'On'] }, link: '#person/' + id }); save(); render(false, true); say(p.hasLogin && !p.loginActive ? 'Switched on. Switch the login on too when they should sign in again.' : 'Switched on.'); }
   else if (k === 'role') tmRole(id);
+  else if (k === 'edit') tmEditPerson(id);
+  else if (k === 'makeLogin') tmMakeLogin(id);
+}
+/* fix a person's details: the same checks as Add person (the phone must not belong to someone else) */
+function tmEditPerson(id) {
+  var p = staff(id); if (!p) return;
+  var em = p.emergency || {};
+  var f = function (key, label, val, type, ph) { return '<label class="field"><span>' + label + '</span><input class="inp" id="ep_' + key + '"' + (type ? ' type="' + type + '" inputmode="' + (type === 'tel' ? 'tel' : type === 'email' ? 'email' : 'text') + '"' : '') + ' autocomplete="off" value="' + esc(val || '') + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '><span class="err" id="ep_' + key + 'Err"></span></label>'; };
+  sheet(sheetHead('Edit details', p.name) +
+    f('name', 'Full name', p.name, '', 'As on their IC') + f('wa', 'WhatsApp number', p.wa || p.phone, 'tel', '012-345 6789') + f('phone', 'Phone number (if different)', p.phone && p.phone !== p.wa ? p.phone : '', 'tel', 'Same as WhatsApp') +
+    f('email', 'Email (optional)', p.email, 'email', '') + f('blood', 'Blood group (optional)', p.blood, '', 'For example O+') +
+    '<div class="st-sub">Emergency contact</div>' + f('emName', 'Name', em.name, '', '') + f('emPhone', 'Phone', em.phone, 'tel', '') + f('emRel', 'Relation', em.relation, '', 'For example Spouse') +
+    '<div class="sheet-foot"><button type="button" class="btn" id="epSave">' + I('check', 2.4) + 'Save</button></div>', function (sh) {
+      var v = function (k) { return $('#ep_' + k, sh).value.trim().replace(/\s+/g, ' '); };
+      $$('.inp', sh).forEach(function (el) { el.addEventListener('input', function () { var e = el.parentNode.querySelector('.err'); if (e) e.textContent = ''; }); });
+      ['wa', 'phone', 'emPhone'].forEach(function (k) { $('#ep_' + k, sh).onblur = function () { if (this.value.trim()) this.value = fmtPhone(this.value); }; });
+      $('#epSave', sh).onclick = function () {
+        var bad = false, err = function (k, t) { $('#ep_' + k + 'Err', sh).textContent = t; bad = true; };
+        var name = v('name'), wa = v('wa'), phone = v('phone') || wa, email = v('email'), emPhone = v('emPhone');
+        if (name.length < 2) err('name', 'Type their name');
+        if (digits(wa).length < 9) err('wa', 'Type a phone number with at least 9 digits');
+        else if (S.staff.some(function (x) { return x.id !== p.id && (normPhone(x.wa || x.phone) === normPhone(wa) || normPhone(x.phone) === normPhone(wa)); })) err('wa', 'Someone else in the team has this number');
+        if (v('phone') && digits(phone).length < 9) err('phone', 'Type a phone number with at least 9 digits');
+        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) err('email', 'This does not look like an email address');
+        if (emPhone && digits(emPhone).length < 9) err('emPhone', 'Type a phone number with at least 9 digits');
+        if (bad) return;
+        var next = { name: name, wa: fmtPhone(wa), phone: fmtPhone(phone), email: email, blood: v('blood').toUpperCase() };
+        var ch = {}; Object.keys(next).forEach(function (k) { if ((p[k] || '') !== next[k]) ch[k] = [p[k] || '', next[k]]; });
+        var ne = { name: v('emName'), phone: emPhone ? fmtPhone(emPhone) : '', relation: v('emRel') };
+        if (JSON.stringify([em.name || '', em.phone || '', em.relation || '']) !== JSON.stringify([ne.name, ne.phone, ne.relation])) ch['emergency contact'] = [em.name || '', ne.name];
+        if (!Object.keys(ch).length) { closeSheet(); say('Nothing changed'); return; }
+        Object.assign(p, next); p.emergency = ne.name || ne.phone ? ne : null;
+        audit(name + '’s details changed', { changes: ch, link: '#person/' + p.id }); save(); closeSheet(); render(false, true); say('Details saved');
+      };
+    });
+}
+/* a field agent (or anyone without a login) gets a username and a role, then the password */
+function tmMakeLogin(id) {
+  var p = staff(id); if (!p) return;
+  var roles = Object.keys(ROLES).filter(function (r) { return r !== 'owner'; }), st = { role: p.isAgent && ROLES.agent ? 'agent' : 'frontdesk' };
+  sheet(sheetHead('Give a login', p.name) +
+    '<div class="field"><span>Role</span><div class="tm-roles">' + roles.map(function (r) { return '<button type="button" class="fchip' + (r === st.role ? ' on' : '') + '" data-r="' + r + '">' + esc(ROLES[r].name) + '</button>'; }).join('') + '</div><span class="hint" id="glRoleLine">' + esc(tmRoleLine(st.role)) + '</span></div>' +
+    '<label class="field"><span>Username</span><input class="inp" id="glUser" autocapitalize="none" spellcheck="false" value="' + esc(p.username || tmUsername(p.name)) + '"><span class="err" id="glUserErr"></span></label>' +
+    '<div class="sheet-foot"><button type="button" class="btn" id="glSave">' + I('key') + 'Give login and make password</button></div>', function (sh) {
+      $$('[data-r]', sh).forEach(function (b) { b.onclick = function () { $$('[data-r]', sh).forEach(function (x) { x.classList.toggle('on', x === b); }); st.role = b.dataset.r; $('#glRoleLine', sh).textContent = tmRoleLine(st.role); }; });
+      $('#glUser', sh).oninput = function () { $('#glUserErr', sh).textContent = ''; };
+      $('#glSave', sh).onclick = function () {
+        var user = $('#glUser', sh).value.trim().toLowerCase();
+        if (!/^[a-z0-9._]{3,}$/.test(user)) { $('#glUserErr', sh).textContent = 'At least 3 letters or numbers, no spaces'; return; }
+        if (S.staff.some(function (x) { return x.id !== p.id && String(x.username || '').toLowerCase() === user; })) { $('#glUserErr', sh).textContent = 'This username is taken'; return; }
+        var was = p.role;
+        p.username = user; p.hasLogin = true; p.loginActive = true; p.role = st.role; if (st.role === 'agent') p.isAgent = true;
+        audit('Login made for ' + p.name, { changes: { login: ['None', 'On'], role: [roleName(was), roleName(st.role)] }, link: '#person/' + p.id }); save();
+        closeSheet(true); render(false, true);
+        setTimeout(function () { tmPassword(p.id, true); }, 40);
+      };
+    });
 }
 function tmRole(id) {
   var p = staff(id);

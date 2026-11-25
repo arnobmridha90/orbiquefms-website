@@ -329,7 +329,7 @@ function scChecks(h, x, short) {
 }
 
 PAGES['schedules'] = {
-  title: 'Handovers & Schedules',
+  title: 'Schedules',
   render: function (root, ctx) {
     var st = ctx.state, p = ctx.params, d = ctx.data, money = ctx.can('bookings.see_amounts') || ctx.can('calendar.see_amounts');
     var today = UI.isoDate(NOW());
@@ -348,7 +348,7 @@ PAGES['schedules'] = {
       return [null, null];
     };
     var WHEN = [['today', 'Today'], ['tomorrow', 'Tomorrow'], ['week', 'This week'], ['upcoming', 'All upcoming'], ['all', 'Every date']];
-    root.innerHTML = '<div class="pg-h"><div><h1>Handovers &amp; Schedules</h1><p>Every pick-up and return, for the front desk and the drivers.</p></div><div class="acts">' + UI.btn('Staff messages', { kind: 'o', icon: 'message-2', attrs: { 'data-sc': 'staffmsg' } }) + '</div></div>' +
+    root.innerHTML = '<div class="pg-h"><div><h1>Schedules</h1><p>Every pick-up and return, for the front desk and the drivers.</p></div><div class="acts">' + UI.btn('Staff messages', { kind: 'o', icon: 'message-2', attrs: { 'data-sc': 'staffmsg' } }) + '</div></div>' +
       '<div class="card sc-tools"><div class="sc-trow"><div id="sc-tabs"></div><div class="sc-view" role="group" aria-label="List style">' + UI.iconBtn('layout-grid', 'Cards', { attrs: { 'data-sc': 'cards', 'aria-pressed': String(!st.compact) } }) + UI.iconBtn('list', 'Compact list, one line each', { attrs: { 'data-sc': 'compact', 'aria-pressed': String(!!st.compact) } }) + '</div></div>' +
       '<div class="sc-when" data-srow>' + WHEN.map(function (w) { return '<button type="button" class="ui-fchip" data-when="' + w[0] + '" aria-pressed="' + (st.when === w[0]) + '">' + w[1] + '</button>'; }).join('') + '<button type="button" class="ui-fchip" data-when="custom" aria-pressed="' + (st.when === 'custom') + '">' + i('calendar') + 'Choose dates</button></div>' +
       '<div class="sc-fil"><div class="inp srch sc-q">' + i('search') + '<input type="search" data-key="q" placeholder="Customer, booking, plate, phone" aria-label="Search handovers" value="' + esc(st.q) + '"></div>' +

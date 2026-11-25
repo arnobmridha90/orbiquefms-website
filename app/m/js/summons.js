@@ -207,7 +207,8 @@ var Summons = (function () {
     var m = !b && s.plate && s.at ? matchFor(s.plate, s.at) : null;
     var acts = [];
     if (s.status === 'Needs review' && can('summons.upload')) acts.push('<button type="button" class="btn" data-a="check">' + I('eye') + 'Check the details</button>');
-    if (s.status === 'No booking' && can('summons.upload')) acts.push('<button type="button" class="btn" data-a="pick">' + I('search') + 'Pick a booking</button>');
+    if (s.status === 'No booking' && can('summons.upload') && m && m.state === 'one') acts.push('<button type="button" class="btn" data-a="linkone">' + I('check') + 'Link ' + esc(m.bookings[0].code) + '</button>');
+    if (s.status === 'No booking' && can('summons.upload')) acts.push('<button type="button" class="btn' + (m && m.state === 'one' ? ' ghost' : '') + '" data-a="pick">' + I('search') + 'Pick a booking</button>');
     if (s.status === 'Ready to charge' && can('summons.charge')) acts.push('<button type="button" class="btn" data-a="charge">' + I('wa') + 'Charge customer</button>');
     if (s.status === 'Charged') {
       if (can('summons.record_payment')) acts.push('<button type="button" class="btn sm-paid" data-a="paid">' + I('cash') + 'Mark as paid</button>');
@@ -220,6 +221,7 @@ var Summons = (function () {
     if ((s.status === 'Waived' || s.status === 'Disputed') && can('summons.waive')) small.push('<button type="button" class="btn link" data-a="reopen">Open it again</button>');
     if (s.status !== 'Paid' && s.status !== 'Needs review' && can('summons.upload')) small.push('<button type="button" class="btn link" data-a="edit">Edit details</button>');
     var bkHtml = b ? '<a class="card2 list sm-bk" href="#booking/' + b.id + '"><div class="c2-main"><div class="c2-t1">' + esc(b.code) + ' · ' + esc(cu.name) + (s.byHand ? ' <span class="chip tone-grey">Chosen by you</span>' : '') + '</div><div class="c2-t2">' + esc(when(b.start)) + ' to ' + esc(when(b.end)) + '</div></div>' + I('chev') + '</a>'
+      : m && m.state === 'one' ? '<div class="banner green">' + I('check') + '<div><b>' + esc(m.bookings[0].code) + ' · ' + esc(cust(m.bookings[0].cust).name) + '</b> had this car at that time. Link it to charge the customer.</div></div>'
       : '<div class="banner red">' + I('info') + '<div><b>No booking.</b> ' + esc(m ? (m.state === 'no_car' ? hint(m) : m.state === 'none' && m.car ? 'Our car ' + m.car.make + ' ' + m.car.model + ' (' + m.car.plate + ') had no booking on ' + dFull(s.at) + ', ' + hm(s.at) + '.' : hint(m)) : 'The plate or the date and time could not be read yet.') + '</div></div>';
     sheet(sheetHead(s.notice ? 'Summons ' + s.notice : s.photo ? 'Summons from a picture' : 'Summons, no notice number yet', (c ? c.plate + ' · ' + c.make + ' ' + c.model : s.plate || '')) +
       '<div class="sm-head">' + chip(s.status, TONE[s.status]) + (s.reason ? '<span class="sm-reason">' + esc(s.reason) + '</span>' : '') + '</div>' +
@@ -239,6 +241,7 @@ var Summons = (function () {
             var a = bt.dataset.a;
             if (a === 'check' || a === 'edit') form(s);
             else if (a === 'pick') pickBooking(s);
+            else if (a === 'linkone' && m && m.state === 'one') { var lb = m.bookings[0]; linkBooking(s, lb.id); s.byHand = false; s.status = 'Ready to charge'; bLog(lb, 'Summons ' + title(s) + ' tied to this booking'); save(); open(s.id); render(false, true); say('Linked to ' + lb.code); }
             else if (a === 'charge') charge(s);
             else if (a === 'paid') markPaid(s);
             else if (a === 'receipt') receipt(s);
@@ -259,7 +262,7 @@ var Summons = (function () {
   }
   function message(s, amt) {
     var b = bk(s.booking), cu = cust(b.cust), c = car(s.car) || car(b.car), bb = B();
-    var lines = ['Hi ' + (firstName(cu.name) || 'there') + ', this is ' + bb.name + '.',
+    var lines = ['Hi ' + (callName(cu.name) || 'there') + ', this is ' + bb.name + '.',
       'A ' + (AUTH_NAME[s.authority] || s.authority || '') + ' summons was issued to the car you rented (' + (c ? c.make + ' ' + c.model + ' ' + c.plate : s.plate) + ', booking ' + b.code + ').',
       'Notice no: ' + s.notice];
     if (s.offence) lines.push('Offence: ' + s.offence);

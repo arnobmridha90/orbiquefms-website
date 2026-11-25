@@ -15,6 +15,14 @@ VIEWS.chat = function (r) {
 };
 var leadsOn = function () { return typeof Leads !== 'undefined' && can('leads.view'); };
 VIEW_STATE.push(function () { if (typeof Leads !== 'undefined') Leads.tab = 'all'; });
+/* re-draw the thread but keep what is half typed in the message box (text, cursor and keyboard) */
+function chatRender() {
+  var t = $('#msgin'), v = t ? t.value : '', a = t ? t.selectionStart : 0, z = t ? t.selectionEnd : 0, f = !!t && document.activeElement === t;
+  render(false);
+  var n = $('#msgin'); if (!n || !t) return;
+  n.value = v; if (v) { n.dispatchEvent(new Event('input')); }
+  if (f) { n.focus(); try { n.setSelectionRange(a, z); } catch (e) {} }
+}
 function lastMsg(c) { return c.msgs[c.msgs.length - 1] || { text: '', at: (c.lead && c.lead.at) || new Date(0).toISOString(), from: 'cust' }; }
 function assistantCard() {
   var a = S.assistant || { on: true }, edit = can('leads.settings');
@@ -88,7 +96,7 @@ function waThread(id) {
   var banner = !a.on ? '<div class="banner ch-tb">' + I('users') + '<div style="flex:1">The assistant is off. Staff answer this chat.</div></div>' :
     c.handled === 'bot' ? '<div class="banner ch-tb">' + I('bot') + '<div style="flex:1">The assistant is handling this chat. Sending a message takes over from it.</div></div>' :
     '<div class="banner ch-tb">' + I('users') + '<div style="flex:1">Staff are handling this chat. <button style="color:var(--brand-ink);font-weight:700" onclick="handBack(\'' + id + '\')">Hand back to assistant</button></div></div>';
-  var html = topbar(c.name || c.phone, { back: '#chat', sub: (c.name ? c.phone + ' · ' : '') + (!a.on ? 'staff replying' : c.handled === 'bot' ? 'assistant replying' : 'staff replying'), right: right, noBell: true }) +
+  var html = topbar(c.name || c.phone, { back: '#chat', sub: (!a.on ? 'Staff' : c.handled === 'bot' ? 'Assistant' : 'Staff') + (c.name ? ' · ' + c.phone : ''), right: right, noBell: true }) +
     sum + '<main class="ch-main">' + banner +
     (cu && !c.name ? '<div class="small muted ch-known">Known customer: <a href="#customer/' + cu.id + '">' + esc(cu.name) + '</a></div>' : '') +
     '<div class="thread" id="thread">' + bubbles(list, function (m) { return m.from === 'cust' ? 'in' : m.from === 'bot' ? 'bot' : 'out'; }) + '</div>' +
@@ -120,7 +128,7 @@ window.addEventListener('hashchange', function () { document.body.classList.remo
 function toBottom() { setTimeout(function () { window.scrollTo(0, document.body.scrollHeight); }, 30); }
 var REPLIES = ['Ok noted', 'Thanks!', 'I can take it, I am nearby.', 'Done. Photos uploaded.', 'Copy that.', 'Will check and update.'];
 function sendStaff(text) {
-  S.staffChat.push({ id: uid(), from: S.me, text: text, at: new Date().toISOString() }); save(); render(false); toBottom();
+  S.staffChat.push({ id: uid(), from: S.me, text: text, at: new Date().toISOString() }); save(); chatRender(); toBottom();
   /* a colleague answers a little later, to show a staff chat notification */
   var others = S.staff.filter(function (p) { return p.id !== S.me && p.active !== false; }), mate = others[Math.floor(Math.random() * others.length)];
   if (!mate) return;
@@ -130,7 +138,7 @@ function sendStaff(text) {
     var here = route().name === 'chat' && route().a === 'staff';
     if (!here) S.staffUnread = (S.staffUnread || 0) + 1;
     save();
-    if (here) { render(false); toBottom(); } else notify('staff', firstName(mate.name) + ' in Team chat', msg, '#chat/staff', { from: mate.id });
+    if (here) { chatRender(); toBottom(); } else notify('staff', firstName(mate.name) + ' in Team chat', msg, '#chat/staff', { from: mate.id });
     if (here) refreshBadges();
   }, 5000 + Math.random() * 3000);
 }
@@ -138,14 +146,14 @@ function sendWa(id, text) {
   var c = S.wa.filter(function (x) { return x.id === id; })[0];
   c.msgs.push({ from: 'staff', by: S.me, text: text, at: new Date().toISOString() }); c.handled = 'staff';
   if (c.lead && !c.lead.takenBy && (c.lead.state === 'waiting' || c.lead.state === 'assistant') && can('leads.manage')) { c.lead.takenBy = S.me; c.lead.takenAt = new Date().toISOString(); c.lead.state = 'taken'; }
-  save(); render(false); toBottom();
+  save(); chatRender(); toBottom();
   later(function () {
     var msg = ['Ok thank you!', 'Great, I will transfer now.', 'Can I pick up at 9 am instead?', 'Noted, thanks', 'Alright, please book for me.'][Math.floor(Math.random() * 5)];
     c.msgs.push({ from: 'cust', text: msg, at: new Date().toISOString() });
     var here = route().name === 'chat' && route().b === id;
     if (!here) c.unread++;
     save();
-    if (here) { render(false); toBottom(); } else notify('wa', (c.name || c.phone) + ' on WhatsApp', msg, '#chat/wa/' + id);
+    if (here) { chatRender(); toBottom(); } else notify('wa', (c.name || c.phone) + ' on WhatsApp', msg, '#chat/wa/' + id);
   }, 6000 + Math.random() * 3000);
 }
 

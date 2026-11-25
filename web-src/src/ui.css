@@ -68,6 +68,8 @@
 .ui-frange .inp input{width:150px}
 .ui-ftog{white-space:nowrap;cursor:pointer}
 .ui-fmore{display:none}
+.ui-fcombo{flex:0 1 220px;min-width:180px;margin:0}
+.ui-fcombo .ui-cbx-btn{min-height:36px}
 .ui-fchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ui-fchip{border:1px solid var(--divider);background:transparent;border-radius:999px;height:30px;padding:0 12px;font-size:13px;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .ui-fchip:hover{background:var(--hover)}

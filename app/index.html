@@ -1123,6 +1123,8 @@ svg{display:block}
 .ui-frange .inp input{width:150px}
 .ui-ftog{white-space:nowrap;cursor:pointer}
 .ui-fmore{display:none}
+.ui-fcombo{flex:0 1 220px;min-width:180px;margin:0}
+.ui-fcombo .ui-cbx-btn{min-height:36px}
 .ui-fchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ui-fchip{border:1px solid var(--divider);background:transparent;border-radius:999px;height:30px;padding:0 12px;font-size:13px;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .ui-fchip:hover{background:var(--hover)}
@@ -2767,11 +2769,13 @@ button.dsh-legi:hover{background:var(--hover)}
 .pg-income .inc-k.person{border-top-color:var(--divider);cursor:pointer;min-height:44px}
 .pg-income .inc-k.person:hover{border-color:var(--primary)}
 .pg-income .inc-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;min-height:36px}
-.pg-income .inc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.2fr);gap:22px;align-items:start}
+.pg-income .inc-grid{display:grid;grid-template-columns:minmax(340px,1fr) minmax(0,1.8fr);gap:22px;align-items:start}
+.pg-income #inc-kind td,.pg-income #inc-kind th{white-space:normal}
+.pg-income .inc-kind{display:block;min-width:140px;overflow-wrap:anywhere}
 .pg-income .inc-grid section{min-width:0}
 .pg-income .inc-h{margin:0 0 10px;font-size:12.5px;font-weight:500;letter-spacing:.5px;color:var(--text);border-left:3px solid var(--primary);padding-left:8px;line-height:1.2}
 .pg-income .inc-sm{display:block;font-size:12px;color:var(--text3);margin-top:2px}
-@media (max-width:1100px){.pg-income .inc-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:1200px){.pg-income .inc-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){
   .pg-income{padding-bottom:40px}
   .pg-income .inc-card0{padding:16px 14px 20px}
@@ -3741,6 +3745,12 @@ button.dsh-legi:hover{background:var(--hover)}
   .pg-settings .set-fee-amt .inp{flex:1;width:auto}
   .pg-settings .set-rate-add .inp{flex:1 1 120px;width:auto}
 }
+/* remove buttons on handover fee rates and platform chips: a 40 px tap area on a phone, 8 px from the next control */
+@media (max-width:760px){
+  .pg-settings .set-x{width:40px;height:40px;margin:-4px -8px -4px 0}
+  .pg-settings .set-rate,.pg-settings .chip:has(.set-x){min-height:40px}
+  .pg-settings .set-fee-rates,.pg-settings .set-tg + .row{gap:8px}
+}
 
 /* ---- pages/signatures.css ---- */
 /* Signatures (builder 1). .pg-signatures for the page; .sg-* for the drawer and the draw pad. */
@@ -3816,6 +3826,7 @@ button.dsh-legi:hover{background:var(--hover)}
 .sr-biacts{flex:none;justify-content:center}
 @media (max-width:760px){.sr-biacts .ib{width:40px;height:40px}}
 .sr-bic{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}
+.sr-owed{display:block;font-size:12px;font-weight:600}
 
 /* ---- pages/summons.css ---- */
 /* ============================================================ Summons (builder 4) */
@@ -4438,6 +4449,13 @@ button.dsh-legi:hover{background:var(--hover)}
 .brand-dark-accent .exp-chip[aria-pressed="true"],
 .brand-dark-accent .exp-ic[aria-pressed="true"],
 .brand-dark-accent .pg-reports .rpt-chip[aria-pressed="true"]{background:var(--focus);border-color:var(--focus);color:#fff;box-shadow:none}
+
+/* a page with a floating add button (Expenses on a phone): the back-to-top button and the toasts sit above it,
+   so the two round buttons never overlap and a message never covers the add button */
+@media (max-width:760px){
+  body:has(.exp-fab) .d-totop{bottom:calc(20px + env(safe-area-inset-bottom) + 56px + 12px);right:25px}
+  body:has(.exp-fab) #ui-toasts{bottom:calc(20px + env(safe-area-inset-bottom) + 56px + 12px)}
+}
 
 /* Tabler icons used by the template system */
 .tabler-activity{--svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 12h4l3 8l4-16l3 8h4'/%3E%3C/svg%3E");}
@@ -7413,12 +7431,20 @@ var UI = (function () {
       o.fields.forEach(function (f) {
         if (f.type === 'search') main += '<div class="inp srch ui-fsearch">' + i('search') + '<input type="search" data-f="' + e(f.key) + '" data-key="flt-' + e(f.key) + '" placeholder="' + e(f.placeholder || 'Search') + '" aria-label="' + e(f.placeholder || 'Search') + '" value="' + e(v[f.key] || '') + '"></div>';
         else if (f.type === 'select') main += '<div class="inp ui-fsel ui-fx"' + (f.width ? ' style="width:' + f.width + 'px"' : '') + '><select data-f="' + e(f.key) + '" aria-label="' + e(f.label || f.key) + '">' + (f.all !== false ? '<option value="">' + e(f.all || 'All') + '</option>' : '') + U.options(f.options, v[f.key]) + '</select></div>';
+        else if (f.type === 'combo') main += '<div class="ui-fcombo ui-fx" data-fcombo="' + e(f.key) + '"' + (f.width ? ' style="width:' + f.width + 'px"' : '') + '></div>';
         else if (f.type === 'date') main += '<div class="ui-fdate ui-fx">' + U.dateField({ key: 'flt-' + f.key, aria: f.label || f.key, value: v[f.key] || '', compact: true, chips: false, placeholder: f.label || 'Any day', attrs: { 'data-f': f.key } }) + '</div>';
         else if (f.type === 'daterange') main += '<div class="ui-frange ui-fx" role="group" aria-label="' + e(f.label || 'Dates') + '">' + (f.label ? '<span class="b2">' + e(f.label) + '</span>' : '') + U.dateField({ key: 'flt-' + f.from, aria: 'From', value: v[f.from] || '', compact: true, chips: false, placeholder: 'From', attrs: { 'data-f': f.from } }) + '<span class="faint">to</span>' + U.dateField({ key: 'flt-' + f.to, aria: 'To', value: v[f.to] || '', compact: true, chips: false, placeholder: 'To', min: v[f.from] || null, attrs: { 'data-f': f.to } }) + '</div>';
         else if (f.type === 'toggle') main += '<label class="ui-ftog ui-fx row gap6 b2"><span class="sw"><input type="checkbox" data-f="' + e(f.key) + '"' + (v[f.key] ? ' checked' : '') + '><span></span></span>' + e(f.label) + '</label>';
         else if (f.type === 'chips') chips += '<div class="ui-fchips" role="group" aria-label="' + e(f.label || f.key) + '">' + (f.label ? '<span class="b2">' + e(f.label) + '</span>' : '') + f.options.map(function (op) { var val = Array.isArray(op) ? op[0] : op, lb = Array.isArray(op) ? op[1] : op, n = Array.isArray(op) ? op[2] : null, tone = Array.isArray(op) ? op[3] : null; var on = String(v[f.key] == null ? (f.default != null ? f.default : (Array.isArray(f.options[0]) ? f.options[0][0] : f.options[0])) : v[f.key]) === String(val); return '<button type="button" class="ui-fchip' + (tone ? ' ' + tone : '') + '" data-fc="' + e(f.key) + '" data-v="' + e(val) + '" aria-pressed="' + on + '">' + e(lb) + (n != null ? '<span class="n">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>';
       });
       el.innerHTML = '<div class="ui-fb' + (st.open ? ' open' : '') + '"><div class="ui-frow">' + main + '<button type="button" class="btn o sm ui-fmore" data-fmore aria-expanded="' + !!st.open + '">' + i('filter') + 'Filters' + (count ? ' (' + count + ')' : '') + '</button>' + (any ? '<button type="button" class="btn t sm ui-fclear" data-fclear>' + i('x') + 'Clear filters</button>' : '') + (o.extra || '') + '</div>' + (chips ? '<div class="ui-frow">' + chips + '</div>' : '') + '</div>';
+      /* searchable filters (a long list of cars or kinds): the shared combo, with "All" as the empty value */
+      o.fields.forEach(function (f) {
+        if (f.type !== 'combo') return;
+        var box = el.querySelector('[data-fcombo="' + f.key + '"]'); if (!box) return;
+        U.combo(box, { key: 'flt-' + f.key, aria: f.label || f.key, placeholder: f.all || 'All', title: f.title || f.label || 'Choose', items: f.items, search: f.search, value: v[f.key] || '', searchPlaceholder: f.searchPlaceholder, emptyText: f.emptyText, noMatchHelp: f.noMatchHelp,
+          onChange: function (val) { v[f.key] = val || ''; draw(); o.onChange && o.onChange(v, f.key); } });
+      });
     }
     var st = { open: false };
     el.addEventListener('input', function (ev) { var t = ev.target; if (t.matches('input[type="search"][data-f]')) { v[t.getAttribute('data-f')] = t.value; deb(t.getAttribute('data-f')); } });
@@ -8091,6 +8117,15 @@ var UI = (function () {
     ctrl.car = function () { var v = ctrl.value(); return v ? carById(v) : null; };
     ctrl.busy = function () { var c = ctrl.car(); return c ? busy(c, opts.start || null, opts.end || null, opts.exceptId) : null; };
     return ctrl;
+  };
+
+  /* a searchable car filter for UI.filters: UI.carFilter({key:'car', label:'Car', all:'Any car', extra:[['none','Not tied to a car']], cars})
+     Type the plate with or without spaces, the model or the colour. */
+  U.carFilter = function (o) {
+    o = o || {};
+    return { type: 'combo', key: o.key || 'car', label: o.label || 'Car', all: o.all || 'Any car', title: o.title || 'Choose a car', searchPlaceholder: 'Plate, model or colour', noMatchHelp: 'Try the numbers of the plate, or the model.',
+      items: function () { return (o.extra || []).map(function (x) { return { value: x[0], label: x[1] }; }).concat((o.cars || D().cars).map(function (c) { return { value: c.id, label: c.plate, sub: carName(c) + ' · ' + c.color + (c.fleet && c.fleet !== 'Active' ? ' · ' + c.fleet : ''), kw: normPlate(c.plate) + ' ' + c.make + ' ' + c.model + ' ' + c.color, car: c }; })); },
+      search: function (it, q) { var np = normPlate(q); if (it.car && np && normPlate(it.car.plate) === np) return 10; if (it.car && np.length >= 2 && normPlate(it.car.plate).indexOf(np) >= 0) return 5; return U.wordsMatch(it.label + ' ' + (it.sub || '') + ' ' + (it.kw || ''), q) ? 1 : 0; } };
   };
 
   /* UI.bookingPicker(el, {key:'booking', label:'Booking', value (code), filter(b) -> bool, onChange(code, booking), showCancelled,
@@ -10412,7 +10447,7 @@ PAGES['bookings'] = {
         { type: 'search', key: 'q', placeholder: 'Booking no., name, phone, plate' },
         { type: 'select', key: 'status', label: 'Status', options: LISTS.bookingStatus, all: 'All Statuses' },
         { type: 'select', key: 'pay', label: 'Payment Status', options: [['None', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s]; })), all: 'All Payment Statuses' },
-        { type: 'select', key: 'car', label: 'Car', options: d.cars.map(function (c) { return [c.id, bkCarLabel(c)]; }), all: 'All Cars', width: 220 },
+        Object.assign(UI.carFilter({ key: 'car', all: 'All Cars' }), { width: 220 }),
         { type: 'daterange', from: 'from', to: 'to', label: 'Rental dates' },
         { type: 'chips', key: 'quick', label: 'Quick', options: [['all', 'All', d.bookings.length], ['out', 'Out now', count(quick.out)], ['soon', 'Going out in 3 days', count(quick.soon)], ['back', 'Back in 3 days', count(quick.back)], ['late', 'Late', count(quick.late), 'bad'], ['due', 'Money due', count(quick.due)]] }
       ],
@@ -12974,7 +13009,7 @@ function expSheet(rec, prefill) {
   var dayHtml = function () {
     var isT = st.day && +st.day === +today, isY = st.day && +st.day === +yest, de = st.day ? dayErr() : '';
     return '<div class="exp-f"><label class="exp-l">Which day was it spent? <em>*</em></label><div class="exp-days"><button type="button" class="exp-day" data-day="t" aria-pressed="' + !!isT + '"><b>Today</b><small>' + esc(expShortDay(today)) + '</small></button><button type="button" class="exp-day" data-day="y" aria-pressed="' + !!isY + '"><b>Yesterday</b><small>' + esc(expShortDay(yest)) + '</small></button></div>' +
-      UI.dateField({ id: 'exp-dp', key: 'dayPick', value: st.day && !isT && !isY ? st.day : null, chips: false, placeholder: 'Or pick another day', max: new Date(today.getTime() + DAY), help: de ? '' : 'Or pick any other day on the calendar.', error: de, aria: 'Or pick another day' }) + '</div>';
+      UI.dateField({ id: 'exp-dp', key: 'dayPick', value: st.day && !isT && !isY ? st.day : null, chips: false, placeholder: 'Or pick another day', max: new Date(today.getTime() + DAY), error: de, aria: 'Or pick another day' }) + '</div>';
   };
   var shownCats = function () {
     var all = expCats().filter(function (c) { return !c.hidden || st.lines.some(function (l) { return l.cat === c.id; }); }).filter(function (c) { return expMayUse(c) || st.lines.some(function (l) { return l.cat === c.id; }); });
@@ -13350,9 +13385,9 @@ PAGES['expenses'] = {
       '<div class="card exp-where"><h3>Where the money went <span class="b2">Tap a kind to see only its entries</span></h3>' + (kinds.length ? '<div class="exp-kinds">' + (showAll ? kinds : kinds.slice(0, 4)).map(function (k) { var p = tot ? k.v / tot : 0, on2 = kindOn(k); return '<button type="button" class="exp-kind' + (on2 ? ' on' : '') + '" data-kf="' + esc(k.cat || k.src) + '" data-kft="' + (k.cat ? 'cat' : 'src') + '" aria-pressed="' + on2 + '"><span class="exp-ki">' + i(k.icon) + '</span><span class="grow"><span class="row"><span class="grow">' + esc(k.k) + '</span><b>' + UI.money(k.v) + '</b><small>' + Math.round(p * 100) + '%</small></span><i class="exp-bar"><b style="width:' + Math.max(1, p * 100) + '%"></b></i></span></button>'; }).join('') + '</div>' + (kinds.length > 4 ? '<button type="button" class="inv-link exp-more" data-allk>' + (showAll ? 'Show fewer' : 'Show all ' + kinds.length + ' kinds') + '</button>' : '') : '<p class="b2">Nothing spent in this month yet.</p>') + '</div></div>' +
       '<div class="card exp-card"><div id="exp-f"></div><div class="exp-totl" id="exp-totl"></div><div id="exp-t"></div></div>' + (canAdd ? '<button type="button" class="exp-fab" data-add aria-label="Add expense">' + i('plus') + '</button>' : '');
     var cats = expCats(), users = D().users.filter(function (u) { return u.id !== uid && src.some(function (e) { return e.by === u.id; }); });
-    var fields = [{ type: 'search', key: 'q', placeholder: 'Kind, car, Booking ID, note or who was paid' },
-      { type: 'select', key: 'cat', label: 'Kind', all: 'All kinds', options: EXP_GROUPS.reduce(function (a, g) { return a.concat(cats.filter(function (c) { return expGroupOf(c) === g; }).map(function (c) { return { value: c.id, label: c.name + (c.hidden ? ' (hidden)' : ''), group: g }; })); }, []) },
-      { type: 'select', key: 'car', label: 'Car', all: 'Any car', options: [['none', 'Not tied to a car']].concat(D().cars.map(function (c) { return [c.id, c.plate + ' · ' + carModel(c)]; })) }]
+    var fields = [{ type: 'search', key: 'q', placeholder: 'Search kind, car, booking or note' },
+      { type: 'combo', key: 'cat', label: 'Kind', all: 'All kinds', title: 'Choose a kind', searchPlaceholder: 'Type a kind, like fuel or toll', items: EXP_GROUPS.reduce(function (a, g) { return a.concat(cats.filter(function (c) { return expGroupOf(c) === g; }).map(function (c) { return { value: c.id, label: c.name + (c.hidden ? ' (hidden)' : ''), group: g, kw: g }; })); }, []) },
+      UI.carFilter({ key: 'car', all: 'Any car', extra: [['none', 'Not tied to a car']] })]
       .concat(all ? [{ type: 'select', key: 'by', label: 'Recorded by', all: 'Everyone', options: (uid ? [[uid, 'Me (' + me().name + ')']] : []).concat(users.map(function (u) { return [u.id, u.name]; })) }] : [])
       .concat([{ type: 'select', key: 'order', label: 'Order', all: false, default: 'new', options: [['new', 'Newest first'], ['old', 'Oldest first'], ['big', 'Biggest first'], ['small', 'Smallest first']] }])
       .concat(all ? [{ type: 'chips', key: 'src', options: [['all', 'All', month.length], ['recorded', 'Recorded', month.filter(function (e) { return e.source === 'recorded'; }).length], ['job', 'Service jobs', month.filter(function (e) { return e.source === 'job'; }).length], ['paper', 'Papers', month.filter(function (e) { return e.source === 'paper'; }).length]] }] : []);
@@ -13623,8 +13658,9 @@ PAGES['income'] = {
     body.innerHTML = kh + (who && everyone ? '<button type="button" class="inv-link inc-back" data-pp="">' + i('arrow-left') + 'Everyone</button>' : '') +
       '<div class="inc-grid"><section><h4 class="inc-h">BY KIND</h4><div id="inc-kind"></div></section><section><h4 class="inc-h">HANDOVERS</h4><div id="inc-list"></div></section></div>';
     var emptyText = { icon: 'coins', title: 'No handover fees in this period', text: 'They are recorded on Expenses > Add expense.', action: ctx.can('expenses.add') ? UI.btn('Add expense', { kind: 'tonal', icon: 'plus', attrs: { 'data-add': '1' } }) : '' };
-    UI.table(body.querySelector('#inc-kind'), { rows: klist, rowKey: 'kind', density: 'compact', pageSize: false,
-      columns: [{ key: 'kind', label: 'Kind', render: function (k) { return esc(k.kind); } }, { key: 'n', label: 'Count', money: true, render: function (k) { return String(k.n); } }, { key: 'amount', label: 'Amount', money: true }],
+    /* a narrow table: the kind name wraps so the count and the amount always show (no sideways scroll) */
+    UI.table(body.querySelector('#inc-kind'), { rows: klist, rowKey: 'kind', density: 'compact', pageSize: false, minWidth: 300,
+      columns: [{ key: 'kind', label: 'Kind', render: function (k) { return '<span class="inc-kind">' + esc(k.kind) + '</span>'; } }, { key: 'n', label: 'Count', money: true, render: function (k) { return String(k.n); } }, { key: 'amount', label: 'Amount', money: true }],
       footer: klist.length ? function () { return '<tr><td><b>Total</b></td><td class="c"><b>' + rows.length + '</b></td><td class="c"><b>' + UI.money(total) + '</b></td></tr>'; } : null,
       card: function (k) { return '<div class="row gap10"><div class="grow"><b>' + esc(k.kind) + '</b><small class="inc-sm">' + plural(k.n, 'fee') + '</small></div><b>' + UI.money(k.amount) + '</b></div>'; },
       empty: { icon: 'coins', title: 'Nothing yet', text: '' } });
@@ -17673,7 +17709,7 @@ function scChecks(h, x, short) {
 }
 
 PAGES['schedules'] = {
-  title: 'Handovers & Schedules',
+  title: 'Schedules',
   render: function (root, ctx) {
     var st = ctx.state, p = ctx.params, d = ctx.data, money = ctx.can('bookings.see_amounts') || ctx.can('calendar.see_amounts');
     var today = UI.isoDate(NOW());
@@ -17692,7 +17728,7 @@ PAGES['schedules'] = {
       return [null, null];
     };
     var WHEN = [['today', 'Today'], ['tomorrow', 'Tomorrow'], ['week', 'This week'], ['upcoming', 'All upcoming'], ['all', 'Every date']];
-    root.innerHTML = '<div class="pg-h"><div><h1>Handovers &amp; Schedules</h1><p>Every pick-up and return, for the front desk and the drivers.</p></div><div class="acts">' + UI.btn('Staff messages', { kind: 'o', icon: 'message-2', attrs: { 'data-sc': 'staffmsg' } }) + '</div></div>' +
+    root.innerHTML = '<div class="pg-h"><div><h1>Schedules</h1><p>Every pick-up and return, for the front desk and the drivers.</p></div><div class="acts">' + UI.btn('Staff messages', { kind: 'o', icon: 'message-2', attrs: { 'data-sc': 'staffmsg' } }) + '</div></div>' +
       '<div class="card sc-tools"><div class="sc-trow"><div id="sc-tabs"></div><div class="sc-view" role="group" aria-label="List style">' + UI.iconBtn('layout-grid', 'Cards', { attrs: { 'data-sc': 'cards', 'aria-pressed': String(!st.compact) } }) + UI.iconBtn('list', 'Compact list, one line each', { attrs: { 'data-sc': 'compact', 'aria-pressed': String(!!st.compact) } }) + '</div></div>' +
       '<div class="sc-when" data-srow>' + WHEN.map(function (w) { return '<button type="button" class="ui-fchip" data-when="' + w[0] + '" aria-pressed="' + (st.when === w[0]) + '">' + w[1] + '</button>'; }).join('') + '<button type="button" class="ui-fchip" data-when="custom" aria-pressed="' + (st.when === 'custom') + '">' + i('calendar') + 'Choose dates</button></div>' +
       '<div class="sc-fil"><div class="inp srch sc-q">' + i('search') + '<input type="search" data-key="q" placeholder="Customer, booking, plate, phone" aria-label="Search handovers" value="' + esc(st.q) + '"></div>' +
@@ -18565,18 +18601,22 @@ function srModel(R, from, to, everyone) {
     var tin = sum(R.ledger.map(function (r) { return r.inn || 0; })), tout = sum(R.ledger.map(function (r) { return r.out || 0; }));
     m.sections.push({ title: 'Balance', sheet: 'Balance', noFormula: true, cols: [{ l: 'Date', t: 'date', w: 11 }, { l: 'Booking ID', w: 12 }, { l: 'Description', w: 38 }, { l: 'In', t: 'money', w: 12 }, { l: 'Out', t: 'money', w: 12 }, { l: 'Balance at hand', t: 'money', w: 14, strong: true }],
       rows: R.ledger.map(function (r) { return [r.date, r.booking || '', r.note ? { t: r.desc, s: r.note } : r.desc, r.inn == null ? '' : r.inn, r.out == null ? '' : r.out, r.balance]; }), total: ['Total, and balance at hand', '', '', tin, tout, who.closing] });
-    m.sections.push({ title: 'Staff-wise income (handover fees)', sheet: 'Staff-wise income', cols: ec, rows: rows('income'), total: ['Total', '', '', '', who.income], empty: 'No handover fees in this period.' });
-    m.sections.push({ title: 'Staff-wise expense (everyday kinds they paid)', sheet: 'Staff-wise expense', cols: ec, rows: rows('expenses', true), total: ['Total', '', '', '', who.expenses], empty: 'No expenses in this period.' });
+    m.sections.push({ title: 'Income (handover fees)', sheet: 'Income', cols: ec, rows: rows('income'), total: ['Total', '', '', '', who.income], empty: 'No handover fees in this period.' });
+    m.sections.push({ title: 'Expenses (everyday kinds they paid)', sheet: 'Expenses', cols: ec, rows: rows('expenses', true), total: ['Total', '', '', '', who.expenses], empty: 'No expenses in this period.' });
   } else {
     m.info = [['Staff', 'Everyone']];
     var t = function (k) { return sum(R.people.map(function (p) { return p[k]; })); };
-    m.kpis = [{ l: 'Balance at hand', raw: t('closing'), t: 'money', hero: true, note: 'Everyone together' }, { l: 'Income', raw: t('income'), t: 'money', note: 'Handover fees' }, { l: 'Expenses paid', raw: t('expenses'), t: 'money' }, { l: 'Staff', raw: R.people.length, t: 'int' }];
+    /* cash some staff hold and money the company owes others are two different things: never add them together */
+    var hold = sum(R.people.map(function (p) { return Math.max(0, p.closing); })), owed = -sum(R.people.map(function (p) { return Math.min(0, p.closing); }));
+    m.kpis = [{ l: 'Cash staff hold', raw: hold, t: 'money', hero: true, note: 'Company money to bank in' }, { l: 'Company owes staff', raw: owed, t: 'money', note: 'Pay it back to them' }, { l: 'Income', raw: t('income'), t: 'money', note: 'Handover fees' }, { l: 'Expenses paid', raw: t('expenses'), t: 'money' }, { l: 'Staff', raw: R.people.length, t: 'int' }];
     m.sections.push({ title: 'Everyone', sheet: 'Everyone', cols: [{ l: 'Staff', w: 16 }].concat(SR_PARTS.map(function (p) { return { l: p[1], t: 'money', w: 12 }; })), rows: R.people.map(function (p) { return [p.name].concat(SR_PARTS.map(function (q) { return p[q[0]]; })); }), total: ['Total'].concat(SR_PARTS.map(function (q) { return t(q[0]); })) });
   }
   m.notes = ['Income = the handover fees they recorded. Expenses = the everyday kinds they recorded and paid (not handover fees, not office and admin costs, which the office pays).', 'Balance at hand = cash from customers + money from the company - expenses paid - deposits handed back in cash - cash banked in - their handover fees. Positive: they hold company money. Negative: the company owes them.', 'Balance at start is the same sum for everything before the period.'];
   m.sheets = function () { return rptAutoBook(m); };
   return m;
 }
+/* a balance: what they hold, or "Owed RM 1,220.50" in red when the company owes them */
+function srBal(v) { return v < -0.004 ? '<b class="sr-neg">Owed ' + UI.money(-v) + '</b>' : '<b>' + UI.money(v) + '</b>'; }
 function srLedgerTable(el, rows, closing) {
   var neg = function (v) { return '<span class="' + (v < 0 ? 'sr-neg' : '') + '">' + UI.money(v) + '</span>'; };
   UI.table(el, { rows: rows.map(function (r, k) { return Object.assign({ k: k }, r); }), rowKey: 'k', density: 'compact', pageSize: false, minWidth: 760, maxHeight: '70vh',
@@ -18620,11 +18660,11 @@ PAGES['staff-reports'] = {
       body.innerHTML = '<div class="pg-reports sr-k">' + rptKpisHtml(m, true) + '</div>' + (who ? (everyone ? '<button type="button" class="inv-link sr-back" data-all>' + i('arrow-left') + 'Everyone</button>' : '') + '<div class="sr-tabs" id="sr-tabs"></div><div id="sr-tab"></div>' : '<h4 class="sr-h">EVERYONE</h4><div id="sr-all"></div><p class="b2 sr-tip">Tap a name for that person\'s details.</p>');
       if (!who) {
         UI.table(body.querySelector('#sr-all'), { rows: R.people, rowKey: 'id', density: 'compact', pageSize: false, minWidth: 1100, onRowClick: function (p) { st.person = p.id; st.tab = 'balance'; ctx.setParams({ person: p.id }); st.pp = p.id; ctx.refresh(); },
-          columns: [{ key: 'name', label: 'Staff', render: function (p) { return '<button type="button" class="inv-link" data-sp="' + esc(p.id) + '">' + esc(p.name) + '</button>'; } }].concat(SR_PARTS.map(function (q) { return { key: q[0], label: q[1], money: true, render: function (p) { var v = p[q[0]], h = UI.money(v); return q[0] === 'closing' ? '<b class="' + (v < 0 ? 'sr-neg' : '') + '">' + h + '</b>' : h; } }; })),
-          footer: function () { return '<tr><td><b>Total</b></td>' + SR_PARTS.map(function (q) { return '<td class="c"><b>' + UI.money(sum(R.people.map(function (p) { return p[q[0]]; }))) + '</b></td>'; }).join('') + '</tr>'; },
-          card: function (p) { return '<div class="sr-pc"><div class="row"><b class="grow">' + esc(p.name) + '</b><span class="sr-amt"><small>Balance at hand</small><b class="' + (p.closing < 0 ? 'sr-neg' : '') + '">' + UI.money(p.closing) + '</b></span></div><div class="sr-pg">' + SR_PARTS.slice(0, 7).map(function (q) { return '<span><small>' + esc(q[1]) + '</small>' + UI.money(p[q[0]]) + '</span>'; }).join('') + '</div></div>'; } });
+          columns: [{ key: 'name', label: 'Staff', render: function (p) { return '<button type="button" class="inv-link" data-sp="' + esc(p.id) + '">' + esc(p.name) + '</button>'; } }].concat(SR_PARTS.map(function (q) { return { key: q[0], label: q[1], money: true, render: function (p) { var v = p[q[0]]; return q[0] === 'closing' ? srBal(v) : UI.money(v); } }; })),
+          footer: function () { return '<tr><td><b>Total</b></td>' + SR_PARTS.map(function (q) { if (q[0] === 'closing') { var hd = sum(R.people.map(function (p) { return Math.max(0, p.closing); })), ow = -sum(R.people.map(function (p) { return Math.min(0, p.closing); })); return '<td class="c"><b>' + UI.money(hd) + '</b>' + (ow ? '<small class="sr-neg sr-owed">Owed ' + UI.money(ow) + '</small>' : '') + '</td>'; } return '<td class="c"><b>' + UI.money(sum(R.people.map(function (p) { return p[q[0]]; }))) + '</b></td>'; }).join('') + '</tr>'; },
+          card: function (p) { return '<div class="sr-pc"><div class="row"><b class="grow">' + esc(p.name) + '</b><span class="sr-amt"><small>Balance at hand</small>' + srBal(p.closing) + '</span></div><div class="sr-pg">' + SR_PARTS.slice(0, 7).map(function (q) { return '<span><small>' + esc(q[1]) + '</small>' + UI.money(p[q[0]]) + '</span>'; }).join('') + '</div></div>'; } });
       } else {
-        var tabs = [{ id: 'balance', label: 'Balance' }, { id: 'income', label: 'Staff-wise income', count: who.entries.filter(function (e) { return e.part === 'income'; }).length }, { id: 'expense', label: 'Staff-wise expense', count: who.entries.filter(function (e) { return e.part === 'expenses'; }).length }, { id: 'bankins', label: 'Bank-ins' }];
+        var tabs = [{ id: 'balance', label: 'Balance' }, { id: 'income', label: 'Income', count: who.entries.filter(function (e) { return e.part === 'income'; }).length }, { id: 'expense', label: 'Expenses', count: who.entries.filter(function (e) { return e.part === 'expenses'; }).length }, { id: 'bankins', label: 'Bank-ins' }];
         var drawTab = function () {
           var el = body.querySelector('#sr-tab');
           if (st.tab === 'balance') srLedgerTable(el, R.ledger, who.closing);
@@ -19755,7 +19795,7 @@ PAGES['tasks'] = {
     UI.filters(root.querySelector('.tsk-flt'), { values: st.f,
       fields: [{ type: 'search', key: 'q', placeholder: 'Search tasks, booking, plate...' }, { type: 'select', key: 'status', label: 'Status', options: LISTS.taskStatus, all: 'Status: All' },
         { type: 'select', key: 'type', label: 'Type', options: LISTS.taskTypes, all: 'Type: All' }, { type: 'select', key: 'emp', label: 'Employee', options: d.employees.map(function (e) { return [e.id, e.name]; }), all: 'All Employees' },
-        { type: 'select', key: 'car', label: 'Car', options: cars.map(function (c) { return [c.id, c.plate + ' · ' + carModel(c)]; }), all: 'All Cars' }, { type: 'daterange', from: 'cFrom', to: 'cTo', label: 'Created At' }, { type: 'daterange', from: 'sFrom', to: 'sTo', label: 'Scheduled At' }],
+        UI.carFilter({ key: 'car', all: 'All Cars', cars: cars }), { type: 'daterange', from: 'cFrom', to: 'cTo', label: 'Created At' }, { type: 'daterange', from: 'sFrom', to: 'sTo', label: 'Scheduled At' }],
       onChange: function () { tbl.setRows(rows()); }, extra: rowsSel });
     function rows() {
       var v = st.f, q = tidySearch(v.q || '').toLowerCase();
@@ -20302,7 +20342,7 @@ function teamLoginDrawer(o) {
       el.innerHTML = '<div class="grid g2 tm-form">' + UI.input({ key: 'name', label: 'Name', required: true, value: e ? e.name : '', help: 'Shown in the team list and the activity log.' }) + UI.input({ key: 'username', label: 'Username', required: true, value: guess, help: 'What they type to sign in. Every person needs their own; never share one.' }) +
         UI.input({ key: 'email', label: 'Email (optional)', type: 'email', value: e ? e.email : '' }) + UI.select({ key: 'agent', label: 'Linked field profile (optional)', value: e ? e.id : '', options: [['', 'None']].concat((e ? [e] : []).concat(free.filter(function (x) { return x !== e; })).map(function (x) { return [x.id, x.name]; })) }) +
         UI.select({ key: 'role', label: 'Start from template', value: 'role-none', options: D().roles.filter(function (r) { return r.key !== 'owner'; }).map(function (r) { return [r.id, r.name]; }), help: 'New logins start with No access. You can switch features on in the Access tab later.', full: true }) + teamPwFields('Password') + '</div>' +
-        UI.alert('Choose a password and pass it on to them yourself. It is never shown again.', 'pri') + '<p class="ui-err tm-err" hidden></p>';
+        UI.alert('Choose a password and pass it on to them yourself. It is never shown again.', 'pri');
       teamWirePw(el, function () { return el.querySelector('[data-key="username"]').value.trim().toLowerCase(); }, function () { var f = UI.form(el), ag = f.agent ? employeeById(f.agent) : null; return { name: f.name, phone: ag ? ag.wa : '' }; });
       teamWireEmail(el, null);
     },
