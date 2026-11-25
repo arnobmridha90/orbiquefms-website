@@ -13,7 +13,7 @@
 #   /etc/cron.d/ventura-sync (only after --start), /var/log/ventura-sync.log, MySQL login 'fms_sync' (SELECT only).
 set -u -o pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Run it as root (or with sudo)."; exit 1; }
-COMMIT=285451738607947799a27b99898ba6f67ee8290c
+COMMIT=053f224d7f146d202aa697e250bb63554b423f42
 RAW=https://raw.githubusercontent.com/arnobmridha90/orbiquefms-website/$COMMIT/tools
 DIR=/opt/ventura-sync; CONF=/etc/ventura-sync; STATE=/var/lib/ventura-sync
 PY="/usr/bin/python3 -I $DIR/ventura-sync/ventura_sync.py --config $CONF/env"
@@ -48,7 +48,7 @@ while read -r sum path; do
   echo "$sum  $dest.new" | sha256sum -c --quiet || { echo "FAILED: $path is not the expected file"; rm -f "$dest.new"; exit 1; }
   mv "$dest.new" "$dest"
 done <<'SUMS'
-c3afac81ca9ba9f2ba89d2efe20701d2af622c78b5fad38e92c99c337194a08b ventura-sync/ventura_sync.py
+912bebdfec87c1a474a1b6f6c62e3394cf9d5d478da2ad63b5f7d2a0eaef4660 ventura-sync/ventura_sync.py
 4de15da4c61dc132f4fb9ab763063e693d521a80fd0e87943b9a453dd4c19d6c ventura-sync/vendor/PyMySQL-1.1.1-py3-none-any.whl
 1c3bb36378e377a16647a59af5cbb27b2acf4a103ee8b129c1a6bf4a763c7cb8 ventura-import/ventura_export.py
 SUMS
