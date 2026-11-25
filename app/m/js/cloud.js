@@ -12,7 +12,7 @@
 var FMS_CLOUD = (function () {
   var cfg = window.FMS_CONFIG || {};
   var sb = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'fms.auth' } });
-  var COLLS = ['staff', 'cars', 'customers', 'bookings', 'notes', 'downtime', 'jobs', 'vendors', 'papers', 'odometer', 'summons', 'tasks', 'autoRules',
+  var COLLS = ['staff', 'quotes', 'cars', 'customers', 'bookings', 'notes', 'downtime', 'jobs', 'vendors', 'papers', 'odometer', 'summons', 'tasks', 'autoRules',
     'deductions', 'refunds', 'bankIns', 'expenses', 'instalments', 'tracker', 'alarms', 'wa', 'staffChat', 'invoices', 'receipts', 'audit', 'schedules', 'answers'];
   var APPEND_ONLY = { audit: 1, staffChat: 1 };          /* the app trims these lists in memory; trimming never deletes rows */
   var LOCAL_ONLY = ['notifs', 'recentCars', 'recentBookings', 'dueSeen'];
