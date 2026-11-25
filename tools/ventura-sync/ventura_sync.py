@@ -26,11 +26,13 @@ Config file (KEY=VALUE lines, root/sync-user only, chmod 600):
     FILE_BUDGET_MB=300
 """
 import argparse
+import base64
 import fcntl
 import hashlib
 import json
 import mimetypes
 import os
+import subprocess
 import sys
 import time
 import urllib.error
@@ -43,7 +45,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'ventura-import'))
 sys.path.insert(0, os.path.join(HERE, 'vendor', 'PyMySQL-1.1.1-py3-none-any.whl'))   # pure Python, so no pip needed on the server
 import ventura_export  # noqa: E402
 
-BATCH = 300
+BATCH = 100
 
 
 def read_config(path):
@@ -53,9 +55,11 @@ def read_config(path):
         if line and not line.startswith('#') and '=' in line:
             k, v = line.split('=', 1)
             cfg[k.strip()] = v.strip().strip('"').strip("'")
-    for k in ('MYSQL_DEFAULTS', 'MYSQL_DB', 'FMS_URL', 'FMS_SERVICE_KEY', 'FMS_SLUG', 'STATE_DIR'):
+    for k in ('MYSQL_DEFAULTS', 'MYSQL_DB', 'FMS_URL', 'FMS_SLUG', 'STATE_DIR'):
         if not cfg.get(k):
             sys.exit('config: %s is missing' % k)
+    if not cfg.get('FMS_SERVICE_KEY') and not (cfg.get('SYNC_CLIENT_ID') and cfg.get('SYNC_KEY')):
+        sys.exit('config: set SYNC_CLIENT_ID and SYNC_KEY (key pair), or FMS_SERVICE_KEY')
     cfg.setdefault('MEDIA_ROOT', '/var/www/ventura-api/media')
     cfg.setdefault('PRIVATE_MEDIA_ROOT', '/var/www/ventura-api/media_private')
     cfg['FILE_BUDGET_MB'] = int(cfg.get('FILE_BUDGET_MB') or 300)
@@ -67,9 +71,12 @@ def fp(obj):
 
 
 class FMS:
-    def __init__(self, url, key):
-        self.url = url.rstrip('/')
-        self.key = key
+    """Service-key mode (FMS_SERVICE_KEY): talks to Supabase REST and Storage directly."""
+    def __init__(self, cfg):
+        self.url = cfg['FMS_URL'].rstrip('/')
+        self.key = cfg['FMS_SERVICE_KEY']
+        self.slug = cfg['FMS_SLUG']
+        self.org = None
 
     def call(self, method, path, body=None, headers=None, raw=None, ctype='application/json'):
         h = {'apikey': self.key}
@@ -81,25 +88,90 @@ class FMS:
         elif body is not None:
             data, h['Content-Type'] = json.dumps(body, ensure_ascii=False, default=str).encode(), 'application/json'
         h.update(headers or {})
-        for attempt in range(4):
-            req = urllib.request.Request(self.url + path, data=data, method=method, headers=h)
-            try:
-                with urllib.request.urlopen(req, timeout=120) as r:
-                    txt = r.read()
-                    return json.loads(txt) if txt and r.headers.get('Content-Type', '').startswith('application/json') else None
-            except urllib.error.HTTPError as e:
-                msg = e.read()[:300].decode('utf-8', 'replace')
-                if e.code < 500 or attempt == 3:
-                    raise RuntimeError('FMS said %s on %s %s: %s' % (e.code, method, path.split('?')[0], msg))
-            except urllib.error.URLError as e:
-                if attempt == 3:
-                    raise RuntimeError('cannot reach FMS: %s' % e.reason)
-            time.sleep(2 ** attempt)
+        return http(self.url + path, method, data, h)
 
-    def upsert(self, table, rows, conflict):
+    def hello(self):
+        org = self.call('GET', '/rest/v1/orgs?slug=eq.%s&select=id,next_no' % urllib.parse.quote(self.slug))
+        if not org:
+            sys.exit('FMS has no company "%s" yet.' % self.slug)
+        self.org = org[0]['id']
+        return org[0]
+
+    def upsert(self, table, rows):
+        conflict = {'records': 'org_id,coll,id', 'blobs': 'org_id,key', 'import_map': 'org_id,source,source_table,source_id'}[table]
+        for r in rows:
+            r['org_id'] = self.org
         for i in range(0, len(rows), BATCH):
             self.call('POST', '/rest/v1/%s?on_conflict=%s' % (table, conflict), rows[i:i + BATCH],
                       {'Prefer': 'resolution=merge-duplicates,return=minimal'})
+
+    def mark_deleted(self, coll, ids):
+        q = ','.join('"%s"' % x.replace('"', '') for x in ids)
+        self.call('PATCH', '/rest/v1/records?org_id=eq.%s&coll=eq.%s&id=in.(%s)' % (self.org, urllib.parse.quote(coll), urllib.parse.quote(q)),
+                  {'deleted': True}, {'Prefer': 'return=minimal'})
+
+    def next_no(self, n):
+        self.call('PATCH', '/rest/v1/orgs?id=eq.%s&next_no=lt.%d' % (self.org, n), {'next_no': n}, {'Prefer': 'return=minimal'})
+
+    def upload(self, path, body, ctype):
+        self.call('POST', '/storage/v1/object/company-files/%s/%s' % (self.org, urllib.parse.quote(path)), raw=body, ctype=ctype,
+                  headers={'x-upsert': 'true'})
+
+
+class SignedFMS(FMS):
+    """Key-pair mode (SYNC_CLIENT_ID + SYNC_KEY): every request is signed with this server's Ed25519 private key and goes
+    through the ventura-sync function, which only lets it write into its own company. No FMS secret is kept here."""
+    def __init__(self, cfg):
+        self.fn = cfg['FMS_URL'].rstrip('/') + '/functions/v1/ventura-sync'
+        self.client = cfg['SYNC_CLIENT_ID']
+        self.keyfile = cfg['SYNC_KEY']
+        self.org = None
+
+    def op(self, op, args=None, body=b'', ctype='application/json'):
+        a = json.dumps(args or {}, separators=(',', ':'))
+        t = str(int(time.time()))
+        msg = '\n'.join([t, self.client, op, a, hashlib.sha256(body).hexdigest()]).encode()
+        sig = subprocess.run(['openssl', 'pkeyutl', '-sign', '-inkey', self.keyfile, '-rawin'], input=msg, capture_output=True)
+        if sig.returncode != 0:
+            raise RuntimeError('openssl could not sign: ' + sig.stderr.decode()[:200])
+        h = {'X-Sync-Client': self.client, 'X-Sync-Op': op, 'X-Sync-Args': a, 'X-Sync-Time': t,
+             'X-Sync-Sig': base64.b64encode(sig.stdout).decode(), 'Content-Type': ctype}
+        return http(self.fn, 'POST', body, h)
+
+    def hello(self):
+        r = self.op('hello')
+        self.org = r['id']
+        return r
+
+    def upsert(self, table, rows):
+        for i in range(0, len(rows), BATCH):
+            self.op('upsert', {'table': table}, json.dumps(rows[i:i + BATCH], ensure_ascii=False, default=str).encode())
+
+    def mark_deleted(self, coll, ids):
+        self.op('mark_deleted', {'coll': coll}, json.dumps(ids).encode())
+
+    def next_no(self, n):
+        self.op('next_no', {'n': n})
+
+    def upload(self, path, body, ctype):
+        self.op('upload', {'path': path}, body, ctype)
+
+
+def http(url, method, data, h):
+    for attempt in range(4):
+        req = urllib.request.Request(url, data=data, method=method, headers=h)
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                txt = r.read()
+                return json.loads(txt) if txt and r.headers.get('Content-Type', '').startswith('application/json') else None
+        except urllib.error.HTTPError as e:
+            msg = e.read()[:300].decode('utf-8', 'replace')
+            if e.code < 500 or attempt == 3:
+                raise RuntimeError('FMS said %s on %s %s: %s' % (e.code, method, url.split('?')[0].split('/v1/')[-1], msg))
+        except urllib.error.URLError as e:
+            if attempt == 3:
+                raise RuntimeError('cannot reach FMS: %s' % e.reason)
+        time.sleep(2 ** attempt)
 
 
 def load_state(d):
@@ -134,11 +206,9 @@ def run(cfg, dry):
     finally:
         conn.close()
     t_export = time.time() - t0
-    fms = FMS(cfg['FMS_URL'], cfg['FMS_SERVICE_KEY'])
-    org = fms.call('GET', '/rest/v1/orgs?slug=eq.%s&select=id,next_no' % urllib.parse.quote(cfg['FMS_SLUG']))
-    if not org:
-        sys.exit('FMS has no company "%s" yet: run the first import before the sync.' % cfg['FMS_SLUG'])
-    org_id, next_no = org[0]['id'], org[0]['next_no']
+    fms = SignedFMS(cfg) if cfg.get('SYNC_CLIENT_ID') else FMS(cfg)
+    org = fms.hello()
+    org_id, next_no = org['id'], org['next_no']
 
     # ---- records
     sent, gone = 0, 0
@@ -153,14 +223,11 @@ def run(cfg, dry):
             sent += len(changed); gone += len(removed)
             continue
         if changed:
-            fms.upsert('records', [{'org_id': org_id, 'coll': coll, 'id': r['id'], 'data': r, 'deleted': False} for r in changed],
-                       'org_id,coll,id')
+            fms.upsert('records', [{'org_id': org_id, 'coll': coll, 'id': r['id'], 'data': r, 'deleted': False} for r in changed])
             sent += len(changed)
         for i in range(0, len(removed), 100):
             part = removed[i:i + 100]
-            ids = ','.join('"%s"' % x.replace('"', '') for x in part)
-            fms.call('PATCH', '/rest/v1/records?org_id=eq.%s&coll=eq.%s&id=in.(%s)' % (org_id, urllib.parse.quote(coll), urllib.parse.quote(ids)),
-                     {'deleted': True}, {'Prefer': 'return=minimal'})
+            fms.mark_deleted(coll, part)
             gone += len(part)
         st['h'][coll] = new
         save_state(cfg['STATE_DIR'], st)
@@ -172,17 +239,17 @@ def run(cfg, dry):
             if dry:
                 print('blob %s changed' % key)
             else:
-                fms.upsert('blobs', [{'org_id': org_id, 'key': key, 'data': {'v': val}}], 'org_id,key')
+                fms.upsert('blobs', [{'org_id': org_id, 'key': key, 'data': {'v': val}}])
                 st['h']['blob:' + key] = h
     if d['nextNo'] > (next_no or 0) and not dry:
-        fms.call('PATCH', '/rest/v1/orgs?id=eq.%s' % org_id, {'next_no': d['nextNo']}, {'Prefer': 'return=minimal'})
+        fms.next_no(d['nextNo'])
 
     # ---- import map (only new pairs)
     have = set(tuple(x) for x in st.get('src', []))
     fresh = [s for s in d['sources'] if tuple(s) not in have]
     if fresh and not dry:
         fms.upsert('import_map', [{'org_id': org_id, 'source': 'ventura', 'source_table': t, 'source_id': s, 'coll': c, 'id': f}
-                                  for c, f, t, s in fresh], 'org_id,source,source_table,source_id')
+                                  for c, f, t, s in fresh])
         st['src'] = [list(x) for x in have | set(tuple(s) for s in fresh)]
     if not dry:
         save_state(cfg['STATE_DIR'], st)
@@ -192,14 +259,16 @@ def run(cfg, dry):
     up, up_bytes, missing = 0, 0, 0
     todo = [f for f in d['files'] if f['path'] not in st['files']]
     for f in todo:
-        root = cfg['PRIVATE_MEDIA_ROOT'] if f['private'] else cfg['MEDIA_ROOT']
-        local = os.path.join(root, f['src'].split('/', 1)[1])
-        try:
-            size, mtime = os.path.getsize(local), int(os.path.getmtime(local))
-        except OSError:
+        # Older uploads (inspection photos, ID documents) may sit in the public folder even when Ventura now files
+        # them as private, and the other way round: look in both, the expected one first.
+        rel = f['src'].split('/', 1)[1]
+        roots = [cfg['PRIVATE_MEDIA_ROOT'], cfg['MEDIA_ROOT']] if f['private'] else [cfg['MEDIA_ROOT'], cfg['PRIVATE_MEDIA_ROOT']]
+        local = next((os.path.join(r, rel) for r in roots if os.path.isfile(os.path.join(r, rel))), None)
+        if not local:
             missing += 1
             st['missing'][f['path']] = int(time.time())
             continue
+        size, mtime = os.path.getsize(local), int(os.path.getmtime(local))
         if up_bytes + size > budget and up:
             break
         if dry:
@@ -208,8 +277,7 @@ def run(cfg, dry):
         with open(local, 'rb') as fh:
             body = fh.read()
         ctype = mimetypes.guess_type(local)[0] or 'application/octet-stream'
-        obj = '/storage/v1/object/company-files/%s/%s' % (org_id, urllib.parse.quote(f['path']))
-        fms.call('POST', obj, raw=body, ctype=ctype, headers={'x-upsert': 'true'})
+        fms.upload(f['path'], body, ctype)
         st['files'][f['path']] = mtime
         st['missing'].pop(f['path'], None)
         up += 1; up_bytes += size
