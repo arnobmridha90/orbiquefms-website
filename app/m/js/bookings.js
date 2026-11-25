@@ -39,8 +39,7 @@ var BK_TESTS = {
   depositdue: function (b) {
     var now = Date.now(), m;
     if (['Confirmed', 'Agreement Sent', 'Agreement Signed', 'Car Delivered'].indexOf(b.bookingStatus) < 0 || new Date(b.start).getTime() > now + 2 * DAY || new Date(b.end).getTime() < now) return false;
-    if (b.paymentStatus && b.paymentStatus !== 'Deposit Due') return false;
-    m = calcBooking(b); return m.deposit > 0 && m.depositReceived + 0.99 < m.deposit;
+    m = calcBooking(b); /* goes by the money recorded, not by the payment status label */ return m.deposit > 0 && m.depositReceived + 0.99 < m.deposit;
   },
   collect: function (b) { return bkLive(b) && new Date(b.start).getTime() < Date.now() + 2 * DAY && calcBooking(b).due > 0.99; },
   done: function (b) { return b.bookingStatus === 'Car Returned' || b.bookingStatus === 'Completed'; },
@@ -313,7 +312,11 @@ function bkCustCard(b, cu) {
 }
 function bkDepositChip(b) {
   var ps = b.paymentStatus;
-  if (ps === 'Refund Pending') return '<div class="bk-dep wait">' + I('bank') + '<div class="grow"><b>Deposit: waiting to be returned</b><small>' + rm(Math.max(0, calcBooking(b).depositReceived)) + ' held' + (b.refundPendingAt ? ' since ' + dShort(b.refundPendingAt) : '') + '</small></div><button class="btn sm" onclick="Deposit.open(\'' + b.id + '\')">Return the deposit</button></div>';
+  if (ps === 'Refund Pending') {
+    var x = typeof Deposit !== 'undefined' ? Deposit.info(b) : { net: calcBooking(b).depositReceived, basis: calcBooking(b).depositReceived };
+    return '<div class="bk-dep wait">' + I('bank') + '<div class="grow"><b>' + (b.bookingStatus === 'Cancelled' ? 'Money paid: waiting to be returned' : 'Deposit: waiting to be returned') + '</b><small>' + rm(Math.max(0, x.net)) + (Math.abs(x.net - x.basis) > 0.009 ? ' of ' + rm(x.basis) : '') + ' to return' + (b.refundPendingAt ? ' · since ' + dShort(b.refundPendingAt) : '') + '</small></div><button class="btn sm" onclick="Deposit.open(\'' + b.id + '\')">' + (b.bookingStatus === 'Cancelled' ? 'Return the money' : 'Return the deposit') + '</button></div>';
+  }
+  if (b.bookingStatus === 'Cancelled' && b.cancelMoney === 'credit' && typeof Deposit !== 'undefined') { var xc = Deposit.info(b); if (!xc.refund && xc.net > 0.004) return '<div class="bk-dep wait">' + I('cash') + '<div class="grow"><b>Kept as credit for the customer</b><small>' + rm(xc.net) + ' left to use on a later booking</small></div><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">Details</button></div>'; }
   if (ps === 'Deposit Refunded') return '<div class="bk-dep done">' + I('check', 2.2) + '<div class="grow"><b>Deposit: returned to the customer</b></div><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">See details</button></div>';
   return '';
 }
@@ -405,6 +408,7 @@ function bkStatusPick(id, axis) {
         (off ? '<span class="t2">Set by recording the refund on Deposits</span>' : s === 'Cancelled' ? '<span class="t2">Asks for a reason first</span>' : '') + '</span></label>';
     }).join('') + '</div>' +
     '<div class="sheet-foot"><button class="btn" id="bkstsave">Save</button></div>', function (sh) {
+      $$('input[name=bkst]', sh).forEach(function (i) { i.onchange = function () { var w = $('#bkstwarn', sh); if (w) { w.remove(); $('#bkstsave', sh).textContent = 'Save'; } }; });
       $('#bkstsave', sh).onclick = function () {
         var v = ($('input[name=bkst]:checked', sh) || {}).value;
         if (!v || v === cur) { closeSheet(); return; }
@@ -412,7 +416,17 @@ function bkStatusPick(id, axis) {
         if (isB && (cur === 'Cancelled' || cur === 'Completed') && v !== 'Cancelled' && v !== 'Completed') { var cl = bkClash(b); if (cl) { closeSheet(true); setTimeout(function () { bkClashSheet(b, cl); }, 30); return; } }
         if (isB && cur === 'Cancelled' && v !== 'Completed') { delete b.cancelMoney; if (b.paymentStatus === 'Refund Pending' && !(window.Deposit && Deposit.refundOf(b.id))) { b.paymentStatus = calcBooking(b).depositReceived > 0 ? 'Deposit Received' : 'Deposit Due'; delete b.refundPendingAt; } }
         if (isB) { var ch = setBookingStatus(b, v); notify('change', b.code + ': ' + b.bookingStatus, ch.length ? ch.join(', ') : '', '#booking/' + id, { self: true }); }
-        else { if (v === 'Deposit Refunded' && lockRef) { say('Record the refund on Deposits'); return; } setPaymentStatus(b, v === 'None' ? null : v, 'changed by hand'); say('Payment status: ' + v); }
+        else {
+          if (v === 'Deposit Refunded' && lockRef) { say('Record the refund on Deposits'); return; }
+          var mm = calcBooking(b), shortBy = v === 'Deposit Received' ? Math.max(0, mm.deposit - mm.depositReceived) : v === 'Full Payment Received' ? mm.due : 0;
+          if (shortBy > 0.99 && !$('#bkstwarn', sh)) {
+            var paidW = v === 'Deposit Received' ? mm.depositReceived : mm.received;
+            var w = document.createElement('div'); w.className = 'banner amber'; w.id = 'bkstwarn';
+            w.innerHTML = I('warn') + '<div><b>' + (paidW > 0 ? rm(paidW) + ' was recorded' : 'Nothing was recorded') + '. ' + rm(shortBy) + ' is still due.</b> The status will not match the money. Record the payment instead, or tap Set anyway.</div>';
+            $('.bk-radios', sh).after(w); $('#bkstsave', sh).textContent = 'Set anyway'; w.scrollIntoView({ block: 'nearest' }); return;
+          }
+          setPaymentStatus(b, v === 'None' ? null : v, 'changed by hand'); say('Payment status: ' + v);
+        }
         closeSheet(); render(false, true);
       };
     });
@@ -597,6 +611,8 @@ function bkMoveCar(id) {
 function deleteBk(id) {
   var b = bk(id), ins = b.inspection || {};
   if (ins.agent || ins.customer) { confirm({ icon: 'info', title: 'This booking cannot be deleted', text: 'It has an inspection with photos. Set its status to Cancelled instead.', ok: 'OK', cancel: 'Close' }); return; }
+  var pays = activePays(b);
+  if (pays.length) { var tot = pays.reduce(function (s, x) { return s + payTotal(x); }, 0); confirm({ icon: 'info', title: 'This booking cannot be deleted', text: 'It has ' + rm(tot) + ' in payments (' + pays.length + (pays.length === 1 ? ' payment' : ' payments') + '). Cancel it instead, then refund or keep the money.', ok: 'OK', cancel: 'Close' }); return; }
   var p = calcBooking(b), holds = p.depositReceived > 0 && b.paymentStatus !== 'Deposit Refunded';
   var warn = holds ? '<p class="bk-delwarn">' + esc(b.code) + ' still holds a deposit of ' + rm(p.depositReceived) + ' that has not been returned. Deleting it removes its refund case from Deposit refunds.</p>' : '';
   confirm({ icon: 'danger', title: 'Delete booking?', text: 'Delete ' + b.code + '? This cannot be undone.', danger: true,

@@ -131,8 +131,13 @@ var Pay = (function () {
     var st = { items: KIND_ORDER.map(function (k) { return { kind: k, on: preset.indexOf(k) >= 0, amt: '', touched: false }; }), method: bm, cashTo: S.me, after: null, depOf: 'this', other: null,
       atMode: 'now', date: toLocalInput(new Date()), time: toTimeInput(new Date()), ref: '', note: '', receipt: can('billing.issue_receipt'), status: null, checked: false, err: '' };
     if (opts.amount != null && st.items.filter(function (i) { return i.on; })[0]) { var f = st.items.filter(function (i) { return i.on; })[0]; f.amt = money2(opts.amount); f.touched = true; }
-    var sh = sheet(sheetHead('Record payment', b.code + ' · ' + cust(b.cust).name) + '<div class="pay-body"></div>', null, { full: true, cls: 'pay-sheet' });
+    var sh = sheet(sheetHead('Record payment', b.code + ' · ' + cust(b.cust).name) + '<div class="pay-body"></div>', null, { full: true, cls: 'pay-sheet',
+      guard: function () { return st.dirty && !st.done ? { title: 'Close without recording?', text: 'What you typed will be lost.', ok: 'Close anyway', cancel: 'Keep editing' } : null; } });
     var body = $('.pay-body', sh);
+    /* anything typed or picked makes the sheet ask before it closes */
+    body.addEventListener('input', function () { st.dirty = true; });
+    body.addEventListener('change', function () { st.dirty = true; });
+    body.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('[data-tick],[data-quick],[data-meth],[data-when],[data-depof],#paycash,#payother,#payusecr')) st.dirty = true; }, true);
 
     function ticked() { return st.items.filter(function (i) { return i.on; }); }
     function suggest() {
@@ -163,10 +168,12 @@ var Pay = (function () {
       var h = '';
       if (can('bookings.see_amounts')) h += '<div class="pay-sum"><div><small>Booking total</small><b class="money">' + rm(m.payable) + '</b></div><div><small>Received</small><b class="money">' + rm(m.received) + '</b></div><div><small>' + (m.overpaid ? 'Extra' : 'To collect') + '</small><b class="money ' + (m.due ? 'tone-red-text' : '') + '">' + rm(m.due || m.overpaid) + '</b></div></div>';
       var chips = [];
+      if (depL > 0 && rentL > 0 && !fromDep) chips.push('<button type="button" class="fchip" data-quick="bal">Balance <b class="money">' + rm(depL + rentL) + '</b></button>');
       if (depL > 0 && !fromDep) chips.push('<button type="button" class="fchip" data-quick="dep">Deposit <b class="money">' + rm(depL) + '</b></button>');
       if (rentL > 0) chips.push('<button type="button" class="fchip" data-quick="rent">Rent and charges <b class="money">' + rm(rentL) + '</b></button>');
-      if (depL > 0 && rentL > 0 && !fromDep) chips.push('<button type="button" class="fchip" data-quick="bal">Balance <b class="money">' + rm(depL + rentL) + '</b></button>');
       if (chips.length) h += '<div class="chiprow pay-quick">' + chips.join('') + '</div>';
+      var cr = typeof custCredit === 'function' && !fromDep ? custCredit(b.cust) : null;
+      if (cr && cr.total > 0) h += '<div class="banner green pay-credit">' + I('cash') + '<div class="grow">' + esc(firstName(cust(b.cust).name)) + ' has <b class="money">' + rm(cr.total) + '</b> credit from ' + esc(cr.rows.map(function (r) { return r.b.code; }).join(', ')) + '.<div><button type="button" class="btn sm ghost" id="payusecr" data-cr="' + cr.rows[0].b.id + '">Pay from credit</button></div></div></div>';
       h += '<div class="pay-h">What is this payment for?</div><div class="small muted pay-hint">Tick everything it paid for and check each amount.</div>';
       h += '<div class="card pay-items' + (pr.none ? ' bad' : '') + '">' + st.items.map(function (i, n) {
         var lock = fromDep && i.kind === 'Security deposit', hint = '';
@@ -187,7 +194,8 @@ var Pay = (function () {
         (st.afterErr ? '<span class="err">' + esc(st.afterErr) + '</span>' : '') + (st.afterErr && st.after != null ? '<span class="hint"><button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button></span>' : st.afterErr ? '' : '<span class="hint" id="payafterh">' + (st.after != null ? 'Changed by hand. <button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button>' : cardHint()) + '</span>') + '</label>';
       if (fromDep) {
         var sb = srcBooking(), left = sb ? payDepositLeft(sb) : 0;
-        h += '<div class="field"><span>Deposit of</span><div class="seg pay-depof"><button type="button" class="' + (st.depOf === 'this' ? 'on' : '') + '" data-depof="this">This booking (' + esc(b.code) + ')</button><button type="button" class="' + (st.depOf === 'other' ? 'on' : '') + '" data-depof="other">Another booking</button></div>' +
+        var thisLeft = payDepositLeft(b), thisOff = thisLeft <= 0.004;
+        h += '<div class="field"><span>Deposit of</span><div class="seg pay-depof"><button type="button" class="' + (st.depOf === 'this' ? 'on' : '') + '" data-depof="this"' + (thisOff ? ' disabled' : '') + '>This booking (' + esc(b.code) + ')' + (thisOff ? '<small>No deposit left</small>' : '') + '</button><button type="button" class="' + (st.depOf === 'other' ? 'on' : '') + '" data-depof="other">Another booking</button></div>' +
           (st.depOf === 'other' ? '<button type="button" class="carfield ' + (sb ? 'picked-car' : 'empty-car') + '" id="payother">' + I('list') + '<span class="grow">' + (sb ? '<span class="pk-plate pay-pn">' + esc(sb.code) + ' · ' + esc(cust(sb.cust).name) + '</span><span class="pk-sub">Deposit left <span class="money">' + rm(left) + '</span></span>' : 'Choose the booking whose deposit pays this') + '</span>' + I('chev') + '</button>' + (st.otherErr ? '<span class="err">' + esc(st.otherErr) + '</span>' : '') : '') +
           (sb ? '<span class="hint">No money comes in: the amount is taken off the deposit of ' + esc(sb.code) + ' (' + rm(left) + ' left) and the refund of that deposit is smaller by the same amount.</span>' : '') + '</div>';
       }
@@ -219,6 +227,7 @@ var Pay = (function () {
       var c = $('#paycnt', sh); if (c) c.textContent = cntText();
       var g = $('#paygol', sh); if (g) g.textContent = goText();
       var a = $('#payafter', sh); if (a && st.after == null && document.activeElement !== a) a.value = afterValue();
+      var ah = $('#payafterh', sh); if (ah && st.after == null && !st.afterErr) ah.innerHTML = cardHint();
       var s = $('#paysth', sh); if (s) { var ps = previewStatus(); s.innerHTML = statusHint(ps); if (st.status == null) $('#paysts', sh).checked = !!ps; }
     }
     function draw() { var y = sh.scrollTop; body.innerHTML = html(); wire(); sh.scrollTop = y; }
@@ -231,9 +240,18 @@ var Pay = (function () {
       }; });
       $$('[data-meth]', body).forEach(function (el) { el.onclick = function () {
         st.method = el.dataset.meth; st.err = ''; st.afterErr = '';
-        if (st.method === 'Deposit adjustment') { var d = st.items[0]; if (d.on) { d.on = false; d.touched = false; say('A security deposit cannot be paid from a deposit'); if (!ticked().length) st.items[1].on = true; } }
+        if (st.method === 'Deposit adjustment') {
+          var d = st.items[0]; if (d.on) { d.on = false; d.touched = false; say('A security deposit cannot be paid from a deposit'); if (!ticked().length) st.items[1].on = true; }
+          /* nothing left on this booking's deposit: go straight to another booking's */
+          if (st.depOf === 'this' && payDepositLeft(b) <= 0.004) { st.depOf = 'other'; suggest(); draw(); if (!st.other) pickOther(); return; }
+        }
         suggest(); draw();
       }; });
+      var uc = $('#payusecr', body); if (uc) uc.onclick = function () {
+        st.method = 'Deposit adjustment'; st.depOf = 'other'; st.other = uc.dataset.cr; st.err = '';
+        st.items.forEach(function (i) { if (i.kind === 'Security deposit') { i.on = false; i.touched = false; } }); if (!ticked().length) st.items[1].on = true;
+        suggest(); draw();
+      };
       var pc = $('#paycash', body); if (pc) pc.onclick = function () { Pickers.staff({ title: 'Who has the cash?', selected: [st.cashTo], onPick: function (p) { if (p) { st.cashTo = p.id; draw(); } } }); };
       var pa = $('#payafter', body); if (pa) pa.oninput = function () { st.after = pa.value; st.afterErr = ''; pa.classList.remove('bad'); var hh = $('#payafterh', body); if (hh) hh.innerHTML = 'Changed by hand. <button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button>'; var rr = $('#payafterr', body); if (rr) rr.onclick = function () { st.after = null; draw(); }; };
       var par = $('#payafterr', body); if (par) par.onclick = function () { st.after = null; draw(); };
@@ -288,6 +306,7 @@ var Pay = (function () {
       });
     }
     function success(res) {
+      st.done = true;
       var p = res.pay, tot = payTotal(p), cu = cust(b.cust);
       var h = '<div class="pay-done"><div class="pay-done-ic">' + I('check', 3) + '</div><h3>Payment of ' + rm(tot) + ' recorded</h3>' +
         (res.duplicate ? '<div class="banner amber">' + I('info') + '<div>The same payment was recorded a moment ago, so it was not added twice.</div></div>' : '') +

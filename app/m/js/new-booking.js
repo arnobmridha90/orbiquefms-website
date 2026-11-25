@@ -133,7 +133,7 @@ function nbTemp() {
   var pk = nbParsePlace(NB.pick), rk = nbParsePlace(NB.ret);
   return blankBooking({ start: NB.s, end: NB.e, car: NB.car, pickKind: pk.kind, pickLoc: pk.id, pickNote: NB.pickNote, retKind: rk.kind, retLoc: rk.id, retNote: NB.retNote,
     rates: { daily: nbNum('daily'), hourly: nbNum('hourly'), deposit: nbNum('deposit'), discount: nbNum('discount'), delivery: nbNum('delivery'), 'return': nbNum('return'), others: nbNum('others') },
-    cover: nbCover(), bookingStatus: NB.status, paymentStatus: NB.payStatus || null });
+    cover: nbCover(), bookingStatus: NB.status, paymentStatus: NB.payStatus === 'Deposit Due' ? 'Deposit Due' : null });
 }
 function nbMoneyMode() { return can('bookings.edit_amounts') ? 'edit' : can('bookings.see_amounts') ? 'see' : 'hidden'; }
 /* customers that already use this phone / IC (never make a duplicate) */
@@ -331,11 +331,11 @@ function nbPriceSection(probs) {
     '<div class="nb-grid">' + fld('daily', 'Daily rate') + fld('hourly', 'Hourly rate') + fld('deposit', 'Deposit') + fld('discount', 'Discount') + fld('delivery', 'Delivery') + fld('return', 'Return') + fld('others', 'Others') + '</div></div>';
 }
 function nbPaySection() {
-  var tmp = nbTemp(), canRef = canPickRefunded(tmp), mEdit = nbMoneyMode() === 'edit';
+  var mEdit = nbMoneyMode() === 'edit';
   var seg = function (id, list, cur, dis) { return '<div class="seg nb-seg" id="' + id + '">' + list.map(function (x) { return '<button type="button" data-v="' + x + '" class="' + (x === cur ? 'on' : '') + '"' + (dis ? ' disabled' : '') + '>' + x + '</button>'; }).join('') + '</div>'; };
   var body = '<div class="field"><span>Payment method</span>' + seg('nb_method', ['Cash', 'Card', 'Online Transfer'], NB.method, !mEdit) + (!mEdit ? '<span class="hint">Needs Edit amounts access</span>' : '') + '</div>' +
     '<div class="field"><span>Booking status</span>' + seg('nb_status', ['Pending', 'Confirmed'], NB.status) + '</div>' +
-    '<label class="field"><span>Payment status</span><select class="inp" id="nb_paystatus"><option value="">None</option>' + PAY_STATUSES.map(function (p) { var dis = p === 'Deposit Refunded' && !canRef; return '<option value="' + p + '"' + (p === NB.payStatus ? ' selected' : '') + (dis ? ' disabled' : '') + '>' + p + (dis ? ' (only by recording the refund)' : '') + '</option>'; }).join('') + '</select></label>' +
+    '<label class="field"><span>Payment status</span><select class="inp" id="nb_paystatus"><option value="">None</option>' + ['Deposit Due'].map(function (p) { return '<option value="' + p + '"' + (p === NB.payStatus ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '</select><span class="hint">Money received comes from a recorded payment: use Record deposit now after saving.</span></label>' +
     '<label class="field"><span>Booked through</span><select class="inp" id="nb_src">' + ['Staff', 'WhatsApp', 'Website', 'Walk-in'].map(function (x) { return '<option' + (x === NB.source ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label>' +
     '<label class="field"><span>Note for staff</span><textarea class="inp" id="nb_note" rows="2" placeholder="Optional">' + esc(NB.note) + '</textarea></label>';
   return '<div class="formcard nb-paycard" id="nbs_pay">' + nbFold('pay', 'Payment and status', [NB.method, NB.status, NB.payStatus || 'No payment status', NB.source].join(' · '), body) + '</div>';
@@ -638,7 +638,7 @@ function nbCommit(n) {
   }
   var t = nbTemp(), no = S.nextNo++;
   var b = blankBooking({ no: no, code: bookingCode(no), cust: cid, car: t.car, start: n.s, end: n.e, created: nowIso, createdBy: S.me, source: n.source,
-    bookingStatus: n.status === 'Confirmed' ? 'Confirmed' : 'Pending', paymentStatus: n.payStatus || null, method: nbMoneyMode() === 'edit' ? n.method : 'Cash',
+    bookingStatus: n.status === 'Confirmed' ? 'Confirmed' : 'Pending', paymentStatus: n.payStatus === 'Deposit Due' ? 'Deposit Due' : null, method: nbMoneyMode() === 'edit' ? n.method : 'Cash',
     rates: t.rates, cover: t.cover, pickKind: t.pickKind, pickLoc: t.pickLoc, pickNote: String(n.pickNote || '').trim(), retKind: t.retKind, retLoc: t.retLoc, retNote: String(n.retNote || '').trim(),
     note: String(n.note || '').trim(), leadId: n.leadId || null, docs: docs, formId: uid() + uid().slice(0, 4), agentToken: uid() + uid() });
   if (B().signature) b.signature = B().signature;
