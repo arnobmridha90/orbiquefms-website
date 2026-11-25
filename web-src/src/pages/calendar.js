@@ -93,6 +93,9 @@ PAGES['calendar'] = {
       var bg = '<div class="cl-bg">' + cells.map(function (c) { return '<i class="' + c + '"></i>'; }).join('') + '</div>';
       var nowP = NOW() > r.from && NOW() < r.to ? '<span class="cl-now" style="left:' + pct(NOW()) + '%" aria-hidden="true"></span>' : '';
       var minW = r.n * colW;
+      /* bookings that fall inside a workshop period of their car: both bars get a red outline and a warning icon */
+      var clash = {}; workshopClashes(d).forEach(function (z) { clash[z.b.code] = z.w; clash[z.w.id] = z.b; });
+      var clashI = function (key, what) { return clash[key] ? i('alert-triangle', 'cl-cx') : ''; };
       var rows = cars.map(function (c) {
         var items = ev.bks.filter(function (x) { return x.car === c; }).map(function (x) { return { s: x.start, e: x.end, b: x }; })
           .concat(ev.shop.filter(function (w) { return w.car === c.id; }).map(function (w) { return { s: w.from, e: w.to || new Date(Math.max(+NOW(), +r.to)), w: w }; }))
@@ -103,9 +106,9 @@ PAGES['calendar'] = {
         var bars = items.map(function (it) {
           var L = pct(it.s), R = pct(it.e), cut = it.s < r.from, cutR = it.e > r.to;
           var style = 'left:' + L + '%;width:calc(' + Math.max(R - L, 0) + '% - 3px);top:' + (8 + it.lane * 30) + 'px';
-          if (it.w) return '<button type="button" class="cl-ev shop' + (it.w.back ? ' past' : '') + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + '" style="' + style + '" data-shop="' + it.w.id + '" title="Workshop: ' + esc(it.w.reason) + '"><b>Workshop · ' + esc(it.w.reason === 'Accident' ? 'Accident repair' : it.w.reason) + '</b>' + (it.w.note ? ' · ' + esc(it.w.note) : '') + '</button>';
+          if (it.w) return '<button type="button" class="cl-ev shop' + (it.w.back ? ' past' : '') + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + (clash[it.w.id] ? ' clash' : '') + '" style="' + style + '" data-shop="' + it.w.id + '" title="Workshop: ' + esc(it.w.reason) + (clash[it.w.id] ? '. Clashes with booking ' + clash[it.w.id].code : '') + '">' + clashI(it.w.id) + '<b>Workshop · ' + esc(it.w.reason === 'Accident' ? 'Accident repair' : it.w.reason) + '</b>' + (it.w.note ? ' · ' + esc(it.w.note) : '') + '</button>';
           var x = it.b;
-          return '<button type="button" class="cl-ev ' + clTone(x) + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + '" style="' + style + '" data-bk="' + x.code + '" aria-label="' + esc(x.code + ', ' + x.cust.name + ', ' + x.status) + '"><b>' + esc(x.cust.name) + '</b> • ' + tm(x.start) + ' - ' + tm(x.end) + ' • ' + clDays(x) + '</button>';
+          return '<button type="button" class="cl-ev ' + clTone(x) + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + (clash[x.code] ? ' clash' : '') + '" style="' + style + '" data-bk="' + x.code + '"' + (clash[x.code] ? ' title="Clashes with workshop time (' + esc(clash[x.code].reason.toLowerCase()) + ')"' : '') + ' aria-label="' + esc(x.code + ', ' + x.cust.name + ', ' + x.status + (clash[x.code] ? ', clashes with workshop time' : '')) + '">' + clashI(x.code) + '<b>' + esc(x.cust.name) + '</b> • ' + tm(x.start) + ' - ' + tm(x.end) + ' • ' + clDays(x) + '</button>';
         }).join('');
         return '<div class="cl-car" data-car="' + c.id + '" role="button" tabindex="0" title="Open ' + esc(c.plate) + '">' + carsThumb(c, 'cl-ph') + '<div class="cl-ci"><b>' + esc(c.plate) + '</b><span>' + esc(carName(c)) + '</span><small>' + esc(c.color) + (c.fleet && c.fleet !== 'Active' ? ' · ' + esc(c.fleet) : '') + '</small></div></div>' +
           '<div class="cl-track' + (ctx.can('bookings.create') && (!c.fleet || c.fleet === 'Active') ? ' book' : '') + '" style="height:' + (16 + nl * 30) + 'px" data-row="' + c.id + '">' + bg + nowP + bars + '</div>';
@@ -139,6 +142,7 @@ PAGES['calendar'] = {
       return '<div class="cl-tip"><div class="cl-tip-h"><b>' + esc(x.cust.name) + '</b>' + UI.phone(x.cust.phone, { wa: true }) + '</div>' +
         '<div class="cl-tip-s"><div><b>' + clDays(x) + '</b></div><div>' + UI.fmt.dateTime(x.start) + '</div><div>' + UI.fmt.dateTime(x.end) + '</div><div class="faint">' + esc(x.car.plate) + ' · ' + esc(carName(x.car)) + '</div></div>' +
         (money ? '<div class="cl-tip-s"><div class="faint">Daily: ' + UI.fmt.money(x.rate || x.car.rate) + ' · Hourly: ' + UI.fmt.money(x.hourly || x.car.hourly) + '</div>' + mrow('Total Rent', UI.money(x.rent), true) + mrow('Security Deposit', UI.money(x.dep)) + (x.disc ? mrow('Discount', '- ' + UI.money(x.disc)) : '') + mrow('Total Amount Paid', UI.money(paid), true) + '</div>' : '<div class="cl-tip-s faint">Amounts are hidden for your role.</div>') +
+        (function () { var z = workshopClashes(d).filter(function (q) { return q.b === x; })[0]; return z ? '<div class="cl-tip-s">' + UI.alert('This booking clashes with workshop time (' + z.w.reason.toLowerCase() + ', ' + UI.fmt.dt(z.w.from) + (z.w.to ? ' to ' + UI.fmt.dt(z.w.to) : ', no return date') + '). Move the booking to another car or change the workshop dates.', 'bad') + '</div>' : ''; })() +
         '<div class="cl-tip-s"><div class="cl-tr"><span>Booking Status</span>' + UI.status('booking', x.status) + '</div><div class="cl-tr"><span>Payment Status</span>' + UI.status('payment', x.pay || 'None') + '</div><div class="cl-tr"><span>Booking ID</span><b class="mono">' + x.code + '</b></div></div>' +
         '<div class="cl-tip-a">' + UI.btn('Open booking', { size: 'sm', icon: 'external-link', attrs: { 'data-tip': 'open', 'data-v': x.code } }) + '</div></div>';
     }
@@ -163,7 +167,13 @@ PAGES['calendar'] = {
       if (c.fleet && c.fleet !== 'Active') { UI.toast(c.plate + ' is marked ' + c.fleet + ', so it cannot be booked.', { tone: 'warn' }); return; }
       var r = clRange(st.view, st.date), rc = el.getBoundingClientRect(), fr = Math.max(0, Math.min(.9999, (ev.clientX - rc.left) / rc.width)), at = new Date(+r.from + fr * (r.to - r.from)), s;
       if (r.unit === 'hour') { s = new Date(at.getFullYear(), at.getMonth(), at.getDate(), at.getHours(), 0); } else { s = clDay(at); s.setHours(10, 0, 0, 0); }
-      ctx.api.newBooking({ car: c.id, start: s, end: new Date(s.getTime() + DAY) });
+      /* never start a booking in the past: a past day says so; today starts at the next full hour */
+      var now = NOW(), nextH = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0);
+      if ((r.unit === 'hour' ? new Date(s.getTime() + 36e5) : new Date(clDay(s).getTime() + DAY)) <= now) { UI.toast((r.unit === 'hour' ? 'That time' : 'That day') + ' has passed, so a booking cannot start then. Use New Booking for a late entry.', { tone: 'warn' }); return; }
+      if (s < nextH) s = nextH;
+      var e = new Date(s.getTime() + DAY), bz = busy(c, s, e);
+      if (!bz.free) { UI.toast(c.plate + ' is not free then: ' + (bz.kind === 'booking' ? 'booked on ' + bz.booking.code + ' until ' + UI.fmt.dt(bz.booking.end) : bz.reason) + '.', { tone: 'warn', ms: 5000 }); return; }
+      ctx.api.newBooking({ car: c.id, start: s, end: e });
     });
     UI.on(root, 'input', '[data-key="clq"]', UI.debounce(function (ev, el) { st.q = el.value; ctx.setParams({ q: st.q || null }, true); draw(); }, 180));
     var openCar = function (el) { ctx.api.openCar(el.getAttribute('data-car')); };

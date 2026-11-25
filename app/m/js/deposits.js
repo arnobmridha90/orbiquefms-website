@@ -41,9 +41,11 @@ var Deposit = (function () {
     });
     return out;
   }
+  /* the card company's charge taken off payment lines (a line's `after` is what really came in): that money never reached us, so it is not given back */
+  function cardKept(b, kind) { return sen(activePays(b).reduce(function (s, p) { return s + (p.items || []).reduce(function (t, i) { return t + ((!kind || i.kind === kind) && i.after != null ? (+i.amt || 0) - (+i.after || 0) : 0); }, 0); }, 0)); }
   function info(b, ix) {
     var m = calcBooking(b), cancelled = b.bookingStatus === 'Cancelled';
-    var received = cancelled ? m.received + m.extra : m.depositReceived, agreed = cancelled ? 0 : m.deposit;
+    var received = cancelled ? m.received + m.extra - cardKept(b, null) : m.depositReceived - cardKept(b, 'Security deposit'), agreed = cancelled ? 0 : m.deposit;
     var refund = refundOf(b.id), notRecorded = received <= 0;
     var basis = refund && refund.received != null ? +refund.received : (notRecorded ? agreed : received);
     var adj = deds(b.id).filter(function (d) { return d.kind !== 'Used for a payment'; }), used = usedLines(b, ix);
@@ -133,8 +135,9 @@ var Deposit = (function () {
       /* received */
       h += '<div class="sec"><h2>' + (x.cancelled ? 'Money paid' : 'Deposit received') + '</h2></div><div class="list">';
       if (depPays.length) h += depPays.map(function (p) {
-        var amt = x.cancelled ? payTotal(p) : (p.items || []).reduce(function (s, i) { return s + (i.kind === 'Security deposit' ? +i.amt || 0 : 0); }, 0);
-        return '<div class="card2"><div class="c2-main"><div class="c2-t1">' + esc(p.method === 'Online Transfer' ? 'Bank transfer' : p.method) + (p.ref ? ' · ' + esc(p.ref) : '') + '</div><div class="c2-t2">' + esc(dFull(p.at)) + ', ' + hm(p.at) + (p.by ? ' · ' + esc(who(p.by)) : '') + '</div></div><div class="c2-end">' + rm(amt) + '</div></div>';
+        var its = (p.items || []).filter(function (i) { return x.cancelled || i.kind === 'Security deposit'; });
+        var amt = its.reduce(function (s, i) { return s + (i.after != null ? +i.after || 0 : +i.amt || 0); }, 0), fee = its.reduce(function (s, i) { return s + (i.after != null ? (+i.amt || 0) - (+i.after || 0) : 0); }, 0);
+        return '<div class="card2"><div class="c2-main"><div class="c2-t1">' + esc(methodText(p.method)) + (p.ref ? ' · ' + esc(p.ref) : '') + '</div><div class="c2-t2">' + esc(dFull(p.at)) + ', ' + hm(p.at) + (p.by ? ' · ' + esc(who(p.by)) : '') + (fee > 0.004 ? ' · ' + rm(fee) + ' card charge taken off' : '') + '</div></div><div class="c2-end">' + rm(amt) + '</div></div>';
       }).join('') + '<div class="sumline big"><span>Total</span><span class="money">' + rm(x.received) + '</span></div>';
       else if (x.refund) h += '<div class="card2"><div class="c2-main"><div class="c2-t1">No deposit payment was recorded</div><div class="c2-t2">The refund was worked out from the deposit typed when it was recorded.</div></div><div class="c2-end">' + rm(x.basis) + '</div></div>';
       else h += '<div class="dep-typed"><div class="banner amber">' + I('info') + '<div>No deposit payment is recorded. The deposit on the booking is used. You can change it if the customer gave a different amount.</div></div>' +
@@ -447,6 +450,24 @@ SEEDERS.push({ key: 'm4DepUse', fn: function (d, x) {
   if (c) mk(c, 50, 'Other payment', 'fuel top up');
 } });
 
+/* ---------- data fix: a cancelled booking that still holds money paid waits to be refunded (unless it was kept as credit) ---------- */
+SEEDERS.push({ key: 'm4CancelRefund', fn: function (d) {
+  d.m4CancelRefund = 1;
+  d.bookings.forEach(function (b) {
+    if (b.bookingStatus !== 'Cancelled' || b.cancelMoney === 'credit' || b.paymentStatus === 'Refund Pending' || b.paymentStatus === 'Deposit Refunded') return;
+    var x = Deposit.info(b); if (x.refund || x.net <= 0.004) return;
+    var cx = (b.log || []).filter(function (l) { return /^Booking cancelled/.test(l.text); }).pop();
+    b.paymentStatus = 'Refund Pending'; b.refundPendingAt = (cx && cx.at) || b.end;
+    (b.log = b.log || []).push({ at: new Date().toISOString(), by: 'System', text: 'Payment status changed to Refund Pending (money paid on a cancelled booking was not given back)' });
+  });
+} });
+/* a customer's credit: money kept on their cancelled bookings to pay a later booking */
+function custCredit(custIds) {
+  var ids = [].concat(custIds), rows = [];
+  S.bookings.forEach(function (b) { if (ids.indexOf(b.cust) < 0 || b.bookingStatus !== 'Cancelled' || b.cancelMoney !== 'credit') return; var x = Deposit.info(b); if (!x.refund && x.net > 0.004) rows.push({ b: b, amt: x.net }); });
+  return { rows: rows, total: Math.round(rows.reduce(function (s, r) { return s + r.amt; }, 0) * 100) / 100 };
+}
+
 /* ---------- #deposits list ---------- */
 VIEWS.deposits = function () {
   if (!can('deposits.view')) return { html: topbar('Deposits', { back: '#more' }) + '<main>' + noAccess('deposits.view') + '</main>' };
@@ -475,7 +496,7 @@ VIEWS.deposits = function () {
     var b = r.b, x = r.x, cu = cust(b.cust), c = car(b.car) || {};
     var end = depList.tab === 'wait' ? rm(x.net) + (Math.abs(x.net - x.basis) > 0.009 ? '<small>of ' + rm(x.basis) + '</small>' : '<small>to return</small>') : rm(x.refund ? x.refund.amt : 0) + '<small>' + (x.refund ? esc(x.refund.method || 'Nothing back') : x.state === 'used' ? 'Used' : 'By hand') + '</small>';
     return '<button type="button" class="card2 dep-row" data-dep="' + b.id + '"><div class="c2-main"><div class="c2-t1">' + esc(cu.name) + '</div><div class="c2-t2">' + esc(b.code) + ' · ' + esc(c.plate || '') + '</div>' +
-      '<div class="dep-chips">' + (depList.tab === 'wait' ? Deposit.waitChip(x.wait) + (x.takenOff ? chip('-' + rm(x.takenOff) + ' kept', 'grey') : '') + (x.notRecorded ? chip('Deposit not recorded', 'amber') : '') + '<span class="small muted">back ' + esc(dShort(b.end)) + '</span>' : Deposit.stateChip(x) + '<span class="small muted">' + esc(dShort(r.t)) + '</span>') + '</div></div><div class="c2-end">' + end + '</div></button>';
+      '<div class="dep-chips">' + (depList.tab === 'wait' ? (b.bookingStatus === 'Cancelled' ? chip('Cancelled', 'grey') : '') + Deposit.waitChip(x.wait) + (x.takenOff ? chip('-' + rm(x.takenOff) + ' kept', 'grey') : '') + (x.notRecorded ? chip('Deposit not recorded', 'amber') : '') + '<span class="small muted">back ' + esc(dShort(b.end)) + '</span>' : Deposit.stateChip(x) + '<span class="small muted">' + esc(dShort(r.t)) + '</span>') + '</div></div><div class="c2-end">' + end + '</div></button>';
   };
   var html = topbar('Deposits', { back: '#more' }) + '<main class="dep-main">' +
     '<div class="kpis dep-kpis">' +

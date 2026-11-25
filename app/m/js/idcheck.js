@@ -59,8 +59,9 @@ var IdCheck = (function () {
   }
   function summary(chk) {
     var flagged = chk.results.some(function (r) { return r.status === 'flagged'; }), err = chk.results.some(function (r) { return r.status === 'error'; });
-    var label = !chk.valid ? 'IC not valid' : flagged ? 'IC flagged' : err ? 'IC check not finished' : 'IC checked, all clear';
-    return { at: new Date().toISOString(), ic: maskIC(chk.ic), valid: chk.valid, label: label, tone: !chk.valid ? 'red' : flagged ? 'amber' : err ? 'grey' : 'green' };
+    var differs = chk.match === 'mismatch' || chk.match === 'near';
+    var label = !chk.valid ? 'IC not valid' : flagged ? 'IC flagged' : err ? 'IC check not finished' : differs ? 'IC checked, name differs' : 'IC checked, all clear';
+    return { at: new Date().toISOString(), ic: maskIC(chk.ic), valid: chk.valid, label: label, tone: !chk.valid ? 'red' : flagged || differs ? 'amber' : err ? 'grey' : 'green' };
   }
   function readDoc(kind, src, opts) {
     var R = rng(seedOf(src + kind + Date.now()));
@@ -113,14 +114,17 @@ var IdCheck = (function () {
       var c = st.chk; c.match = nameMatch(c.name, st.formName); c.decision = decide(c);
       if (opts.onCheck) opts.onCheck(summary(c));
       if (b) { b.icCheck = summary(c); save(); }
-      if (c.decision.fill) fill({ name: titleName(c.name), ic: c.ic, nationality: 'Malaysian' });
+      if (c.decision.fill) fill(icPatch(c));
     };
+    /* the name read from the IC only replaces the typed or saved name when they agree (or nothing was typed); otherwise staff decide with 'Use name from IC' */
+    var nameOk = function (c) { return !String(st.formName || '').trim() || c.match === 'match'; };
+    var icPatch = function (c) { var p = { ic: c.ic, nationality: 'Malaysian' }; if (nameOk(c) && c.name) p.name = titleName(c.name); return p; };
     var checkOnline = function () {
       st.busy = 'online'; draw();
       return runOnline(st.chk.ic, st.attempt++).then(function (rows) { if (!st.chk) return; st.chk.results = rows; st.busy = null; afterCheck(); st.jump = '.idc-res'; draw(); });
     };
     var readIc = function (src) {
-      st.busy = 'ic'; st.err = ''; st.filled = ''; st.chk = null; st.jump = '.idc-busy'; draw();
+      st.busy = 'ic'; st.err = ''; st.filled = ''; st.chk = null; st.nameUsed = false; st.jump = '.idc-busy'; draw();
       var known = digits(opts.ic).length === 12 ? opts.ic : null, R = rng(seedOf(src.slice(-40) + Date.now()));
       Media.readIC(src.indexOf('demo:') === 0 ? src + Math.random() : src, { ic: known && R() < .85 ? known : null, name: st.formName && R() < .75 ? String(st.formName).toUpperCase() : null, delay: 1000 }).then(function (r) {
         if (!sh.isConnected) return;
@@ -197,7 +201,8 @@ var IdCheck = (function () {
         }
         if (busy !== 'online' && c.decision) {
           if (c.decision.why) res += '<div class="banner ' + (c.decision.fill ? 'blue' : 'amber') + '">' + I('info') + '<div>' + esc(c.decision.why) + '</div></div>';
-          if (!c.decision.fill && c.ic) res += '<button type="button" class="btn ghost idc-anyway" id="idc_anyway">Fill in the name and IC anyway</button>';
+          if (!c.decision.fill && c.ic) res += '<button type="button" class="btn ghost idc-anyway" id="idc_anyway">' + (nameOk(c) ? 'Fill in the name and IC anyway' : 'Fill in the IC number anyway') + '</button>';
+          if (!nameOk(c) && c.name && !st.nameUsed) res += '<button type="button" class="btn ghost idc-usename" id="idc_usename">Use name from IC: ' + esc(titleName(c.name)) + '</button>';
           if (c.results.some(function (r) { return r.status === 'error'; })) res += '<button type="button" class="btn link idc-retry" id="idc_retry">' + I('reset') + 'Try the online check again</button>';
         }
         res += '<div class="idc-edit"><div class="small muted">Read wrongly? Fix it here.</div><label class="field"><span>IC number</span><input class="inp" id="idc_ic" value="' + esc(st.edIc) + '" inputmode="numeric" autocomplete="off"></label>' +
@@ -219,7 +224,11 @@ var IdCheck = (function () {
       $$('[data-slot]', box).forEach(function (el) { el.onclick = function () { take(SLOTS.filter(function (s) { return s.k === el.dataset.slot; })[0]); }; });
       $$('[data-rm]', box).forEach(function (el) { el.onclick = function () { remove(el.dataset.rm, +el.dataset.i); }; });
       $('#idc_sample', box).onchange = function () { st.sample = this.checked; };
-      var an = $('#idc_anyway', box); if (an) an.onclick = function () { fill({ name: titleName(st.chk.name), ic: st.chk.ic, nationality: 'Malaysian' }); draw(); };
+      var an = $('#idc_anyway', box); if (an) an.onclick = function () { fill(icPatch(st.chk)); draw(); };
+      var un = $('#idc_usename', box); if (un) un.onclick = function () {
+        var nm = titleName(st.chk.name); st.nameUsed = true; fill({ name: nm }); st.formName = nm; st.chk.match = 'match';
+        if (opts.onCheck) opts.onCheck(summary(st.chk)); if (b) { b.icCheck = summary(st.chk); save(); } draw();
+      };
       var rt = $('#idc_retry', box); if (rt) rt.onclick = function () { checkOnline(); };
       var ii = $('#idc_ic', box), nn = $('#idc_name', box), fx = $('#idc_fix', box);
       if (ii) {
@@ -228,7 +237,7 @@ var IdCheck = (function () {
         fx.onclick = function () {
           var raw = ii.value.trim(), dd = digits(raw), ic = dd.length === 12 ? dd.slice(0, 6) + '-' + dd.slice(6, 8) + '-' + dd.slice(8) : raw, fa = icFacts(ic);
           st.chk = { ic: ic, name: nn.value.trim().toUpperCase(), valid: !fa.issues.length, facts: fa.facts, issues: fa.issues, results: [] };
-          st.edIc = st.chk.ic; st.edName = st.chk.name; st.filled = '';
+          st.edIc = st.chk.ic; st.edName = st.chk.name; st.filled = ''; st.nameUsed = false;
           if (st.chk.valid) checkOnline(); else { afterCheck(); draw(); }
         };
       }

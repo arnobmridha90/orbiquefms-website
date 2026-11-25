@@ -1897,6 +1897,11 @@ html.ui-locked,html.ui-locked body{overflow:hidden}
 .pg-calendar .cl-lday{background:linear-gradient(var(--hover),var(--hover)),var(--paper)}
 .pg-calendar .cl-lnone{padding:12px 16px;border-bottom:1px solid var(--divider);color:var(--text2);font-size:13.5px}
 
+/* a booking inside its car's workshop time, and that workshop bar: red outline and a warning icon */
+.pg-calendar .cl-ev.clash{box-shadow:0 0 0 2px #dc2626,0 1px 2px rgb(0 0 0 / .15);z-index:3}
+.pg-calendar .cl-ev .cl-cx{font-size:13px;margin-right:4px;vertical-align:-2px;color:#fff;filter:drop-shadow(0 0 1px rgb(0 0 0 / .5))}
+.pg-calendar .cl-ev.yellow .cl-cx{color:#991b1b;filter:none}
+
 /* ---- pages/cars.css ---- */
 /* Cars page and the car drawer (cr-) */
 .cr-thumb{display:block;width:100%;aspect-ratio:240/112;overflow:hidden}
@@ -5852,7 +5857,7 @@ function carName(c) { return c.make + ' ' + c.model; }
 function carModel(c) { return c.make + ' ' + c.model.split(' ')[0]; }
 
 /* status colours: the template system's own */
-var BOOKING_COLORS = { 'Pending': '#94a3b8', 'Confirmed': '#94a3b8', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#ef4444', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' };
+var BOOKING_COLORS = { 'Pending': '#94a3b8', 'Confirmed': '#0891b2', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#6366f1', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' };
 var PAY_COLORS = { 'Deposit due': '#ef4444', 'Deposit Received': '#eab308', 'Full Payment Received': '#10b981', 'Extension due': '#ef4444', 'Extension paid': '#22c55e', 'Refund Pending': '#3b82f6', 'Deposit Refunded': '#f97316' };
 function schip(label, color) { return '<span class="schip" style="color:' + color + ';border-color:' + color + '4d;background:' + color + '26">' + esc(label) + '</span>'; }
 function bchip(b) { return schip(b.status, BOOKING_COLORS[b.status] || '#94a3b8'); }
@@ -7011,8 +7016,8 @@ function bkCalc(o) {
    before: the booking as it is (null for a new one). patch: what is about to be saved ({status, pay, submitted, dep}).
    1. Submitted (the customer signed the form): Pending, Confirmed or Agreement Sent become Agreement Signed, and the payment
       status becomes Deposit due unless it is already Deposit Received, Full Payment Received, Refund Pending or Deposit Refunded.
-   2. A change to Car Returned sets Refund Pending (or Deposit Refunded when the booking has no deposit), unless it is already
-      Deposit Refunded. Only on the change, so people can pick another payment status afterwards. */
+   2. A change to Car Returned sets Refund Pending when a deposit was received (or Deposit Refunded when the booking has no
+      deposit), unless it is already Deposit Refunded. A deposit that was never received leaves the payment status alone. Only on the change, so people can pick another payment status afterwards. */
 var EARLY_STATUSES = ['Pending', 'Confirmed', 'Agreement Sent'];
 function applyStatusRules(before, patch) {
   var b = before || {}, out = Object.assign({}, patch), notes = [];
@@ -7023,8 +7028,12 @@ function applyStatusRules(before, patch) {
   }
   if (status === 'Car Returned' && b.status !== 'Car Returned' && pay !== 'Deposit Refunded') {
     var dep = out.dep != null ? Number(out.dep) : Number(b.dep || 0);
-    out.pay = dep > 0 ? 'Refund Pending' : 'Deposit Refunded';
-    notes.push(dep > 0 ? 'The car is back, so the deposit is now Refund Pending.' : 'The car is back and there is no deposit to give back, so the payment status is Deposit Refunded.');
+    /* only a deposit the company actually has can go back: a recorded deposit payment, or a payment status that says
+       it was received (older bookings whose payment was never recorded) */
+    var gotDep = (b.code && bookingPaid(b).deposit > 0) || ['Deposit Received', 'Full Payment Received', 'Extension paid', 'Extension due', 'Refund Pending'].indexOf(pay) >= 0;
+    if (!(dep > 0)) { out.pay = 'Deposit Refunded'; notes.push('The car is back and there is no deposit to give back, so the payment status is Deposit Refunded.'); }
+    else if (gotDep) { out.pay = 'Refund Pending'; notes.push('The car is back, so the deposit is now Refund Pending.'); }
+    else notes.push('No deposit was received, so there is nothing to give back. The payment status stays ' + (pay || 'None') + '.');
   }
   /* a cancelled booking still holding the customer's deposit: the deposit is now waiting to go back */
   if (status === 'Cancelled' && b.status !== 'Cancelled' && b.code && (pay === 'Deposit Received' || pay === 'Full Payment Received') && bookingPaid(b).deposit > 0) {
@@ -7052,6 +7061,25 @@ function bookingPaid(x, d) {
   d.payments.forEach(function (p) { if (p.booking !== code || p.void) return; all += p.amount; (p.items || [{ kind: p.kind, amount: p.amount }]).forEach(function (it) { if (it.kind === 'Security deposit') dep += it.amount; }); });
   return { all: all, deposit: dep };
 }
+/* money paid towards the booking's own charges (not extension or other payments, which are extra charges) above its
+   total: what the company owes back after the booking got cheaper. payable defaults to the booking's total. */
+var EXTRA_PAY_KINDS = ['Extension payment', 'Other payment'];
+function bookingOverpaid(x, payable, d) {
+  d = d || D(); var code = typeof x === 'string' ? x : x.code, bk = typeof x === 'string' ? findBooking(code) : x, paid = 0;
+  if (!bk || bk.status === 'Cancelled') return 0;
+  d.payments.forEach(function (p) { if (p.booking !== code || p.void) return; (p.items || [{ kind: p.kind, amount: p.amount }]).forEach(function (it) { if (EXTRA_PAY_KINDS.indexOf(it.kind) < 0) paid += it.amount; }); });
+  return Math.max(0, Math.round((paid - (payable != null ? payable : bk.payable || 0)) * 100) / 100);
+}
+/* live bookings whose dates overlap a workshop period of their car: [{b, w}] (one row per booking, the first clash) */
+function workshopClashes(d) {
+  d = d || D(); var out = [];
+  d.bookings.forEach(function (x) {
+    if (!x.car || ['Cancelled', 'Completed', 'Car Returned'].indexOf(x.status) >= 0 || x.end < NOW()) return;
+    var w = (d.downtime || []).filter(function (z) { return z.car === x.car.id && !z.back && z.from < x.end && (!z.to || z.to > x.start); })[0];
+    if (w) out.push({ b: x, w: w });
+  });
+  return out.sort(function (a, b) { return a.b.start - b.b.start; });
+}
 /* does what is recorded reach the booking total (a sen or two short still counts) / the booking's deposit? */
 function coversTotal(x, d) { return !(x.payable > 0) || bookingPaid(x, d).all >= x.payable - .99; }
 function coversDeposit(x, d) { return !(x.dep > 0) || bookingPaid(x, d).deposit >= x.dep; }
@@ -7076,7 +7104,8 @@ function canPickRefunded(x, d) {
    busy(car or id, start, end, exceptCode) -> {free, kind: 'booking'|'workshop'|'fleet'|null, reason, booking, downtime, soon}
    Not free when: the car is Not in use or Sold; a booking that is not Completed or Cancelled overlaps; a workshop period
    (downtime, no end = never ends) overlaps. Periods that only touch do not clash. soon: the car comes back less than
-   company.turnaroundH hours before start ('Back at 2:00 PM, 2 hrs before'). Without dates only the fleet status and a
+   company.turnaroundH hours before start, or goes out again less than that after end ('Back 20 Oct, 9:00 AM, 1 hr before
+   pick-up'), with gapH; the same rule as Availability's "Check" group. Without dates only the fleet status and a
    workshop period covering now are checked. */
 function busy(car, start, end, except, d) {
   d = d || D(); var c = typeof car === 'object' ? car : byId(d.cars, car);
@@ -7092,9 +7121,16 @@ function busy(car, start, end, except, d) {
   }
   if (dts.length) return { free: false, kind: 'workshop', reason: dts[0].to ? 'In workshop until ' + fmtD(dts[0].to) : 'In workshop', booking: null, downtime: dts[0], soon: '' };
   if (start) {
-    var gap = turnaroundH(d) * 36e5;
-    var before = d.bookings.filter(function (x) { return x.car === c && x.code !== except && x.status !== 'Cancelled' && x.end <= s && s - x.end < gap; }).sort(function (a, b) { return b.end - a.end; })[0];
-    if (before) { var hh = Math.round((s - before.end) / 36e5 * 10) / 10; res.soon = 'Back at ' + tm(before.end) + ', ' + (hh < 1 ? Math.round(hh * 60) + ' min' : hh + ' hr' + (hh === 1 ? '' : 's')) + ' before'; res.booking = before; }
+    /* inside the company's gap between rentals (like Availability): the car comes back, or goes out again, less than
+       turnaroundH hours from this period. Still bookable, but staff should check the cleaning time. */
+    var gapH = turnaroundH(d), gap = gapH * 36e5, durT = function (ms) { var hh = Math.round(ms / 36e5 * 10) / 10; return ms <= 0 ? 'at the same time' : hh < 1 ? Math.round(ms / 6e4) + ' min' : hh + ' hr' + (hh === 1 ? '' : 's'); };
+    var live = function (x) { return x.car === c && x.code !== except && x.status !== 'Cancelled' && x.status !== 'Completed'; };
+    var before = d.bookings.filter(function (x) { return live(x) && x.end <= s && s - x.end < gap; }).sort(function (a, b) { return b.end - a.end; })[0];
+    var after = end ? d.bookings.filter(function (x) { return live(x) && x.start >= e && x.start - e < gap; }).sort(function (a, b) { return a.start - b.start; })[0] : null;
+    var parts = [];
+    if (before) { parts.push('back ' + fmtD(before.end) + ', ' + tm(before.end) + ', ' + (before.end - s === 0 ? 'right at pick-up' : durT(s - before.end) + ' before pick-up')); res.booking = before; }
+    if (after) { parts.push('next booking ' + fmtD(after.start) + ', ' + tm(after.start) + ', ' + (after.start - e === 0 ? 'right at return' : durT(after.start - e) + ' after return')); res.next = after; }
+    if (parts.length) { res.soon = parts.join('; '); res.soon = res.soon.charAt(0).toUpperCase() + res.soon.slice(1); res.gapH = gapH; }
   }
   return res;
 }
@@ -7260,7 +7296,7 @@ var UI = (function () {
   /* ---------------- statuses and chips ---------------- */
   /* the reference colours for every status family; UI.status(family, value) draws the tonal chip */
   U.STATUS = {
-    booking: { 'Pending': '#94a3b8', 'Confirmed': '#94a3b8', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#ef4444', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' },
+    booking: { 'Pending': '#94a3b8', 'Confirmed': '#0891b2', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#6366f1', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' },
     payment: { '': '#94a3b8', 'None': '#94a3b8', 'Deposit due': '#ef4444', 'Deposit Received': '#eab308', 'Full Payment Received': '#10b981', 'Extension due': '#ef4444', 'Extension paid': '#22c55e', 'Refund Pending': '#3b82f6', 'Deposit Refunded': '#f97316' },
     task: { 'Pending': '#f59e0b', 'In Progress': '#3b82f6', 'Completed': '#22c55e', 'Cancelled': '#9ca3af' },
     wa: { 'Not Sent': '#9ca3af', 'Template Sent': '#3b82f6', 'Reply Received': '#f59e0b', 'Details Sent': '#22c55e', 'Failed': '#ef4444' },
@@ -8096,7 +8132,7 @@ var UI = (function () {
           if (b.kind === 'fleet') { badge = { text: b.reason, tone: 'grey' }; rank = 3; }
           else if (b.kind === 'workshop') { badge = { text: b.reason, tone: 'warn' }; rank = 2; }
           else if (b.kind === 'booking') { badge = { text: b.reason, tone: 'bad' }; rank = 1; }
-          else if (opts.start) badge = { text: b.soon ? 'Free, ' + b.soon.replace(/^Back/, 'back') : 'Free', tone: b.soon ? 'warn' : 'ok' };
+          else if (opts.start) { badge = { text: b.soon ? 'Check: ' + b.soon.charAt(0).toLowerCase() + b.soon.slice(1) + ' (gap is ' + b.gapH + ' hr' + (b.gapH === 1 ? '' : 's') + ')' : 'Free', tone: b.soon ? 'warn' : 'ok' }; if (b.soon) rank = 0.5; }
         }
         return { value: c.id, label: c.plate, sub: carName(c) + ' · ' + c.color, badge: badge, kw: normPlate(c.plate) + ' ' + c.make + ' ' + c.model + ' ' + c.color + ' ' + c.type + ' #' + c.serial, rank: rank, car: c, busy: b,
           html: '<span class="ui-cbx-t"><b class="ui-plate">' + e(c.plate) + '</b><small>' + e(carName(c)) + ' · ' + e(c.color) + '</small></span>' };
@@ -9423,10 +9459,13 @@ function bkRecv(x) { var r = DB.received(x.code); return r || (D().payments.some
 function bkMoney(x) {
   var rec = bkRecv(x), due = Math.round((x.payable - rec) * 100) / 100;
   var tone = x.status === 'Cancelled' ? 'grey' : !x.payable ? 'info' : due < 0 ? 'info' : due === 0 ? 'ok' : rec > 0 ? 'warn' : 'bad';
-  return { total: x.payable, rec: rec, due: due, tone: tone, pct: x.payable ? Math.min(100, rec / x.payable * 100) : 100 };
+  var over = x.status === 'Cancelled' ? 0 : bookingOverpaid(x);
+  if (over > 0) tone = 'warn';
+  return { total: x.payable, rec: rec, due: due, over: over, tone: tone, pct: x.payable ? Math.min(100, rec / x.payable * 100) : 100 };
 }
-/* "RM 120.00 due" / "Paid" / "RM 20.00 extra" */
-function bkDueText(m) { return m.due > 0 ? UI.fmt.money(m.due) + ' due' : m.due < 0 ? UI.fmt.money(-m.due) + ' extra' : 'Paid'; }
+/* "RM 120.00 due" / "Paid" / "RM 550.00 to give back" (paid more than the total) / "Paid + RM 20.00 extra" (extension
+   or other charges paid on top) */
+function bkDueText(m) { return m.due > 0 ? UI.fmt.money(m.due) + ' due' : m.over > 0 ? UI.fmt.money(m.over) + ' to give back' : m.due < 0 ? 'Paid + ' + UI.fmt.money(-m.due) + ' extra' : 'Paid'; }
 function bkAgents(x) {
   var ids = {}; (x.agentIds || []).forEach(function (a) { ids[a] = 1; });
   D().tasks.forEach(function (t) { if (t.booking === x.code && t.status !== 'Cancelled') (t.agents || []).forEach(function (a) { ids[a] = 1; }); });
@@ -9665,13 +9704,27 @@ function bkSaveStatus(x, patch, label) {
   UI.toast(x.code + ': ' + (patch.status || patch.pay || 'None') + (notes.length ? '. ' + notes.join(' ') : ''), { ms: notes.length ? 6000 : 3500 });
   return true;
 }
+/* checks before a status that ends the rental: {block: 'message'} stops it, {ask: 'message'} asks first.
+   Completed: not before the pick-up time, and ask when money is still due. Car Returned: ask when the car never
+   went out (no Car Delivered yet, or the pick-up is still to come). */
+function bkStatusWarn(x, v) {
+  if (!x || v === x.status) return {};
+  var future = x.start > NOW(), out = x.status === 'Car Delivered' || x.status === 'Car Returned';
+  if (v === 'Completed') {
+    if (future && !out) return { block: 'The pick-up is on ' + UI.fmt.dt(x.start) + ', so this booking cannot be completed yet. If it is not going ahead, cancel it instead.' };
+    var m = bkMoney(x);
+    if (m.due > 0.004 && x.status !== 'Cancelled') return { ask: UI.fmt.money(m.due) + ' is still due on ' + x.code + '. Complete it anyway? The amount stays on the list as money due.' };
+  }
+  if (v === 'Car Returned' && !out) return { ask: 'This car has not gone out yet: ' + x.code + ' is ' + x.status + (future ? ' and the pick-up is on ' + UI.fmt.dt(x.start) : '') + '. Mark it as returned anyway?' };
+  return {};
+}
 function bkStatusDialog(x, kind) {
   if (!can('bookings.change_status')) { UI.toast('Changing a status needs the "Change status" access', { tone: 'warn' }); return; }
   var pay = kind === 'pay', locked = pay && !canPickRefunded(x);
   var sel = pay ? bkLockRefunded(UI.select({ key: 'st', label: 'New Status', options: bkPayOptions(locked), value: x.pay || '' }), locked) : UI.select({ key: 'st', label: 'New Status', options: LISTS.bookingStatus, value: x.status });
   var hint = function (v) {
     if (pay) return locked ? 'Deposit Refunded is set by recording the refund on the Deposit refunds page.' : '';
-    var r = applyStatusRules(x, { status: v }); return (r.notes || []).join(' ');
+    var r = applyStatusRules(x, { status: v }), w = bkStatusWarn(x, v); return [w.block || w.ask || ''].concat(r.notes || []).filter(Boolean).join(' ');
   };
   UI.dialog({ title: pay ? 'Update Payment Status' : 'Update Booking Status', text: 'Select a new status for booking ' + x.code, width: 'sm',
     body: function (el) {
@@ -9686,6 +9739,18 @@ function bkStatusDialog(x, kind) {
       /* the car may have been given to someone else while this booking was cancelled or completed */
       var bad = !pay ? bkReviveProblem(x, patch) : '';
       if (bad) { d.body.querySelector('[data-bkx-busy]').innerHTML = UI.alert(bad, 'bad'); return false; }
+      /* Completed or Car Returned on a booking that has not gone out yet, or that still has money due */
+      var w = !pay ? bkStatusWarn(x, v) : {};
+      if (w.block) { d.body.querySelector('[data-bkx-busy]').innerHTML = UI.alert(w.block, 'bad'); return false; }
+      if (w.ask) {
+        var m0 = bkMoney(x), canPay = v === 'Completed' && m0.due > 0.004 && can('billing.record_payment');
+        return new Promise(function (res) {
+          var decided = false, fin = function (val) { if (!decided) { decided = true; res(val); } };
+          UI.dialog({ title: (v === 'Completed' ? 'Complete ' : 'Mark ') + x.code + (v === 'Completed' ? '?' : ' as returned?'), width: 'sm', alert: true, body: '<p class="ui-ctext">' + esc(w.ask) + '</p>', onClose: function () { fin(false); },
+            buttons: [{ label: 'Keep it as it is', kind: 'g', onClick: function () { fin(false); } }].concat(canPay ? [{ label: 'Record payment', kind: 'g', onClick: function () { fin(false); setTimeout(function () { UI.closeAll(); API.recordPayment(x.code); }, 0); } }] : [])
+              .concat([{ label: v === 'Completed' ? 'Complete anyway' : 'Mark returned', kind: 'err', onClick: function () { fin(bkSaveStatus(x, patch, label)); } }]) });
+        });
+      }
       /* cancelling a booking that holds money: say how much and what happens to the deposit first */
       var got = !pay && v === 'Cancelled' && x.status !== 'Cancelled' ? bookingPaid(x) : null;
       if (got && got.all > 0.004) {
@@ -9696,6 +9761,16 @@ function bkStatusDialog(x, kind) {
       }
       return bkSaveStatus(x, patch, label);
     } }] });
+}
+
+/* the phone card's buttons: the next step for this booking. The form while it is not signed, then Record payment while
+   money is due, else open the booking. */
+function bkCardActs(x, m, can2) {
+  var h = '', pay = can2('billing.record_payment') && x.status !== 'Cancelled' && m.due > 0.004;
+  if (!x.submitted && EARLY_STATUSES.indexOf(x.status) >= 0) h += UI.btn('Send form', { kind: pay ? 'o' : 'tonal', size: 'sm', icon: 'brand-whatsapp', attrs: { 'data-bk': 'send' } });
+  if (pay) h += UI.btn('Record payment', { kind: 'tonal', size: 'sm', icon: 'cash', attrs: { 'data-bk': 'recpay' } });
+  if (!h) h += UI.btn(can2('bookings.edit') ? 'Open booking' : 'View booking', { kind: 'o', size: 'sm', icon: can2('bookings.edit') ? 'pencil' : 'eye', attrs: { 'data-bk': 'open' } });
+  return h;
 }
 
 /* ---------------- delete (one or many) ---------------- */
@@ -10076,8 +10151,10 @@ function bkOpenBooking(code, prefill) {
       var need = !x || (!nonBlock && (x.status === 'Completed' || x.status === 'Cancelled' || f.car !== x.car.id || mn(r.s) !== mn(x.start) || mn(r.e) !== mn(x.end)));
       if (!b.free && need) { bad = true; al.push(UI.alert(bkBusyText(b), 'bad', { html: true })); }
       else if (!b.free) { if (!nonBlock && !ro) al.push(UI.alert(bkBusyText(b) + ' You can still save, because the car and the dates did not change.', 'warn', { html: true })); }
-      else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + (b.soon ? 'The car is free for these dates. ' + esc(b.soon) + ', so plan the cleaning.' : 'The car is free for these dates.') + '</div>');
+      else if (!ro && b.soon) al.push(UI.alert('Inside the ' + plural(b.gapH, 'hour') + ' gap between rentals. ' + b.soon + '. Check the car can be cleaned in time.', 'warn'));
+      else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + 'The car is free for these dates.</div>');
     } else if (r.s && r.e && carCtl) { var k3 = '|' + +r.s + '|' + +r.e; if (avail.key !== k3) { avail.key = k3; carCtl.setDates(r.s, r.e, x ? x.code : undefined); } } }
+    if (isNew && !ro && r.s && r.s < NOW() - 6e4) al.unshift(UI.alert('The pick-up is in the past (' + UI.fmt.dt(r.s) + '). Is this a late entry? You will be asked to confirm on Create.', 'warn'));
     var nm = (f.name || '').trim().toLowerCase(), icn = (f.ic || '').replace(/[\s-]/g, ''), ph = normPhone(f.phone || '');
     var bl = d.people.filter(function (q) { return q.blacklist && q !== (x && x.cust) && ((nm && q.name.toLowerCase() === nm) || (icn.length > 5 && String(q.ic).replace(/[\s-]/g, '') === icn) || (ph.length > 6 && normPhone(q.phone) === ph)); })[0];
     if (bl || (p && p.blacklist && isNew)) al.push(UI.alert('Warning: This customer matches a blacklisted customer record. Please verify before proceeding.', 'bad', { icon: 'ban' }));
@@ -10126,7 +10203,7 @@ function bkOpenBooking(code, prefill) {
     var fo = first[0] === 'car' ? w.querySelector('.ui-cbx-btn') : w.querySelector('input:not([type="hidden"]),select');
     if (fo) setTimeout(function () { try { fo.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 300);
   }
-  function save() {
+  function save(sure) {
     var r = calcNow(), f = r.f;
     var miss = validate(r);
     if (miss.length) {
@@ -10135,6 +10212,19 @@ function bkOpenBooking(code, prefill) {
       showErrors(miss); return false;
     }
     if (!recalc()) { UI.toast(r.e <= r.s ? 'Rental end cannot be before rental start.' : 'The car is not free for these dates. Pick another car or other dates.', { tone: 'warn' }); showErrors([[r.e <= r.s ? 'end' : 'car', r.e <= r.s ? 'Rental end cannot be before rental start' : 'Not free for these dates']]); return false; }
+    /* things to ask before saving: a pick-up in the past on a new booking, a status that ends a rental too early, and a
+       shorter or cheaper booking that leaves the customer paid more than the new total */
+    var stTo = chSt ? f.status : null, stW = x && stTo && stTo !== x.status ? bkStatusWarn(x, stTo) : {};
+    if (stW.block) { UI.toast(stW.block, { tone: 'warn', ms: 6000 }); showErrors([['status', 'Not yet: the pick-up is still to come']]); return false; }
+    var payNew = !x ? 0 : amt ? r.c.payable : bkCalc({ start: r.s, end: r.e, rate: x.rate, hourly: x.hourly, dep: x.dep, disc: x.disc, deliv: x.deliv, ret: x.ret, others: x.others, covDaily: r.pk ? r.pk.daily : 0 }).payable;
+    var overNew = x ? bookingOverpaid(x, payNew) : 0, overGrew = overNew > bookingOverpaid(x || '') + 0.004;
+    if (!sure) {
+      var asks = [];
+      if (isNew && r.s < NOW() - 6e4) asks.push('The pick-up (' + UI.fmt.dt(r.s) + ') is in the past. Is this a late entry for a rental that already started?');
+      if (stW.ask) asks.push(stW.ask);
+      if (overGrew) asks.push('The customer has paid ' + UI.fmt.money(overNew) + ' more than the new total of ' + UI.fmt.money(payNew) + '. After saving, the booking shows ' + UI.fmt.money(overNew) + ' to give back.');
+      if (asks.length) return UI.confirm({ title: isNew ? 'Create this booking?' : 'Save the changes to ' + x.code + '?', text: asks.join(' '), ok: isNew ? 'Create anyway' : 'Save anyway', cancel: 'Go back' }).then(function (y) { return y ? save(true) : false; });
+    }
     var car = carById(f.car), c = r.c, pk = r.pk, so = (f.startOpt || 'Not chosen').split('|'), eo = (f.endOpt || 'Not chosen').split('|');
     var sOpt = handoverOptions('start').filter(function (o) { return o.value === f.startOpt; })[0], eOpt = handoverOptions('end').filter(function (o) { return o.value === f.endOpt; })[0];
     var phone = f.phone.trim();
@@ -10154,6 +10244,8 @@ function bkOpenBooking(code, prefill) {
     rec.status = chSt ? f.status : (x ? x.status : 'Pending'); rec.pay = chSt ? f.pay : (x ? x.pay : '');
     if (chSt && rec.pay === 'Deposit Refunded' && !(x && x.pay === 'Deposit Refunded') && !canPickRefunded({ end: r.e, pay: x ? x.pay : '' })) rec.pay = x ? x.pay : '';
     var rules = applyStatusRules(x, rec), notes = rules.notes || []; rec.status = rules.status; rec.pay = rules.pay;
+    /* paid more than the new total: the whole booking is paid, and the extra waits to go back (To give back) */
+    if (overGrew) { if (['', 'Deposit due', 'Deposit Received'].indexOf(rec.pay || '') >= 0) { rec.pay = 'Full Payment Received'; notes.push('Payment status set to Full Payment Received.'); } notes.push(UI.fmt.money(overNew) + ' to give back to the customer.'); }
     if (rec.submitted && !(x && x.submittedAt)) rec.submittedAt = NOW();
     saved = true;
     var tail2 = notes.length ? ' ' + notes.join(' ') : '';
@@ -10353,7 +10445,8 @@ PAGES['bookings'] = {
       soon: function (x) { return x.status !== 'Cancelled' && x.start >= now && x.start <= soon; },
       back: function (x) { return x.status === 'Car Delivered' && x.end >= now && x.end <= soon; },
       late: function (x) { return x.status === 'Car Delivered' && x.end < now; },
-      due: function (x) { return x.status !== 'Cancelled' && x.status !== 'Pending' && bkMoney(x).due > 0; }
+      due: function (x) { return x.status !== 'Cancelled' && x.status !== 'Pending' && bkMoney(x).due > 0; },
+      over: function (x) { return bookingOverpaid(x) > 0; }
     };
     /* search: a booking code in any form gives that booking exactly; a pasted phone matches any format; plates ignore spaces */
     function matcher(raw) {
@@ -10364,7 +10457,7 @@ PAGES['bookings'] = {
       return function (x) {
         if (/^\d{3,}$/.test(q) && phoneHas(x.cust.phone, q)) return true;
         if (np.length >= 3 && normPlate(x.car.plate).indexOf(np) >= 0) return true;
-        return UI.wordsMatch(x.code + ' ' + x.cust.name + ' ' + (x.cust.email || '') + ' ' + x.car.plate, q);
+        return UI.wordsMatch(x.code + ' ' + x.cust.name + ' ' + (x.cust.email || '') + ' ' + x.car.plate + ' ' + (x.car.make || '') + ' ' + (x.car.model || '') + ' ' + (x.car.color || ''), q);
       };
     }
     function rowsFor() {
@@ -10398,7 +10491,7 @@ PAGES['bookings'] = {
     };
     var amount = function (x) {
       if (x.status === 'Cancelled') return '<span class="faint">Cancelled</span>';
-      var m = bkMoney(x), tip = 'Total ' + UI.fmt.money(m.total) + ' · Received ' + UI.fmt.money(m.rec) + ' · ' + (m.due > 0 ? 'Still due ' + UI.fmt.money(m.due) : m.due < 0 ? 'Paid in full, ' + UI.fmt.money(-m.due) + ' extra' : 'Paid in full');
+      var m = bkMoney(x), tip = 'Total ' + UI.fmt.money(m.total) + ' · Received ' + UI.fmt.money(m.rec) + ' · ' + (m.due > 0 ? 'Still due ' + UI.fmt.money(m.due) : m.over > 0 ? 'Paid ' + UI.fmt.money(m.over) + ' more than the total: give it back' : m.due < 0 ? 'Paid in full, plus ' + UI.fmt.money(-m.due) + ' of extra charges' : 'Paid in full');
       return '<div class="bkx-amt t-' + m.tone + '" title="' + tip + '"><b class="num">' + UI.fmt.money(m.total) + '</b><span class="bkx-bar"><i style="width:' + m.pct + '%"></i></span><small class="num">' + bkDueText(m) + '</small></div>';
     };
     var docsCell = function (x) {
@@ -10435,8 +10528,7 @@ PAGES['bookings'] = {
           '<div class="bkx-cd-r"><span class="ellip t1c fw5">' + esc(x.cust.name) + '</span>' + UI.phone(x.cust.phone) + '</div>' +
           '<div class="bkx-cd-r"><span><b class="t1c">' + esc(x.car.plate) + '</b> ' + esc(x.car.model.split(' ')[0]) + '</span><span class="bkx-per">' + bkWhen(x.start) + i('arrow-right') + bkWhen(x.end) + '</span></div>' +
           (seeAmt && x.status !== 'Cancelled' ? '<div class="bkx-cd-m t-' + m.tone + '"><span class="num"><b>' + UI.fmt.money(m.total) + '</b></span><span class="bkx-bar"><i style="width:' + m.pct + '%"></i></span><small class="num">' + bkDueText(m) + '</small></div>' : '') +
-          '<div class="bkx-cd-f">' + UI.btn('Send form', { kind: 'o', size: 'sm', icon: 'brand-whatsapp', attrs: { 'data-bk': 'send' } }) +
-          (can2('billing.record_payment') && x.status !== 'Cancelled' ? UI.btn('Record payment', { kind: 'tonal', size: 'sm', icon: 'cash', attrs: { 'data-bk': 'recpay' } }) : '') +
+          '<div class="bkx-cd-f">' + bkCardActs(x, m, can2) +
           '<span class="grow"></span>' + UI.iconBtn('dots-vertical', 'More for ' + x.code, { attrs: { 'data-bk': 'more' } }) + '</div></div>';
       }
     });
@@ -10444,12 +10536,12 @@ PAGES['bookings'] = {
     UI.filters(root.querySelector('#bkx-f'), {
       values: st.f,
       fields: [
-        { type: 'search', key: 'q', placeholder: 'Booking no., name, phone, plate' },
+        { type: 'search', key: 'q', placeholder: 'Booking no., name, phone, plate or car' },
         { type: 'select', key: 'status', label: 'Status', options: LISTS.bookingStatus, all: 'All Statuses' },
         { type: 'select', key: 'pay', label: 'Payment Status', options: [['None', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s]; })), all: 'All Payment Statuses' },
         Object.assign(UI.carFilter({ key: 'car', all: 'All Cars' }), { width: 220 }),
         { type: 'daterange', from: 'from', to: 'to', label: 'Rental dates' },
-        { type: 'chips', key: 'quick', label: 'Quick', options: [['all', 'All', d.bookings.length], ['out', 'Out now', count(quick.out)], ['soon', 'Going out in 3 days', count(quick.soon)], ['back', 'Back in 3 days', count(quick.back)], ['late', 'Late', count(quick.late), 'bad'], ['due', 'Money due', count(quick.due)]] }
+        { type: 'chips', key: 'quick', label: 'Quick', options: [['all', 'All', d.bookings.length], ['out', 'Out now', count(quick.out)], ['soon', 'Going out in 3 days', count(quick.soon)], ['back', 'Back in 3 days', count(quick.back)], ['late', 'Late', count(quick.late), 'bad'], ['due', 'Money due', count(quick.due)]].concat(count(quick.over) || st.f.quick === 'over' ? [['over', 'To give back', count(quick.over), 'warn']] : []) }
       ],
       /* every filter change goes back to page 1 */
       onChange: function (v2, k) { var r = rowsFor(); st.page = 1; t.setRows(r); root.querySelector('#bkx-count').textContent = countTxt(r); if (k === 'status' || k === '*') drawActs(); }
@@ -10480,6 +10572,7 @@ PAGES['bookings'] = {
       else if (a === 'task') API.newTask({ booking: x.code });
       else if (a === 'send') bkSendForm(x);
       else if (a === 'recpay') API.recordPayment(x.code);
+      else if (a === 'open') bkOpenBooking(x.code);
       else if (a === 'more') moreMenu(el, x);
     });
     function doExport(el) { if (exportOff()) { UI.toast('Pending and cancelled bookings are not income, so they are not in the Excel file. Pick another status.', { tone: 'warn' }); return; } if (st.f.from) { var fr = UI.parseDate(st.f.from), to = st.f.to ? UI.parseDate(st.f.to) : fr; if ((to - fr) / DAY > 366) UI.toast('Choose a period of at most 366 days.', { tone: 'warn' }); else bkExport(fr, to, st.f); } else bkExportPop(el, st.f); }
@@ -10604,6 +10697,9 @@ PAGES['calendar'] = {
       var bg = '<div class="cl-bg">' + cells.map(function (c) { return '<i class="' + c + '"></i>'; }).join('') + '</div>';
       var nowP = NOW() > r.from && NOW() < r.to ? '<span class="cl-now" style="left:' + pct(NOW()) + '%" aria-hidden="true"></span>' : '';
       var minW = r.n * colW;
+      /* bookings that fall inside a workshop period of their car: both bars get a red outline and a warning icon */
+      var clash = {}; workshopClashes(d).forEach(function (z) { clash[z.b.code] = z.w; clash[z.w.id] = z.b; });
+      var clashI = function (key, what) { return clash[key] ? i('alert-triangle', 'cl-cx') : ''; };
       var rows = cars.map(function (c) {
         var items = ev.bks.filter(function (x) { return x.car === c; }).map(function (x) { return { s: x.start, e: x.end, b: x }; })
           .concat(ev.shop.filter(function (w) { return w.car === c.id; }).map(function (w) { return { s: w.from, e: w.to || new Date(Math.max(+NOW(), +r.to)), w: w }; }))
@@ -10614,9 +10710,9 @@ PAGES['calendar'] = {
         var bars = items.map(function (it) {
           var L = pct(it.s), R = pct(it.e), cut = it.s < r.from, cutR = it.e > r.to;
           var style = 'left:' + L + '%;width:calc(' + Math.max(R - L, 0) + '% - 3px);top:' + (8 + it.lane * 30) + 'px';
-          if (it.w) return '<button type="button" class="cl-ev shop' + (it.w.back ? ' past' : '') + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + '" style="' + style + '" data-shop="' + it.w.id + '" title="Workshop: ' + esc(it.w.reason) + '"><b>Workshop · ' + esc(it.w.reason === 'Accident' ? 'Accident repair' : it.w.reason) + '</b>' + (it.w.note ? ' · ' + esc(it.w.note) : '') + '</button>';
+          if (it.w) return '<button type="button" class="cl-ev shop' + (it.w.back ? ' past' : '') + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + (clash[it.w.id] ? ' clash' : '') + '" style="' + style + '" data-shop="' + it.w.id + '" title="Workshop: ' + esc(it.w.reason) + (clash[it.w.id] ? '. Clashes with booking ' + clash[it.w.id].code : '') + '">' + clashI(it.w.id) + '<b>Workshop · ' + esc(it.w.reason === 'Accident' ? 'Accident repair' : it.w.reason) + '</b>' + (it.w.note ? ' · ' + esc(it.w.note) : '') + '</button>';
           var x = it.b;
-          return '<button type="button" class="cl-ev ' + clTone(x) + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + '" style="' + style + '" data-bk="' + x.code + '" aria-label="' + esc(x.code + ', ' + x.cust.name + ', ' + x.status) + '"><b>' + esc(x.cust.name) + '</b> • ' + tm(x.start) + ' - ' + tm(x.end) + ' • ' + clDays(x) + '</button>';
+          return '<button type="button" class="cl-ev ' + clTone(x) + (cut ? ' cl' : '') + (cutR ? ' cr' : '') + (clash[x.code] ? ' clash' : '') + '" style="' + style + '" data-bk="' + x.code + '"' + (clash[x.code] ? ' title="Clashes with workshop time (' + esc(clash[x.code].reason.toLowerCase()) + ')"' : '') + ' aria-label="' + esc(x.code + ', ' + x.cust.name + ', ' + x.status + (clash[x.code] ? ', clashes with workshop time' : '')) + '">' + clashI(x.code) + '<b>' + esc(x.cust.name) + '</b> • ' + tm(x.start) + ' - ' + tm(x.end) + ' • ' + clDays(x) + '</button>';
         }).join('');
         return '<div class="cl-car" data-car="' + c.id + '" role="button" tabindex="0" title="Open ' + esc(c.plate) + '">' + carsThumb(c, 'cl-ph') + '<div class="cl-ci"><b>' + esc(c.plate) + '</b><span>' + esc(carName(c)) + '</span><small>' + esc(c.color) + (c.fleet && c.fleet !== 'Active' ? ' · ' + esc(c.fleet) : '') + '</small></div></div>' +
           '<div class="cl-track' + (ctx.can('bookings.create') && (!c.fleet || c.fleet === 'Active') ? ' book' : '') + '" style="height:' + (16 + nl * 30) + 'px" data-row="' + c.id + '">' + bg + nowP + bars + '</div>';
@@ -10650,6 +10746,7 @@ PAGES['calendar'] = {
       return '<div class="cl-tip"><div class="cl-tip-h"><b>' + esc(x.cust.name) + '</b>' + UI.phone(x.cust.phone, { wa: true }) + '</div>' +
         '<div class="cl-tip-s"><div><b>' + clDays(x) + '</b></div><div>' + UI.fmt.dateTime(x.start) + '</div><div>' + UI.fmt.dateTime(x.end) + '</div><div class="faint">' + esc(x.car.plate) + ' · ' + esc(carName(x.car)) + '</div></div>' +
         (money ? '<div class="cl-tip-s"><div class="faint">Daily: ' + UI.fmt.money(x.rate || x.car.rate) + ' · Hourly: ' + UI.fmt.money(x.hourly || x.car.hourly) + '</div>' + mrow('Total Rent', UI.money(x.rent), true) + mrow('Security Deposit', UI.money(x.dep)) + (x.disc ? mrow('Discount', '- ' + UI.money(x.disc)) : '') + mrow('Total Amount Paid', UI.money(paid), true) + '</div>' : '<div class="cl-tip-s faint">Amounts are hidden for your role.</div>') +
+        (function () { var z = workshopClashes(d).filter(function (q) { return q.b === x; })[0]; return z ? '<div class="cl-tip-s">' + UI.alert('This booking clashes with workshop time (' + z.w.reason.toLowerCase() + ', ' + UI.fmt.dt(z.w.from) + (z.w.to ? ' to ' + UI.fmt.dt(z.w.to) : ', no return date') + '). Move the booking to another car or change the workshop dates.', 'bad') + '</div>' : ''; })() +
         '<div class="cl-tip-s"><div class="cl-tr"><span>Booking Status</span>' + UI.status('booking', x.status) + '</div><div class="cl-tr"><span>Payment Status</span>' + UI.status('payment', x.pay || 'None') + '</div><div class="cl-tr"><span>Booking ID</span><b class="mono">' + x.code + '</b></div></div>' +
         '<div class="cl-tip-a">' + UI.btn('Open booking', { size: 'sm', icon: 'external-link', attrs: { 'data-tip': 'open', 'data-v': x.code } }) + '</div></div>';
     }
@@ -10674,7 +10771,13 @@ PAGES['calendar'] = {
       if (c.fleet && c.fleet !== 'Active') { UI.toast(c.plate + ' is marked ' + c.fleet + ', so it cannot be booked.', { tone: 'warn' }); return; }
       var r = clRange(st.view, st.date), rc = el.getBoundingClientRect(), fr = Math.max(0, Math.min(.9999, (ev.clientX - rc.left) / rc.width)), at = new Date(+r.from + fr * (r.to - r.from)), s;
       if (r.unit === 'hour') { s = new Date(at.getFullYear(), at.getMonth(), at.getDate(), at.getHours(), 0); } else { s = clDay(at); s.setHours(10, 0, 0, 0); }
-      ctx.api.newBooking({ car: c.id, start: s, end: new Date(s.getTime() + DAY) });
+      /* never start a booking in the past: a past day says so; today starts at the next full hour */
+      var now = NOW(), nextH = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0);
+      if ((r.unit === 'hour' ? new Date(s.getTime() + 36e5) : new Date(clDay(s).getTime() + DAY)) <= now) { UI.toast((r.unit === 'hour' ? 'That time' : 'That day') + ' has passed, so a booking cannot start then. Use New Booking for a late entry.', { tone: 'warn' }); return; }
+      if (s < nextH) s = nextH;
+      var e = new Date(s.getTime() + DAY), bz = busy(c, s, e);
+      if (!bz.free) { UI.toast(c.plate + ' is not free then: ' + (bz.kind === 'booking' ? 'booked on ' + bz.booking.code + ' until ' + UI.fmt.dt(bz.booking.end) : bz.reason) + '.', { tone: 'warn', ms: 5000 }); return; }
+      ctx.api.newBooking({ car: c.id, start: s, end: e });
     });
     UI.on(root, 'input', '[data-key="clq"]', UI.debounce(function (ev, el) { st.q = el.value; ctx.setParams({ q: st.q || null }, true); draw(); }, 180));
     var openCar = function (el) { ctx.api.openCar(el.getAttribute('data-car')); };
@@ -12013,6 +12116,8 @@ PAGES['dashboard'] = {
         { key: 'deposit', icon: 'cash-off', tone: 'warn', title: 'Deposit not received, pick-up is close', sub: 'Pick-up is within 2 days (or already started) and the deposit is not marked as received.', rows: live.filter(function (x) { return ['Pending', 'Confirmed', 'Agreement Sent', 'Agreement Signed'].indexOf(x.status) >= 0 && (x.pay === 'Deposit due' || !x.pay) && x.start < now + 2 * DAY; }).map(function (x) { return { b: x, note: pickup(x) }; }) },
         { key: 'invoice', icon: 'file-invoice', tone: 'warn', title: 'No invoice yet', sub: 'Confirmed bookings starting within a week that have no invoice.', rows: live.filter(function (x) { return x.status !== 'Pending' && x.status !== 'Completed' && x.status !== 'Car Returned' && !hasInv[x.code] && x.start < now + 7 * DAY && x.start > now - 7 * DAY; }).map(function (x) { return { b: x, note: pickup(x) }; }) },
         { key: 'refund', icon: 'arrow-back-up', tone: 'warn', title: 'Deposits waiting to be given back', sub: 'The car is back. Give back the deposit less any deductions.', rows: depLists().wait.map(function (z) { var x = findBooking(z.booking); return x ? { b: x, note: (x.status === 'Cancelled' ? 'Cancelled' : 'Back ' + UI.fmt.day(x.end)) + ' · ' + UI.fmt.money(depDue(z)) + ' to give back', go: ['deposits', { booking: x.code }] } : null; }).filter(Boolean) },
+        { key: 'clash', icon: 'tool', tone: 'error', title: 'Booking clashes with the workshop', sub: 'The car is booked while it is in the workshop. Move the booking to another car or change the workshop dates.', rows: workshopClashes(d).map(function (z) { return { b: z.b, note: 'Workshop (' + z.w.reason.toLowerCase() + ') ' + UI.fmt.day(z.w.from) + (z.w.to ? ' to ' + UI.fmt.day(z.w.to) : ', no return date') + ' · ' + pickup(z.b), bad: true }; }) },
+        { key: 'overpaid', icon: 'cash-banknote', tone: 'warn', title: 'Paid more than the total', sub: 'The booking got cheaper after it was paid. Give the extra back to the customer, or record it as a refund.', rows: d.bookings.filter(function (x) { return bookingOverpaid(x) > 0 && ['Cancelled', 'Completed'].indexOf(x.status) < 0; }).map(function (x) { return { b: x, note: UI.fmt.money(bookingOverpaid(x)) + ' to give back' }; }) },
         { key: 'inst', icon: 'calendar-dollar', tone: 'error', title: 'Car instalments overdue', sub: 'The due date has passed and the instalment is not marked as paid.', rows: d.instalments.filter(function (it) { return !it.paid && it.due < t0; }).map(function (it) { var c = carById(it.car); return { label: c.plate + ' · ' + carLbl(c), sub: 'Due ' + UI.fmt.date(it.due) + ' · ' + UI.fmt.money(it.amount), note: plural(Math.round((t0 - dshD0(it.due)) / DAY), 'day') + ' late', bad: true, go: ['instalments', {}] }; }) },
         { key: 'service', icon: 'alert-triangle', tone: 'error', title: 'Services or papers overdue', sub: 'A service is past its due date or distance, or a paper has run out.', rows: dshDue(d).filter(function (r) { return r.left < 0; }).map(function (r) { return { label: r.car.plate + ' · ' + r.what, sub: r.kind === 'paper' ? 'Ran out ' + UI.fmt.date(r.when) : 'Was due ' + UI.fmt.date(r.when), note: plural(-r.left, 'day') + ' overdue', bad: true, go: ['maintenance', { car: r.car.id }] }; }) },
         { key: 'summons', icon: 'gavel', tone: 'error', title: 'Summons with no booking', sub: 'Nobody can be charged until you find out who had the car.', rows: d.summons.filter(function (s) { return !s.booking && ['Waived', 'Paid', 'Disputed'].indexOf(s.status) < 0 && !(s.candidates && s.candidates.length > 1); }).map(function (s) { return { label: (s.authority + ' ' + (s.notice || 'notice')) + ' · ' + (s.plate || 'Plate not read'), sub: s.offence, note: UI.fmt.money(s.fine), bad: true, sid: s.id }; }) }
@@ -12069,7 +12174,7 @@ PAGES['dashboard'] = {
         'Fleet utilisation': 'The share of the car days in the period that were rented.', 'Average booking value': 'What a booking that starts in the period brings in, without the deposit.',
         'Rental days': 'Days rented in the period. Each rental is cut into 24-hour blocks from its pick-up time.', 'Average rental length': 'How many days a rental that starts in the period lasts.',
         'Rental income': 'Daily rent less discounts.', 'Delivery fee': 'Delivery charges.', 'Return fee': 'Return charges.', 'Damage coverage': 'Damage cover sold with the rentals.', 'Other charges': 'Other charges added to bookings.',
-        'Deposits held': 'Security deposits taken for bookings that start in the period. They are held, not income.'
+        'Deposits taken': 'Security deposits taken for bookings that start in the period, including ones already given back. They are not income.'
       };
       var k1 = [], k2 = [];
       if (V.prof) {
@@ -12081,7 +12186,7 @@ PAGES['dashboard'] = {
       if (V.rev) k1.push(['Average booking value', money(A.avgValue), dshChange(A.avgValue, C.avgValue, true, cl), sp('income'), 'revenue']);
       k2.push(['Rental days', n0(A.days), dshChange(A.days, C.days, true, cl)]);
       k2.push(['Average rental length', A.avgLen.toFixed(1) + ' days', dshChange(A.avgLen, C.avgLen, true, cl)]);
-      if (V.rev) [['Rental income', 'rent'], ['Delivery fee', 'deliv'], ['Return fee', 'ret'], ['Damage coverage', 'dmg'], ['Other charges', 'other'], ['Deposits held', 'deposits']].forEach(function (q) { k2.push([q[0], money(A[q[1]]), A[q[1]] || C[q[1]] ? dshChange(A[q[1]], C[q[1]], true, cl) : '']); });
+      if (V.rev) [['Rental income', 'rent'], ['Delivery fee', 'deliv'], ['Return fee', 'ret'], ['Damage coverage', 'dmg'], ['Other charges', 'other'], ['Deposits taken', 'deposits']].forEach(function (q) { k2.push([q[0], money(A[q[1]]), A[q[1]] || C[q[1]] ? dshChange(A[q[1]], C[q[1]], true, cl) : '']); });
       var kpi = function (k, j, small) { return '<div class="vd-kpi vd-rise vd-h-' + (k[4] || 'revenue') + (small ? ' dsh-kpi-sm' : '') + '" style="--i:' + j + '"><span class="lab">' + esc(k[0]) + ' <button type="button" class="dsh-info" data-act="info" data-v="' + esc(defs[k[0]] || '') + '" aria-label="What is ' + esc(k[0]) + '?" title="' + esc(defs[k[0]] || '') + '">' + i('info-circle') + '</button></span><span class="vd-kpi-value num">' + k[1] + '</span>' + (k[2] || '') + (k[3] || '') + '</div>'; };
       var warn = M.cars.filter(function (c) { return !c.rate; }).length ? UI.alert(plural(M.cars.filter(function (c) { return !c.rate; }).length, 'car') + ' have no daily rate, so their days count but their income does not.', 'warn') : '';
       if (part === 'now') return '<section class="col gap24 dsh-sec" id="dsh-now">' + nowCard + '</section>';

@@ -8,7 +8,9 @@
 
 function normRef(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 function payDepositLeft(b) {
-  var got = paidOf(b, 'Security deposit');
+  /* a cancelled booking holds all the money paid on it (kept as credit or waiting to be refunded): the same figure as Deposits */
+  if (b.bookingStatus === 'Cancelled' && typeof Deposit !== 'undefined') { var x = Deposit.info(b); return x.refund ? 0 : x.net; }
+  var got = activePays(b).reduce(function (s, p) { return s + (p.items || []).reduce(function (t, i) { return t + (i.kind === 'Security deposit' ? (i.after != null ? +i.after || 0 : +i.amt || 0) : 0); }, 0); }, 0);
   var kept = (S.deductions || []).filter(function (d) { return d.booking === b.id; }).reduce(function (s, d) { return s + (+d.amt || 0); }, 0);
   var back = (S.refunds || []).filter(function (r) { return r.booking === b.id && !r.voided; }).reduce(function (s, r) { return s + (+r.amt || 0); }, 0);
   return Math.max(0, Math.round((got - kept - back) * 100) / 100);
@@ -182,7 +184,7 @@ var Pay = (function () {
       if (st.method === 'Online Transfer') { var bank = B().bank; h += '<div class="hint pay-mhint">' + I('bank') + (bank ? 'Goes to the bank: ' + esc(bank.name) + ' · ' + esc(bank.accNo) : 'Goes to the company bank account') + '</div>'; }
       if (st.method === 'Cash') { var p = staff(st.cashTo) || me(); h += '<div class="field"><span>Cash to staff</span><button type="button" class="carfield picked-car pay-cashto" id="paycash"><span class="av sm" style="background:' + avColor(p.name) + '">' + initials(p.name) + '</span><span class="grow"><span class="pk-plate pay-pn">' + esc(p.name) + (p.id === S.me ? ' (me)' : '') + '</span><span class="pk-sub">Who has the cash now · tap to change</span></span>' + I('chev') + '</button></div>'; }
       if (st.method === 'Card') h += '<label class="field"><span>Amount after charge</span><div class="rmfield"><input class="inp num' + (st.afterErr ? ' bad' : '') + '" id="payafter" inputmode="decimal" value="' + esc(afterValue()) + '"></div>' +
-        (st.afterErr ? '<span class="err">' + esc(st.afterErr) + '</span>' : '') + (st.afterErr && st.after != null ? '<span class="hint"><button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button></span>' : st.afterErr ? '' : '<span class="hint" id="payafterh">' + (st.after != null ? 'Changed by hand. <button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button>' : 'The card charge is ' + feeText() + '. It comes off the rent, so the deposit stays whole.') + '</span>') + '</label>';
+        (st.afterErr ? '<span class="err">' + esc(st.afterErr) + '</span>' : '') + (st.afterErr && st.after != null ? '<span class="hint"><button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button></span>' : st.afterErr ? '' : '<span class="hint" id="payafterh">' + (st.after != null ? 'Changed by hand. <button type="button" class="pay-lnk" id="payafterr">Use ' + feeText() + '</button>' : cardHint()) + '</span>') + '</label>';
       if (fromDep) {
         var sb = srcBooking(), left = sb ? payDepositLeft(sb) : 0;
         h += '<div class="field"><span>Deposit of</span><div class="seg pay-depof"><button type="button" class="' + (st.depOf === 'this' ? 'on' : '') + '" data-depof="this">This booking (' + esc(b.code) + ')</button><button type="button" class="' + (st.depOf === 'other' ? 'on' : '') + '" data-depof="other">Another booking</button></div>' +
@@ -201,6 +203,13 @@ var Pay = (function () {
       if (st.err) h += '<div class="banner red pay-errb">' + I('warn') + '<div>' + esc(st.err) + '</div></div>';
       h += '<div class="sheet-foot"><button type="button" class="btn" id="paygo">' + I('cash') + '<span id="paygol">' + goText() + '</span></button></div>';
       return h;
+    }
+    /* the line the card charge comes off: rent first, else any line but the deposit, else (only the deposit ticked) the deposit itself */
+    function chargeLine(lines) { return lines.filter(function (l) { return l.kind === 'Rental payment'; })[0] || lines.filter(function (l) { return l.kind !== 'Security deposit'; })[0] || lines[lines.length - 1]; }
+    function cardHint() {
+      var tk = ticked(), ln = chargeLine(tk), tot = total(), af = cardAfter(tot), fee = af != null ? Math.round((tot - af) * 100) / 100 : 0;
+      if (ln && ln.kind === 'Security deposit') { var d = parseMoney(ln.amt) || 0; return '<span class="tone-amber-text">Only the deposit is ticked, so the ' + (fee ? rm(fee) + ' ' : '') + 'card charge (' + feeText() + ') comes off the deposit' + (fee && d ? ' (' + rm(Math.max(0, d - fee)) + ' to return)' : '') + '. To keep the deposit whole, tick Rent and charges too.</span>'; }
+      return 'The card charge is ' + feeText() + '. It comes off ' + (ln ? ln.kind.toLowerCase() : 'the rent') + ', so the deposit stays whole.';
     }
     function cntText() { var n = ticked().length; return n === 0 ? 'Nothing ticked yet' : n === 1 ? '1 item' : n + ' items'; }
     function goText() { var t = total(); return 'Record payment' + (t > 0 ? ' ' + rm(t) : ''); }
@@ -267,7 +276,7 @@ var Pay = (function () {
       }
       var lines = tk.map(function (i) { return { kind: i.kind, amt: parseMoney(i.amt) }; });
       if (st.method === 'Card' && after != null) {
-        var charge = Math.round((tot - after) * 100) / 100, take = lines.filter(function (l) { return l.kind === 'Rental payment'; })[0] || lines.filter(function (l) { return l.kind !== 'Security deposit'; })[0] || lines[lines.length - 1];
+        var charge = Math.round((tot - after) * 100) / 100, take = chargeLine(lines);
         if (charge >= 0 && take && take.amt >= charge) lines.forEach(function (l) { l.after = Math.round((l.amt - (l === take ? charge : 0)) * 100) / 100; });
       }
       payOverAsk(payOver(b, lines)).then(function (go) {
@@ -640,7 +649,7 @@ var Pay = (function () {
         var d = payFindDup(c.hash, c.ref); if (d) { c.dup = d; drawCard(c); return next(); }
         var b = bk(c.booking), ll = lineList(c), lines = ll.lines;
         /* card on a split slip: the parts are of the amount after charge, so the amount paid goes on the rent part */
-        if (ll.scale) { var charge = Math.round((parseMoney(c.amount) - ll.after) * 100) / 100, take = lines.filter(function (l) { return l.kind === 'Rental payment'; })[0] || lines.filter(function (l) { return l.kind !== 'Security deposit'; })[0] || lines[lines.length - 1]; if (charge >= 0 && take && take.amt >= charge) lines.forEach(function (l) { l.after = Math.round((l.amt - (l === take ? charge : 0)) * 100) / 100; }); }
+        if (ll.scale) { var charge = Math.round((parseMoney(c.amount) - ll.after) * 100) / 100, take = chargeLine(lines); if (charge >= 0 && take && take.amt >= charge) lines.forEach(function (l) { l.after = Math.round((l.amt - (l === take ? charge : 0)) * 100) / 100; }); }
         else if (c.method === 'Card' && ll.after != null) { lines[0].after = ll.after; }
         payOverAsk(payOver(b, lines), 'Slip ' + (cards.indexOf(c) + 1) + ' · ' + b.code).then(function (go) {
           if (!go) { c.status = 'error'; c.msg = 'Not recorded: the amount is more than the booking says. Check it, then record again.'; drawCard(c); return next(); }

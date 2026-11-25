@@ -414,8 +414,8 @@ function nbWire() {
       if ((k === 'phone' || k === 'ic') && NB.newMode) nbDupeBox();
       nbSaveDraft(); nbPaint();
     });
-    if (k === 'phone' || k === 'emPhone') el.addEventListener('blur', function () { if (NB && digits(el.value).length >= 9) { el.value = fmtPhone(normPhone(el.value)); NB.f[k] = el.value; if (NB.newMode) nbDupeBox(); nbSaveDraft(); } });
-    if (k === 'phone') el.addEventListener('paste', function () { setTimeout(function () { if (NB && el.isConnected && digits(el.value).length >= 9) { el.value = fmtPhone(normPhone(el.value)); NB.f.phone = el.value; nbDupeBox(); nbSaveDraft(); nbPaint(); } }, 0); });
+    if (k === 'phone' || k === 'emPhone') el.addEventListener('blur', function () { if (NB && digits(el.value).length >= 9) { el.value = fmtPhone(el.value); NB.f[k] = el.value; if (NB.newMode) nbDupeBox(); nbSaveDraft(); } });
+    if (k === 'phone') el.addEventListener('paste', function () { setTimeout(function () { if (NB && el.isConnected && digits(el.value).length >= 9) { el.value = fmtPhone(el.value); NB.f.phone = el.value; nbDupeBox(); nbSaveDraft(); nbPaint(); } }, 0); });
     if (k === 'ic' || k === 'licenceExp') el.addEventListener('change', function () { if (NB) nbRe(); });
   });
   if (NB.newMode) nbDupeBox();
@@ -494,11 +494,11 @@ function nbSuggest() {
   var t = String(NB.q || '').trim();
   if (t.length < 2) { box.innerHTML = ''; return; }
   var all = S.customers.filter(function (c) { return Pickers.customerMatches(c, t); });
-  var count = function (c) { return S.bookings.filter(function (b) { return b.cust === c.id && b.bookingStatus !== 'Cancelled'; }).length; };
+  var count = function (c) { return custStats(c.id); };
   var list = all.slice(0, 6);
   box.innerHTML = '<div class="nb-sug">' + (list.length ? list.map(function (c) {
     var n = count(c);
-    return '<button type="button" class="pk-row" data-cust="' + c.id + '"><span class="av sm" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</span><span class="grow"><span class="pk-l1">' + esc(c.name) + '</span><span class="pk-sub nowrap">' + esc(c.phone) + (c.ic ? ' · ' + esc(maskIC(c.ic)) : '') + ' · ' + n + ' booking' + (n === 1 ? '' : 's') + '</span></span><span class="pk-end">' + custFlags(c).slice(0, 2).map(flagChip).join('') + '</span></button>';
+    return '<button type="button" class="pk-row" data-cust="' + c.id + '"><span class="av sm" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</span><span class="grow"><span class="pk-l1">' + esc(c.name) + '</span><span class="pk-sub nowrap">' + esc(c.phone) + (c.ic ? ' · ' + esc(maskIC(c.ic)) : '') + ' · ' + esc(rentalsText(n)) + '</span></span><span class="pk-end">' + custFlags(c).slice(0, 2).map(flagChip).join('') + '</span></button>';
   }).join('') + (all.length > 6 ? '<button type="button" class="nb-more" id="nb_allcust">' + (all.length - 6) + ' more · See all</button>' : '') : '<div class="nb-none">No customer matches “' + esc(t) + '”.</div>') + '</div>';
   $$('#nb_sug [data-cust]').forEach(function (b) { b.onclick = function () { nbPickCust(cust(b.dataset.cust)); }; });
   var all2 = $('#nb_allcust'); if (all2) all2.onclick = function () { Pickers.customer({ allowNew: true, onPick: function (c, typed) { if (c) nbPickCust(c); else nbStartNew(typed); } }); var pq = $('#pkq'); if (pq) { pq.value = t; pq.dispatchEvent(new Event('input')); } };
@@ -585,6 +585,12 @@ function saveNew() {
     if (dupe.c.blacklist) return nbBlacklistGate(dupe.c).then(function (y) { if (y) { n.cust = dupe.c.id; n.blOverride = true; n.newMode = false; } return y; });
     n.cust = dupe.c.id; n.newMode = false; n.dupeUsed = dupe.c.name + ' (same ' + (dupe.by === 'IC' ? 'IC' : 'phone') + ')'; return true;
   });
+  /* a known customer is only renamed when staff say so (an IC read or a typo must not rename all their bookings) */
+  if (n.cust && n.editCust) steps = steps.then(function (ok) {
+    var c0 = cust(n.cust), nn = String(n.f.name || '').trim(); if (!ok || !c0 || !nn || nn === String(c0.name || '').trim()) return ok;
+    return confirm({ icon: 'warn', title: 'Rename ' + c0.name + '?', text: 'Change the name on file from ' + c0.name + ' to ' + nn + '? It changes the name on all of their bookings.', ok: 'Rename to ' + nn, cancel: 'Keep ' + c0.name, primary: 'cancel' })
+      .then(function (y) { if (!y) n.f.name = c0.name; return true; });
+  });
   if (n.cust && cust(n.cust).blacklist && !n.blOverride) steps = steps.then(function (ok) { return ok && nbBlacklistGate(cust(n.cust)).then(function (y) { if (y) n.blOverride = true; return y; }); });
   NB_SAVING = true; var btn = $('#nb_save'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   steps.then(function (ok) { return new Promise(function (res) { nbAfterSheet(function () { res(ok); }); }); }).then(function (ok) {
@@ -610,7 +616,7 @@ function nbCommit(n) {
   var docs = Object.assign({ icFront: null, icBack: null, passport: null, licence: null, poa: null, other: [] }, n.docs || {});
   if (!cid) {
     cid = 'cu' + uid();
-    S.customers.push({ id: cid, name: String(f.name).trim(), phone: fmtPhone(normPhone(f.phone)), email: String(f.email || '').trim(), ic: ids.ic, passport: ids.passport, nationality: f.nationality || 'Malaysian',
+    S.customers.push({ id: cid, name: String(f.name).trim(), phone: fmtPhone(f.phone), email: String(f.email || '').trim(), ic: ids.ic, passport: ids.passport, nationality: f.nationality || 'Malaysian',
       licenceNo: String(f.licenceNo || '').trim().toUpperCase(), licenceExp: f.licenceExp || '', address: String(f.address || '').trim(), emergency: em.name || em.phone ? em : null, blacklist: null,
       docs: JSON.parse(JSON.stringify(docs)), created: nowIso });
     audit('Added customer ' + String(f.name).trim(), { cust: cid });
@@ -619,7 +625,7 @@ function nbCommit(n) {
     if (n.editCust || n.docs) {
       var set = function (k, v) { v = v == null ? '' : v; if (String(c[k] || '') !== String(v)) { changed[k] = [c[k] || '', v]; c[k] = v; } };
       if (n.editCust) {
-        set('name', String(f.name).trim()); set('phone', fmtPhone(normPhone(f.phone))); set('email', String(f.email || '').trim());
+        set('name', String(f.name).trim()); set('phone', fmtPhone(f.phone)); set('email', String(f.email || '').trim());
         if (ids.ic || ids.passport) { set('ic', ids.ic || c.ic || ''); if (ids.passport) set('passport', ids.passport); }
         set('nationality', f.nationality || c.nationality || ''); set('licenceNo', String(f.licenceNo || '').trim().toUpperCase()); set('licenceExp', f.licenceExp || ''); set('address', String(f.address || '').trim());
         var oe = c.emergency || {}; if ((oe.name || '') !== em.name || (oe.phone || '') !== em.phone || (oe.relation || '') !== em.relation) { changed.emergency = [oe.name || '', em.name]; c.emergency = em.name || em.phone ? em : null; }

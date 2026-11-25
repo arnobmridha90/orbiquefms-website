@@ -27,10 +27,13 @@ function bkRecv(x) { var r = DB.received(x.code); return r || (D().payments.some
 function bkMoney(x) {
   var rec = bkRecv(x), due = Math.round((x.payable - rec) * 100) / 100;
   var tone = x.status === 'Cancelled' ? 'grey' : !x.payable ? 'info' : due < 0 ? 'info' : due === 0 ? 'ok' : rec > 0 ? 'warn' : 'bad';
-  return { total: x.payable, rec: rec, due: due, tone: tone, pct: x.payable ? Math.min(100, rec / x.payable * 100) : 100 };
+  var over = x.status === 'Cancelled' ? 0 : bookingOverpaid(x);
+  if (over > 0) tone = 'warn';
+  return { total: x.payable, rec: rec, due: due, over: over, tone: tone, pct: x.payable ? Math.min(100, rec / x.payable * 100) : 100 };
 }
-/* "RM 120.00 due" / "Paid" / "RM 20.00 extra" */
-function bkDueText(m) { return m.due > 0 ? UI.fmt.money(m.due) + ' due' : m.due < 0 ? UI.fmt.money(-m.due) + ' extra' : 'Paid'; }
+/* "RM 120.00 due" / "Paid" / "RM 550.00 to give back" (paid more than the total) / "Paid + RM 20.00 extra" (extension
+   or other charges paid on top) */
+function bkDueText(m) { return m.due > 0 ? UI.fmt.money(m.due) + ' due' : m.over > 0 ? UI.fmt.money(m.over) + ' to give back' : m.due < 0 ? 'Paid + ' + UI.fmt.money(-m.due) + ' extra' : 'Paid'; }
 function bkAgents(x) {
   var ids = {}; (x.agentIds || []).forEach(function (a) { ids[a] = 1; });
   D().tasks.forEach(function (t) { if (t.booking === x.code && t.status !== 'Cancelled') (t.agents || []).forEach(function (a) { ids[a] = 1; }); });
@@ -269,13 +272,27 @@ function bkSaveStatus(x, patch, label) {
   UI.toast(x.code + ': ' + (patch.status || patch.pay || 'None') + (notes.length ? '. ' + notes.join(' ') : ''), { ms: notes.length ? 6000 : 3500 });
   return true;
 }
+/* checks before a status that ends the rental: {block: 'message'} stops it, {ask: 'message'} asks first.
+   Completed: not before the pick-up time, and ask when money is still due. Car Returned: ask when the car never
+   went out (no Car Delivered yet, or the pick-up is still to come). */
+function bkStatusWarn(x, v) {
+  if (!x || v === x.status) return {};
+  var future = x.start > NOW(), out = x.status === 'Car Delivered' || x.status === 'Car Returned';
+  if (v === 'Completed') {
+    if (future && !out) return { block: 'The pick-up is on ' + UI.fmt.dt(x.start) + ', so this booking cannot be completed yet. If it is not going ahead, cancel it instead.' };
+    var m = bkMoney(x);
+    if (m.due > 0.004 && x.status !== 'Cancelled') return { ask: UI.fmt.money(m.due) + ' is still due on ' + x.code + '. Complete it anyway? The amount stays on the list as money due.' };
+  }
+  if (v === 'Car Returned' && !out) return { ask: 'This car has not gone out yet: ' + x.code + ' is ' + x.status + (future ? ' and the pick-up is on ' + UI.fmt.dt(x.start) : '') + '. Mark it as returned anyway?' };
+  return {};
+}
 function bkStatusDialog(x, kind) {
   if (!can('bookings.change_status')) { UI.toast('Changing a status needs the "Change status" access', { tone: 'warn' }); return; }
   var pay = kind === 'pay', locked = pay && !canPickRefunded(x);
   var sel = pay ? bkLockRefunded(UI.select({ key: 'st', label: 'New Status', options: bkPayOptions(locked), value: x.pay || '' }), locked) : UI.select({ key: 'st', label: 'New Status', options: LISTS.bookingStatus, value: x.status });
   var hint = function (v) {
     if (pay) return locked ? 'Deposit Refunded is set by recording the refund on the Deposit refunds page.' : '';
-    var r = applyStatusRules(x, { status: v }); return (r.notes || []).join(' ');
+    var r = applyStatusRules(x, { status: v }), w = bkStatusWarn(x, v); return [w.block || w.ask || ''].concat(r.notes || []).filter(Boolean).join(' ');
   };
   UI.dialog({ title: pay ? 'Update Payment Status' : 'Update Booking Status', text: 'Select a new status for booking ' + x.code, width: 'sm',
     body: function (el) {
@@ -290,6 +307,18 @@ function bkStatusDialog(x, kind) {
       /* the car may have been given to someone else while this booking was cancelled or completed */
       var bad = !pay ? bkReviveProblem(x, patch) : '';
       if (bad) { d.body.querySelector('[data-bkx-busy]').innerHTML = UI.alert(bad, 'bad'); return false; }
+      /* Completed or Car Returned on a booking that has not gone out yet, or that still has money due */
+      var w = !pay ? bkStatusWarn(x, v) : {};
+      if (w.block) { d.body.querySelector('[data-bkx-busy]').innerHTML = UI.alert(w.block, 'bad'); return false; }
+      if (w.ask) {
+        var m0 = bkMoney(x), canPay = v === 'Completed' && m0.due > 0.004 && can('billing.record_payment');
+        return new Promise(function (res) {
+          var decided = false, fin = function (val) { if (!decided) { decided = true; res(val); } };
+          UI.dialog({ title: (v === 'Completed' ? 'Complete ' : 'Mark ') + x.code + (v === 'Completed' ? '?' : ' as returned?'), width: 'sm', alert: true, body: '<p class="ui-ctext">' + esc(w.ask) + '</p>', onClose: function () { fin(false); },
+            buttons: [{ label: 'Keep it as it is', kind: 'g', onClick: function () { fin(false); } }].concat(canPay ? [{ label: 'Record payment', kind: 'g', onClick: function () { fin(false); setTimeout(function () { UI.closeAll(); API.recordPayment(x.code); }, 0); } }] : [])
+              .concat([{ label: v === 'Completed' ? 'Complete anyway' : 'Mark returned', kind: 'err', onClick: function () { fin(bkSaveStatus(x, patch, label)); } }]) });
+        });
+      }
       /* cancelling a booking that holds money: say how much and what happens to the deposit first */
       var got = !pay && v === 'Cancelled' && x.status !== 'Cancelled' ? bookingPaid(x) : null;
       if (got && got.all > 0.004) {
@@ -300,6 +329,16 @@ function bkStatusDialog(x, kind) {
       }
       return bkSaveStatus(x, patch, label);
     } }] });
+}
+
+/* the phone card's buttons: the next step for this booking. The form while it is not signed, then Record payment while
+   money is due, else open the booking. */
+function bkCardActs(x, m, can2) {
+  var h = '', pay = can2('billing.record_payment') && x.status !== 'Cancelled' && m.due > 0.004;
+  if (!x.submitted && EARLY_STATUSES.indexOf(x.status) >= 0) h += UI.btn('Send form', { kind: pay ? 'o' : 'tonal', size: 'sm', icon: 'brand-whatsapp', attrs: { 'data-bk': 'send' } });
+  if (pay) h += UI.btn('Record payment', { kind: 'tonal', size: 'sm', icon: 'cash', attrs: { 'data-bk': 'recpay' } });
+  if (!h) h += UI.btn(can2('bookings.edit') ? 'Open booking' : 'View booking', { kind: 'o', size: 'sm', icon: can2('bookings.edit') ? 'pencil' : 'eye', attrs: { 'data-bk': 'open' } });
+  return h;
 }
 
 /* ---------------- delete (one or many) ---------------- */
@@ -680,8 +719,10 @@ function bkOpenBooking(code, prefill) {
       var need = !x || (!nonBlock && (x.status === 'Completed' || x.status === 'Cancelled' || f.car !== x.car.id || mn(r.s) !== mn(x.start) || mn(r.e) !== mn(x.end)));
       if (!b.free && need) { bad = true; al.push(UI.alert(bkBusyText(b), 'bad', { html: true })); }
       else if (!b.free) { if (!nonBlock && !ro) al.push(UI.alert(bkBusyText(b) + ' You can still save, because the car and the dates did not change.', 'warn', { html: true })); }
-      else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + (b.soon ? 'The car is free for these dates. ' + esc(b.soon) + ', so plan the cleaning.' : 'The car is free for these dates.') + '</div>');
+      else if (!ro && b.soon) al.push(UI.alert('Inside the ' + plural(b.gapH, 'hour') + ' gap between rentals. ' + b.soon + '. Check the car can be cleaned in time.', 'warn'));
+      else if (!ro) al.push('<div class="bkx-ok">' + i('circle-check') + 'The car is free for these dates.</div>');
     } else if (r.s && r.e && carCtl) { var k3 = '|' + +r.s + '|' + +r.e; if (avail.key !== k3) { avail.key = k3; carCtl.setDates(r.s, r.e, x ? x.code : undefined); } } }
+    if (isNew && !ro && r.s && r.s < NOW() - 6e4) al.unshift(UI.alert('The pick-up is in the past (' + UI.fmt.dt(r.s) + '). Is this a late entry? You will be asked to confirm on Create.', 'warn'));
     var nm = (f.name || '').trim().toLowerCase(), icn = (f.ic || '').replace(/[\s-]/g, ''), ph = normPhone(f.phone || '');
     var bl = d.people.filter(function (q) { return q.blacklist && q !== (x && x.cust) && ((nm && q.name.toLowerCase() === nm) || (icn.length > 5 && String(q.ic).replace(/[\s-]/g, '') === icn) || (ph.length > 6 && normPhone(q.phone) === ph)); })[0];
     if (bl || (p && p.blacklist && isNew)) al.push(UI.alert('Warning: This customer matches a blacklisted customer record. Please verify before proceeding.', 'bad', { icon: 'ban' }));
@@ -730,7 +771,7 @@ function bkOpenBooking(code, prefill) {
     var fo = first[0] === 'car' ? w.querySelector('.ui-cbx-btn') : w.querySelector('input:not([type="hidden"]),select');
     if (fo) setTimeout(function () { try { fo.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }, 300);
   }
-  function save() {
+  function save(sure) {
     var r = calcNow(), f = r.f;
     var miss = validate(r);
     if (miss.length) {
@@ -739,6 +780,19 @@ function bkOpenBooking(code, prefill) {
       showErrors(miss); return false;
     }
     if (!recalc()) { UI.toast(r.e <= r.s ? 'Rental end cannot be before rental start.' : 'The car is not free for these dates. Pick another car or other dates.', { tone: 'warn' }); showErrors([[r.e <= r.s ? 'end' : 'car', r.e <= r.s ? 'Rental end cannot be before rental start' : 'Not free for these dates']]); return false; }
+    /* things to ask before saving: a pick-up in the past on a new booking, a status that ends a rental too early, and a
+       shorter or cheaper booking that leaves the customer paid more than the new total */
+    var stTo = chSt ? f.status : null, stW = x && stTo && stTo !== x.status ? bkStatusWarn(x, stTo) : {};
+    if (stW.block) { UI.toast(stW.block, { tone: 'warn', ms: 6000 }); showErrors([['status', 'Not yet: the pick-up is still to come']]); return false; }
+    var payNew = !x ? 0 : amt ? r.c.payable : bkCalc({ start: r.s, end: r.e, rate: x.rate, hourly: x.hourly, dep: x.dep, disc: x.disc, deliv: x.deliv, ret: x.ret, others: x.others, covDaily: r.pk ? r.pk.daily : 0 }).payable;
+    var overNew = x ? bookingOverpaid(x, payNew) : 0, overGrew = overNew > bookingOverpaid(x || '') + 0.004;
+    if (!sure) {
+      var asks = [];
+      if (isNew && r.s < NOW() - 6e4) asks.push('The pick-up (' + UI.fmt.dt(r.s) + ') is in the past. Is this a late entry for a rental that already started?');
+      if (stW.ask) asks.push(stW.ask);
+      if (overGrew) asks.push('The customer has paid ' + UI.fmt.money(overNew) + ' more than the new total of ' + UI.fmt.money(payNew) + '. After saving, the booking shows ' + UI.fmt.money(overNew) + ' to give back.');
+      if (asks.length) return UI.confirm({ title: isNew ? 'Create this booking?' : 'Save the changes to ' + x.code + '?', text: asks.join(' '), ok: isNew ? 'Create anyway' : 'Save anyway', cancel: 'Go back' }).then(function (y) { return y ? save(true) : false; });
+    }
     var car = carById(f.car), c = r.c, pk = r.pk, so = (f.startOpt || 'Not chosen').split('|'), eo = (f.endOpt || 'Not chosen').split('|');
     var sOpt = handoverOptions('start').filter(function (o) { return o.value === f.startOpt; })[0], eOpt = handoverOptions('end').filter(function (o) { return o.value === f.endOpt; })[0];
     var phone = f.phone.trim();
@@ -758,6 +812,8 @@ function bkOpenBooking(code, prefill) {
     rec.status = chSt ? f.status : (x ? x.status : 'Pending'); rec.pay = chSt ? f.pay : (x ? x.pay : '');
     if (chSt && rec.pay === 'Deposit Refunded' && !(x && x.pay === 'Deposit Refunded') && !canPickRefunded({ end: r.e, pay: x ? x.pay : '' })) rec.pay = x ? x.pay : '';
     var rules = applyStatusRules(x, rec), notes = rules.notes || []; rec.status = rules.status; rec.pay = rules.pay;
+    /* paid more than the new total: the whole booking is paid, and the extra waits to go back (To give back) */
+    if (overGrew) { if (['', 'Deposit due', 'Deposit Received'].indexOf(rec.pay || '') >= 0) { rec.pay = 'Full Payment Received'; notes.push('Payment status set to Full Payment Received.'); } notes.push(UI.fmt.money(overNew) + ' to give back to the customer.'); }
     if (rec.submitted && !(x && x.submittedAt)) rec.submittedAt = NOW();
     saved = true;
     var tail2 = notes.length ? ' ' + notes.join(' ') : '';
@@ -957,7 +1013,8 @@ PAGES['bookings'] = {
       soon: function (x) { return x.status !== 'Cancelled' && x.start >= now && x.start <= soon; },
       back: function (x) { return x.status === 'Car Delivered' && x.end >= now && x.end <= soon; },
       late: function (x) { return x.status === 'Car Delivered' && x.end < now; },
-      due: function (x) { return x.status !== 'Cancelled' && x.status !== 'Pending' && bkMoney(x).due > 0; }
+      due: function (x) { return x.status !== 'Cancelled' && x.status !== 'Pending' && bkMoney(x).due > 0; },
+      over: function (x) { return bookingOverpaid(x) > 0; }
     };
     /* search: a booking code in any form gives that booking exactly; a pasted phone matches any format; plates ignore spaces */
     function matcher(raw) {
@@ -968,7 +1025,7 @@ PAGES['bookings'] = {
       return function (x) {
         if (/^\d{3,}$/.test(q) && phoneHas(x.cust.phone, q)) return true;
         if (np.length >= 3 && normPlate(x.car.plate).indexOf(np) >= 0) return true;
-        return UI.wordsMatch(x.code + ' ' + x.cust.name + ' ' + (x.cust.email || '') + ' ' + x.car.plate, q);
+        return UI.wordsMatch(x.code + ' ' + x.cust.name + ' ' + (x.cust.email || '') + ' ' + x.car.plate + ' ' + (x.car.make || '') + ' ' + (x.car.model || '') + ' ' + (x.car.color || ''), q);
       };
     }
     function rowsFor() {
@@ -1002,7 +1059,7 @@ PAGES['bookings'] = {
     };
     var amount = function (x) {
       if (x.status === 'Cancelled') return '<span class="faint">Cancelled</span>';
-      var m = bkMoney(x), tip = 'Total ' + UI.fmt.money(m.total) + ' · Received ' + UI.fmt.money(m.rec) + ' · ' + (m.due > 0 ? 'Still due ' + UI.fmt.money(m.due) : m.due < 0 ? 'Paid in full, ' + UI.fmt.money(-m.due) + ' extra' : 'Paid in full');
+      var m = bkMoney(x), tip = 'Total ' + UI.fmt.money(m.total) + ' · Received ' + UI.fmt.money(m.rec) + ' · ' + (m.due > 0 ? 'Still due ' + UI.fmt.money(m.due) : m.over > 0 ? 'Paid ' + UI.fmt.money(m.over) + ' more than the total: give it back' : m.due < 0 ? 'Paid in full, plus ' + UI.fmt.money(-m.due) + ' of extra charges' : 'Paid in full');
       return '<div class="bkx-amt t-' + m.tone + '" title="' + tip + '"><b class="num">' + UI.fmt.money(m.total) + '</b><span class="bkx-bar"><i style="width:' + m.pct + '%"></i></span><small class="num">' + bkDueText(m) + '</small></div>';
     };
     var docsCell = function (x) {
@@ -1039,8 +1096,7 @@ PAGES['bookings'] = {
           '<div class="bkx-cd-r"><span class="ellip t1c fw5">' + esc(x.cust.name) + '</span>' + UI.phone(x.cust.phone) + '</div>' +
           '<div class="bkx-cd-r"><span><b class="t1c">' + esc(x.car.plate) + '</b> ' + esc(x.car.model.split(' ')[0]) + '</span><span class="bkx-per">' + bkWhen(x.start) + i('arrow-right') + bkWhen(x.end) + '</span></div>' +
           (seeAmt && x.status !== 'Cancelled' ? '<div class="bkx-cd-m t-' + m.tone + '"><span class="num"><b>' + UI.fmt.money(m.total) + '</b></span><span class="bkx-bar"><i style="width:' + m.pct + '%"></i></span><small class="num">' + bkDueText(m) + '</small></div>' : '') +
-          '<div class="bkx-cd-f">' + UI.btn('Send form', { kind: 'o', size: 'sm', icon: 'brand-whatsapp', attrs: { 'data-bk': 'send' } }) +
-          (can2('billing.record_payment') && x.status !== 'Cancelled' ? UI.btn('Record payment', { kind: 'tonal', size: 'sm', icon: 'cash', attrs: { 'data-bk': 'recpay' } }) : '') +
+          '<div class="bkx-cd-f">' + bkCardActs(x, m, can2) +
           '<span class="grow"></span>' + UI.iconBtn('dots-vertical', 'More for ' + x.code, { attrs: { 'data-bk': 'more' } }) + '</div></div>';
       }
     });
@@ -1048,12 +1104,12 @@ PAGES['bookings'] = {
     UI.filters(root.querySelector('#bkx-f'), {
       values: st.f,
       fields: [
-        { type: 'search', key: 'q', placeholder: 'Booking no., name, phone, plate' },
+        { type: 'search', key: 'q', placeholder: 'Booking no., name, phone, plate or car' },
         { type: 'select', key: 'status', label: 'Status', options: LISTS.bookingStatus, all: 'All Statuses' },
         { type: 'select', key: 'pay', label: 'Payment Status', options: [['None', 'None']].concat(LISTS.paymentStatus.map(function (s) { return [s, s]; })), all: 'All Payment Statuses' },
         Object.assign(UI.carFilter({ key: 'car', all: 'All Cars' }), { width: 220 }),
         { type: 'daterange', from: 'from', to: 'to', label: 'Rental dates' },
-        { type: 'chips', key: 'quick', label: 'Quick', options: [['all', 'All', d.bookings.length], ['out', 'Out now', count(quick.out)], ['soon', 'Going out in 3 days', count(quick.soon)], ['back', 'Back in 3 days', count(quick.back)], ['late', 'Late', count(quick.late), 'bad'], ['due', 'Money due', count(quick.due)]] }
+        { type: 'chips', key: 'quick', label: 'Quick', options: [['all', 'All', d.bookings.length], ['out', 'Out now', count(quick.out)], ['soon', 'Going out in 3 days', count(quick.soon)], ['back', 'Back in 3 days', count(quick.back)], ['late', 'Late', count(quick.late), 'bad'], ['due', 'Money due', count(quick.due)]].concat(count(quick.over) || st.f.quick === 'over' ? [['over', 'To give back', count(quick.over), 'warn']] : []) }
       ],
       /* every filter change goes back to page 1 */
       onChange: function (v2, k) { var r = rowsFor(); st.page = 1; t.setRows(r); root.querySelector('#bkx-count').textContent = countTxt(r); if (k === 'status' || k === '*') drawActs(); }
@@ -1084,6 +1140,7 @@ PAGES['bookings'] = {
       else if (a === 'task') API.newTask({ booking: x.code });
       else if (a === 'send') bkSendForm(x);
       else if (a === 'recpay') API.recordPayment(x.code);
+      else if (a === 'open') bkOpenBooking(x.code);
       else if (a === 'more') moreMenu(el, x);
     });
     function doExport(el) { if (exportOff()) { UI.toast('Pending and cancelled bookings are not income, so they are not in the Excel file. Pick another status.', { tone: 'warn' }); return; } if (st.f.from) { var fr = UI.parseDate(st.f.from), to = st.f.to ? UI.parseDate(st.f.to) : fr; if ((to - fr) / DAY > 366) UI.toast('Choose a period of at most 366 days.', { tone: 'warn' }); else bkExport(fr, to, st.f); } else bkExportPop(el, st.f); }

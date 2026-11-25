@@ -58,8 +58,9 @@ var Docs = (function () {
     var m = calcBooking(b), r = b.rates || {}, lines = [];
     var parts = [];
     if (m.days) parts.push(m.days + ' day' + (m.days === 1 ? '' : 's') + ' x ' + rm(r.daily));
-    if (m.remHours > 0.001) { var h = Math.round(m.remHours * 100) / 100; parts.push(h + ' hour' + (h === 1 ? '' : 's') + ' x ' + rm(r.hourly)); }
-    var exact = (m.days ? (+r.daily || 0) * m.days : 0) + (+r.hourly || 0) * (m.days ? m.remHours : m.hours);
+    var ph = m.days ? m.remHours : m.hours, hourAmt = (+r.hourly || 0) * ph, capped = ph > 0.001 && +r.daily > 0 && hourAmt > +r.daily;
+    if (ph > 0.001) { var h = Math.round(ph * 100) / 100; parts.push(capped ? h + ' hour' + (h === 1 ? '' : 's') + ', charged as 1 day ' + rm(r.daily) : h + ' hour' + (h === 1 ? '' : 's') + ' x ' + rm(r.hourly)); }
+    var exact = (m.days ? (+r.daily || 0) * m.days : 0) + (capped ? +r.daily : hourAmt);
     lines.push({ text: 'Car rental', sub: (parts.join(' + ') || '') + (Math.abs(exact - m.rent) >= 0.005 ? ' (rounded to the nearest RM)' : ''), amt: m.rent, k: 'rent' });
     if (m.coverTotal) lines.push({ text: 'Damage cover: ' + ((b.cover && b.cover.name) || 'Damage cover'), sub: m.coverDays + ' day' + (m.coverDays === 1 ? '' : 's') + ' x ' + rm(b.cover.daily), amt: m.coverTotal, k: 'cover' });
     if (m.delivery) lines.push({ text: 'Delivery charge', sub: placeText(b, 'pick'), amt: m.delivery, k: 'delivery' });

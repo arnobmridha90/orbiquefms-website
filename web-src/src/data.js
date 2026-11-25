@@ -1001,8 +1001,8 @@ function bkCalc(o) {
    before: the booking as it is (null for a new one). patch: what is about to be saved ({status, pay, submitted, dep}).
    1. Submitted (the customer signed the form): Pending, Confirmed or Agreement Sent become Agreement Signed, and the payment
       status becomes Deposit due unless it is already Deposit Received, Full Payment Received, Refund Pending or Deposit Refunded.
-   2. A change to Car Returned sets Refund Pending (or Deposit Refunded when the booking has no deposit), unless it is already
-      Deposit Refunded. Only on the change, so people can pick another payment status afterwards. */
+   2. A change to Car Returned sets Refund Pending when a deposit was received (or Deposit Refunded when the booking has no
+      deposit), unless it is already Deposit Refunded. A deposit that was never received leaves the payment status alone. Only on the change, so people can pick another payment status afterwards. */
 var EARLY_STATUSES = ['Pending', 'Confirmed', 'Agreement Sent'];
 function applyStatusRules(before, patch) {
   var b = before || {}, out = Object.assign({}, patch), notes = [];
@@ -1013,8 +1013,12 @@ function applyStatusRules(before, patch) {
   }
   if (status === 'Car Returned' && b.status !== 'Car Returned' && pay !== 'Deposit Refunded') {
     var dep = out.dep != null ? Number(out.dep) : Number(b.dep || 0);
-    out.pay = dep > 0 ? 'Refund Pending' : 'Deposit Refunded';
-    notes.push(dep > 0 ? 'The car is back, so the deposit is now Refund Pending.' : 'The car is back and there is no deposit to give back, so the payment status is Deposit Refunded.');
+    /* only a deposit the company actually has can go back: a recorded deposit payment, or a payment status that says
+       it was received (older bookings whose payment was never recorded) */
+    var gotDep = (b.code && bookingPaid(b).deposit > 0) || ['Deposit Received', 'Full Payment Received', 'Extension paid', 'Extension due', 'Refund Pending'].indexOf(pay) >= 0;
+    if (!(dep > 0)) { out.pay = 'Deposit Refunded'; notes.push('The car is back and there is no deposit to give back, so the payment status is Deposit Refunded.'); }
+    else if (gotDep) { out.pay = 'Refund Pending'; notes.push('The car is back, so the deposit is now Refund Pending.'); }
+    else notes.push('No deposit was received, so there is nothing to give back. The payment status stays ' + (pay || 'None') + '.');
   }
   /* a cancelled booking still holding the customer's deposit: the deposit is now waiting to go back */
   if (status === 'Cancelled' && b.status !== 'Cancelled' && b.code && (pay === 'Deposit Received' || pay === 'Full Payment Received') && bookingPaid(b).deposit > 0) {
@@ -1042,6 +1046,25 @@ function bookingPaid(x, d) {
   d.payments.forEach(function (p) { if (p.booking !== code || p.void) return; all += p.amount; (p.items || [{ kind: p.kind, amount: p.amount }]).forEach(function (it) { if (it.kind === 'Security deposit') dep += it.amount; }); });
   return { all: all, deposit: dep };
 }
+/* money paid towards the booking's own charges (not extension or other payments, which are extra charges) above its
+   total: what the company owes back after the booking got cheaper. payable defaults to the booking's total. */
+var EXTRA_PAY_KINDS = ['Extension payment', 'Other payment'];
+function bookingOverpaid(x, payable, d) {
+  d = d || D(); var code = typeof x === 'string' ? x : x.code, bk = typeof x === 'string' ? findBooking(code) : x, paid = 0;
+  if (!bk || bk.status === 'Cancelled') return 0;
+  d.payments.forEach(function (p) { if (p.booking !== code || p.void) return; (p.items || [{ kind: p.kind, amount: p.amount }]).forEach(function (it) { if (EXTRA_PAY_KINDS.indexOf(it.kind) < 0) paid += it.amount; }); });
+  return Math.max(0, Math.round((paid - (payable != null ? payable : bk.payable || 0)) * 100) / 100);
+}
+/* live bookings whose dates overlap a workshop period of their car: [{b, w}] (one row per booking, the first clash) */
+function workshopClashes(d) {
+  d = d || D(); var out = [];
+  d.bookings.forEach(function (x) {
+    if (!x.car || ['Cancelled', 'Completed', 'Car Returned'].indexOf(x.status) >= 0 || x.end < NOW()) return;
+    var w = (d.downtime || []).filter(function (z) { return z.car === x.car.id && !z.back && z.from < x.end && (!z.to || z.to > x.start); })[0];
+    if (w) out.push({ b: x, w: w });
+  });
+  return out.sort(function (a, b) { return a.b.start - b.b.start; });
+}
 /* does what is recorded reach the booking total (a sen or two short still counts) / the booking's deposit? */
 function coversTotal(x, d) { return !(x.payable > 0) || bookingPaid(x, d).all >= x.payable - .99; }
 function coversDeposit(x, d) { return !(x.dep > 0) || bookingPaid(x, d).deposit >= x.dep; }
@@ -1066,7 +1089,8 @@ function canPickRefunded(x, d) {
    busy(car or id, start, end, exceptCode) -> {free, kind: 'booking'|'workshop'|'fleet'|null, reason, booking, downtime, soon}
    Not free when: the car is Not in use or Sold; a booking that is not Completed or Cancelled overlaps; a workshop period
    (downtime, no end = never ends) overlaps. Periods that only touch do not clash. soon: the car comes back less than
-   company.turnaroundH hours before start ('Back at 2:00 PM, 2 hrs before'). Without dates only the fleet status and a
+   company.turnaroundH hours before start, or goes out again less than that after end ('Back 20 Oct, 9:00 AM, 1 hr before
+   pick-up'), with gapH; the same rule as Availability's "Check" group. Without dates only the fleet status and a
    workshop period covering now are checked. */
 function busy(car, start, end, except, d) {
   d = d || D(); var c = typeof car === 'object' ? car : byId(d.cars, car);
@@ -1082,9 +1106,16 @@ function busy(car, start, end, except, d) {
   }
   if (dts.length) return { free: false, kind: 'workshop', reason: dts[0].to ? 'In workshop until ' + fmtD(dts[0].to) : 'In workshop', booking: null, downtime: dts[0], soon: '' };
   if (start) {
-    var gap = turnaroundH(d) * 36e5;
-    var before = d.bookings.filter(function (x) { return x.car === c && x.code !== except && x.status !== 'Cancelled' && x.end <= s && s - x.end < gap; }).sort(function (a, b) { return b.end - a.end; })[0];
-    if (before) { var hh = Math.round((s - before.end) / 36e5 * 10) / 10; res.soon = 'Back at ' + tm(before.end) + ', ' + (hh < 1 ? Math.round(hh * 60) + ' min' : hh + ' hr' + (hh === 1 ? '' : 's')) + ' before'; res.booking = before; }
+    /* inside the company's gap between rentals (like Availability): the car comes back, or goes out again, less than
+       turnaroundH hours from this period. Still bookable, but staff should check the cleaning time. */
+    var gapH = turnaroundH(d), gap = gapH * 36e5, durT = function (ms) { var hh = Math.round(ms / 36e5 * 10) / 10; return ms <= 0 ? 'at the same time' : hh < 1 ? Math.round(ms / 6e4) + ' min' : hh + ' hr' + (hh === 1 ? '' : 's'); };
+    var live = function (x) { return x.car === c && x.code !== except && x.status !== 'Cancelled' && x.status !== 'Completed'; };
+    var before = d.bookings.filter(function (x) { return live(x) && x.end <= s && s - x.end < gap; }).sort(function (a, b) { return b.end - a.end; })[0];
+    var after = end ? d.bookings.filter(function (x) { return live(x) && x.start >= e && x.start - e < gap; }).sort(function (a, b) { return a.start - b.start; })[0] : null;
+    var parts = [];
+    if (before) { parts.push('back ' + fmtD(before.end) + ', ' + tm(before.end) + ', ' + (before.end - s === 0 ? 'right at pick-up' : durT(s - before.end) + ' before pick-up')); res.booking = before; }
+    if (after) { parts.push('next booking ' + fmtD(after.start) + ', ' + tm(after.start) + ', ' + (after.start - e === 0 ? 'right at return' : durT(after.start - e) + ' after return')); res.next = after; }
+    if (parts.length) { res.soon = parts.join('; '); res.soon = res.soon.charAt(0).toUpperCase() + res.soon.slice(1); res.gapH = gapH; }
   }
   return res;
 }

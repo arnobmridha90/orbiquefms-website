@@ -264,9 +264,28 @@ function pastRentals(custId, exceptId) {
   return S.bookings.filter(function (x) { return x.cust === custId && x.id !== exceptId && (x.bookingStatus === 'Completed' || x.bookingStatus === 'Car Returned') && new Date(x.end).getTime() < n; })
     .sort(function (a, b) { return new Date(b.end) - new Date(a.end); });
 }
+/* one way to count a customer's bookings everywhere: past (finished rentals, as pastRentals), upcoming (not cancelled and not finished, on rent included), cancelled.
+   custIds: one id or a list (a customer page groups the same person's rows). */
+function custStats(custIds, exceptId) {
+  var ids = [].concat(custIds), n = Date.now(), out = { past: 0, upcoming: 0, cancelled: 0, last: null };
+  S.bookings.forEach(function (x) {
+    if (ids.indexOf(x.cust) < 0 || x.id === exceptId) return;
+    if (x.bookingStatus === 'Cancelled') out.cancelled++;
+    else if ((x.bookingStatus === 'Completed' || x.bookingStatus === 'Car Returned') && new Date(x.end).getTime() < n) { out.past++; if (!out.last || new Date(x.end) > new Date(out.last)) out.last = x.end; }
+    else out.upcoming++;
+  });
+  return out;
+}
+/* '12 past rentals, 2 upcoming' (the same words on every screen) */
+function rentalsText(st, withCancelled) {
+  var t = st.past + ' past rental' + (st.past === 1 ? '' : 's');
+  if (st.upcoming) t += ', ' + st.upcoming + ' upcoming';
+  if (withCancelled && st.cancelled) t += ', ' + st.cancelled + ' cancelled';
+  return t;
+}
 function repeatText(custId, exceptId) {
-  var past = pastRentals(custId, exceptId); if (!past.length) return '';
-  return 'Repeat customer: ' + past.length + ' rental' + (past.length > 1 ? 's' : '') + ', last on ' + dFull(past[0].end);
+  var st = custStats(custId, exceptId); if (!st.past) return '';
+  return 'Repeat customer: ' + rentalsText(st) + '. Last rental ended ' + dFull(st.last);
 }
 /* a `by` field is a staff id for staff, or a plain label ('Website', 'Customer', 'Slip reader'). who() shows either. */
 function who(by) { var p = staff(by); return p ? p.name : (by || ''); }
@@ -333,8 +352,10 @@ function payTotal(p) { return (p.items || []).reduce(function (s, it) { return s
    cover: daily x days (under 24 h = 1, part days round up). payable = rent + deposit + cover + delivery + return + others - discount, whole RM. */
 function calcBooking(b) {
   var r = b.rates || {}, secs = Math.max(0, (new Date(b.end) - new Date(b.start)) / 1000), hours = secs / 3600, days = 0, remHours = hours, rent;
-  if (secs < 86400) rent = (+r.hourly || 0) * hours;
-  else { days = Math.floor(secs / 86400); remHours = (secs % 86400) / 3600; rent = (+r.daily || 0) * days + (+r.hourly || 0) * remHours; }
+  /* hours on top of the full days never cost more than one more day */
+  var daily = +r.daily || 0, partDay = function (h) { var x = (+r.hourly || 0) * h; return daily > 0 ? Math.min(x, daily) : x; };
+  if (secs < 86400) rent = partDay(hours);
+  else { days = Math.floor(secs / 86400); remHours = (secs % 86400) / 3600; rent = daily * days + partDay(remHours); }
   rent = Math.round(rent);
   var coverDays = secs < 86400 ? 1 : days + (secs % 86400 > 0 ? 1 : 0);
   var coverTotal = b.cover && +b.cover.daily ? Math.round(+b.cover.daily * coverDays) : 0;
@@ -761,7 +782,8 @@ var _render = render;
 render = function (navd, keep) { var y = window.scrollY; _render(navd); if (keep) window.scrollTo(0, y); };
 
 /* ---------------- sheets (bottom sheets with Back-button support) ---------------- */
-/* sheet(html, after?, opts?) or sheet(html, opts). opts: {stack:true (open over the current sheet), full:true (full height), cls, onClose, noSwipe}.
+/* sheet(html, after?, opts?) or sheet(html, opts). opts: {stack:true (open over the current sheet), full:true (full height), cls, onClose, noSwipe,
+   guard: fn() -> null to close, or confirm() options to ask first (X, scrim, swipe and the phone's Back); the confirm's ok closes it}.
    Opening pushes a history step, so the phone's Back button closes the top sheet first. Put the main button in <div class="sheet-foot"> so it stays at the bottom. */
 var SHEETS = [], _sheetSeq = 0, _ignorePop = 0;
 function sheet(html, after, opts) {
@@ -776,7 +798,7 @@ function sheet(html, after, opts) {
   SHEETS.forEach(function (s) { s.sh.removeAttribute('id'); s.sc.removeAttribute('id'); });
   sh.id = 'sheet'; sc.id = 'scrim';
   document.body.appendChild(sc); document.body.appendChild(sh);
-  var rec = { id: id, sh: sh, sc: sc, onClose: opts.onClose };
+  var rec = { id: id, sh: sh, sc: sc, onClose: opts.onClose, guard: opts.guard };
   SHEETS.push(rec);
   try { if (replacing && history.state && history.state.fmsSheet === oldTopId) history.replaceState({ fmsSheet: id }, '', location.href); else history.pushState({ fmsSheet: id }, '', location.href); } catch (e) {}
   requestAnimationFrame(function () { requestAnimationFrame(function () { sc.classList.add('show'); sh.classList.add('show'); }); });
@@ -800,18 +822,30 @@ function _removeSheetEl(rec, now) {
 }
 function _dropSheets(n, now) { while (n-- > 0 && SHEETS.length) _removeSheetEl(SHEETS.pop(), now); var top = SHEETS[SHEETS.length - 1]; if (top) { top.sh.id = 'sheet'; top.sc.id = 'scrim'; } placeToasts(); }
 /* close the top sheet (now = no animation). Its history step is taken back too. */
-function closeSheet(now) {
+function closeSheet(now, force) {
   if (!SHEETS.length) return;
   var rec = SHEETS[SHEETS.length - 1];
+  if (!force && _guardAsk(rec)) return;
   _dropSheets(1, now);
   setTimeout(function () { if (history.state && history.state.fmsSheet === rec.id) { _ignorePop++; history.back(); } }, 0);
+}
+/* a guarded sheet with unsaved input asks before it closes; true = it asked (the sheet stays until the person says close) */
+function _guardAsk(rec) {
+  var g = rec.guard && rec.guard(); if (!g || rec.asking) return !!g;
+  rec.asking = true;
+  confirm(Object.assign({ icon: 'warn', primary: 'cancel' }, g)).then(function (yes) { rec.asking = false; if (yes) setTimeout(function () { if (SHEETS[SHEETS.length - 1] === rec) closeSheet(false, true); }, 40); });
+  return true;
 }
 function closeAllSheets() { _dropSheets(SHEETS.length, true); }
 window.addEventListener('popstate', function (e) {
   if (_ignorePop > 0) { _ignorePop--; return; }
   var st = e.state && e.state.fmsSheet, idx = -1;
   for (var i = 0; i < SHEETS.length; i++) if (SHEETS[i].id === st) idx = i;
-  if (SHEETS.length) { _dropSheets(SHEETS.length - (idx + 1), false); if (st && idx < 0) history.back(); return; }
+  if (SHEETS.length) {
+    var top = SHEETS[SHEETS.length - 1];
+    if (idx < SHEETS.length - 1 && top.guard && top.guard()) { try { history.pushState({ fmsSheet: top.id }, '', location.href); } catch (x) {} _guardAsk(top); return; }
+    _dropSheets(SHEETS.length - (idx + 1), false); if (st && idx < 0) history.back(); return;
+  }
   if (st) history.back(); /* a step left by a sheet that is already closed: skip it */
 });
 function fitSheets() {

@@ -42,7 +42,7 @@ var Cust = (function () {
       g.members.forEach(function (c) { g.bookings = g.bookings.concat(bm[c.id] || []); g.notes = g.notes.concat(nm[c.id] || []); });
       /* the main row: the one with the most bookings */
       g.c = g.members.slice().sort(function (a, b) { return (bm[b.id] || []).length - (bm[a.id] || []).length; })[0];
-      g.rentals = g.bookings.filter(function (b) { return b.bookingStatus !== 'Cancelled'; }).length;
+      g.stats = custStats(g.members.map(function (m) { return m.id; })); g.rentals = g.stats.past;
       g.flags = flagsOf(g);
     });
     return order;
@@ -60,7 +60,7 @@ var Cust = (function () {
   }
   function groupOf(id) { var c = byId(S.customers, id); if (!c) return null; var k = keyOf(c), g = { key: k, members: S.customers.filter(function (x) { return keyOf(x) === k; }) }; var ids = g.members.map(function (m) { return m.id; });
     g.bookings = S.bookings.filter(function (b) { return ids.indexOf(b.cust) >= 0; }); g.notes = (S.notes || []).filter(function (n) { return ids.indexOf(n.cust) >= 0; });
-    g.rentals = g.bookings.filter(function (b) { return b.bookingStatus !== 'Cancelled'; }).length; g.c = c; g.flags = flagsOf(g); return g; }
+    g.stats = custStats(ids); g.rentals = g.stats.past; g.c = c; g.flags = flagsOf(g); return g; }
   function fchip(f) { return f === 'Repeat' ? chip('Repeat', 'green') : f === 'Has notes' ? chip('Has notes', 'grey') : flagChip(f); }
   function passes(g, k) {
     if (k === 'blacklisted') return g.flags.indexOf('Blacklisted') >= 0;
@@ -129,7 +129,7 @@ var Cust = (function () {
       '<span class="av" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</span>' +
       '<span class="cu-mid"><span class="cu-name">' + esc(c.name) + '</span>' +
       '<span class="cu-sub"><span class="nowrap">' + esc(c.phone || 'No phone') + '</span>' + (idTxt ? ' · <span class="nowrap">' + esc(idTxt) + '</span>' : '') + '</span>' +
-      '<span class="cu-sub2"><span class="cu-n' + (n > 1 ? ' many' : '') + '">' + n + ' booking' + (n === 1 ? '' : 's') + '</span>' + g.flags.filter(function (f) { return f !== 'Repeat' || g.flags.length < 4; }).slice(0, 3).map(fchip).join('') + '</span></span>' +
+      '<span class="cu-sub2"><span class="cu-n' + (n > 1 ? ' many' : '') + '">' + esc(rentalsText(g.stats)) + '</span>' + g.flags.filter(function (f) { return f !== 'Repeat' || g.flags.length < 4; }).slice(0, 3).map(fchip).join('') + '</span></span>' +
       (tel ? '<a class="cu-ic" href="tel:' + esc(tel) + '" aria-label="Call ' + esc(c.name) + '" onclick="event.stopPropagation()">' + I('phone') + '</a>' +
         '<button type="button" class="cu-ic wa" aria-label="WhatsApp ' + esc(c.name) + '" onclick="event.stopPropagation();Share.wa(\'' + esc(c.phone) + '\', \'\')">' + I('wa') + '</button>' : '') + '</div>';
   }
@@ -142,18 +142,17 @@ var Cust = (function () {
     var c = g.c, tel = telOf(c.phone);
     var right = can('customers.edit') ? '<button class="iconbtn" type="button" onclick="Cust.edit(\'' + c.id + '\')" aria-label="Edit details">' + I('edit') + '</button>' : '';
     var html = topbar(c.name, { back: '#customers', sub: (c.nationality || '') + (c.created ? (c.nationality ? ' · ' : '') + 'customer since ' + MO[new Date(c.created).getMonth()] + ' ' + new Date(c.created).getFullYear() : ''), right: right }) + '<main class="cu-page">' +
-      bannerHtml(g) +
+      bannerHtml(g) + creditHtml(g) +
       '<div class="cu-hero card"><span class="av cu-av" style="background:' + avColor(c.name) + '">' + initials(c.name) + '</span><div class="grow"><div class="cu-hname">' + esc(c.name) + '</div><div class="cu-hflags">' + (function () { var fl = g.flags.filter(function (f) { return f !== 'Repeat'; }); /* the banner below already says how many rentals */ return fl.length ? fl.map(fchip).join('') : '<span class="small muted">No flags</span>'; })() + '</div></div></div>' +
       (tel ? '<div class="cu-call"><a class="btn big" href="tel:' + esc(tel) + '">' + I('phone') + 'Call</a><button type="button" class="btn big cu-wa" onclick="Share.wa(\'' + esc(c.phone) + '\', \'\')">' + I('wa') + 'WhatsApp</button></div>' : '') +
       detailsHtml(c) + blacklistHtml(g) + notesHtml(g) + docsHtml(c) + bookingsHtml(g) + '</main>';
     return { html: html };
   }
   function statsLine(g) {
-    var canc = g.bookings.length - g.rentals, paid = g.bookings.reduce(function (s, b) { return s + calcBooking(b).received; }, 0);
-    var t = g.rentals + ' rental' + (g.rentals === 1 ? '' : 's') + (canc ? ', ' + canc + ' cancelled' : '');
+    var paid = g.bookings.reduce(function (s, b) { return s + calcBooking(b).received; }, 0);
+    var t = rentalsText(g.stats, true);
     if (can('bookings.see_amounts')) t += ', ' + rm(paid) + ' paid';
-    var last = g.bookings.filter(function (b) { return b.bookingStatus !== 'Cancelled' && new Date(b.start) <= new Date(); }).sort(function (a, b) { return new Date(b.start) - new Date(a.start); })[0];
-    return t + (last ? '. Last rental ' + dFull(last.start) : '');
+    return t + (g.stats.last ? '. Last rental ended ' + dFull(g.stats.last) : '');
   }
   function bannerHtml(g) {
     var bl = can('customers.blacklist_view') ? g.members.filter(function (c) { return c.blacklist; })[0] : null, seeNotes = can('customer_notes.view');
@@ -166,6 +165,11 @@ var Cust = (function () {
     else { tone = 'blue'; icon = 'user'; title = g.rentals >= 2 ? 'Repeat customer' : g.rentals === 1 ? 'Rented once before' : 'No rentals yet'; ls = []; }
     ls = ls.filter(Boolean);
     return '<div class="banner ' + tone + ' cu-banner">' + I(icon) + '<div class="grow"><b>' + esc(title) + '</b>' + ls.map(function (l) { return '<div class="cu-bl">' + esc(l) + '</div>'; }).join('') + '<div class="cu-stats">' + esc(statsLine(g)) + '</div></div></div>';
+  }
+  function creditHtml(g) {
+    if (typeof custCredit !== 'function' || !can('bookings.see_amounts')) return '';
+    var cr = custCredit(g.members.map(function (m) { return m.id; })); if (!cr.total) return '';
+    return '<div class="banner green cu-credit">' + I('cash') + '<div class="grow"><b>Credit ' + rm(cr.total) + '</b><div class="cu-bl">Kept from ' + cr.rows.map(function (r) { return '<a href="#booking/' + r.b.id + '">' + esc(r.b.code) + '</a> (' + rm(r.amt) + ')'; }).join(', ') + '. To use it, open the next booking, tap Record payment, then From deposit and Another booking.</div></div></div>';
   }
   function kv(k, v, cls) { return '<div' + (cls ? ' class="' + cls + '"' : '') + '><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div></div>'; }
   function detailsHtml(c) {

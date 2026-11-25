@@ -87,7 +87,7 @@ var UI = (function () {
   /* ---------------- statuses and chips ---------------- */
   /* the reference colours for every status family; UI.status(family, value) draws the tonal chip */
   U.STATUS = {
-    booking: { 'Pending': '#94a3b8', 'Confirmed': '#94a3b8', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#ef4444', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' },
+    booking: { 'Pending': '#94a3b8', 'Confirmed': '#0891b2', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#6366f1', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' },
     payment: { '': '#94a3b8', 'None': '#94a3b8', 'Deposit due': '#ef4444', 'Deposit Received': '#eab308', 'Full Payment Received': '#10b981', 'Extension due': '#ef4444', 'Extension paid': '#22c55e', 'Refund Pending': '#3b82f6', 'Deposit Refunded': '#f97316' },
     task: { 'Pending': '#f59e0b', 'In Progress': '#3b82f6', 'Completed': '#22c55e', 'Cancelled': '#9ca3af' },
     wa: { 'Not Sent': '#9ca3af', 'Template Sent': '#3b82f6', 'Reply Received': '#f59e0b', 'Details Sent': '#22c55e', 'Failed': '#ef4444' },
@@ -923,7 +923,7 @@ var UI = (function () {
           if (b.kind === 'fleet') { badge = { text: b.reason, tone: 'grey' }; rank = 3; }
           else if (b.kind === 'workshop') { badge = { text: b.reason, tone: 'warn' }; rank = 2; }
           else if (b.kind === 'booking') { badge = { text: b.reason, tone: 'bad' }; rank = 1; }
-          else if (opts.start) badge = { text: b.soon ? 'Free, ' + b.soon.replace(/^Back/, 'back') : 'Free', tone: b.soon ? 'warn' : 'ok' };
+          else if (opts.start) { badge = { text: b.soon ? 'Check: ' + b.soon.charAt(0).toLowerCase() + b.soon.slice(1) + ' (gap is ' + b.gapH + ' hr' + (b.gapH === 1 ? '' : 's') + ')' : 'Free', tone: b.soon ? 'warn' : 'ok' }; if (b.soon) rank = 0.5; }
         }
         return { value: c.id, label: c.plate, sub: carName(c) + ' · ' + c.color, badge: badge, kw: normPlate(c.plate) + ' ' + c.make + ' ' + c.model + ' ' + c.color + ' ' + c.type + ' #' + c.serial, rank: rank, car: c, busy: b,
           html: '<span class="ui-cbx-t"><b class="ui-plate">' + e(c.plate) + '</b><small>' + e(carName(c)) + ' · ' + e(c.color) + '</small></span>' };

@@ -57,7 +57,7 @@ function carName(c) { return c.make + ' ' + c.model; }
 function carModel(c) { return c.make + ' ' + c.model.split(' ')[0]; }
 
 /* status colours: the template system's own */
-var BOOKING_COLORS = { 'Pending': '#94a3b8', 'Confirmed': '#94a3b8', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#ef4444', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' };
+var BOOKING_COLORS = { 'Pending': '#94a3b8', 'Confirmed': '#0891b2', 'Agreement Sent': '#ef4444', 'Agreement Signed': '#6366f1', 'Car Delivered': '#22c55e', 'Car Returned': '#3b82f6', 'Completed': '#6b7280', 'Cancelled': '#9ca3af' };
 var PAY_COLORS = { 'Deposit due': '#ef4444', 'Deposit Received': '#eab308', 'Full Payment Received': '#10b981', 'Extension due': '#ef4444', 'Extension paid': '#22c55e', 'Refund Pending': '#3b82f6', 'Deposit Refunded': '#f97316' };
 function schip(label, color) { return '<span class="schip" style="color:' + color + ';border-color:' + color + '4d;background:' + color + '26">' + esc(label) + '</span>'; }
 function bchip(b) { return schip(b.status, BOOKING_COLORS[b.status] || '#94a3b8'); }

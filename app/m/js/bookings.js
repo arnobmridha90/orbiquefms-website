@@ -409,6 +409,8 @@ function bkStatusPick(id, axis) {
         var v = ($('input[name=bkst]:checked', sh) || {}).value;
         if (!v || v === cur) { closeSheet(); return; }
         if (isB && v === 'Cancelled') { closeSheet(true); setTimeout(function () { cancelBk(id); }, 30); return; }
+        if (isB && (cur === 'Cancelled' || cur === 'Completed') && v !== 'Cancelled' && v !== 'Completed') { var cl = bkClash(b); if (cl) { closeSheet(true); setTimeout(function () { bkClashSheet(b, cl); }, 30); return; } }
+        if (isB && cur === 'Cancelled' && v !== 'Completed') { delete b.cancelMoney; if (b.paymentStatus === 'Refund Pending' && !(window.Deposit && Deposit.refundOf(b.id))) { b.paymentStatus = calcBooking(b).depositReceived > 0 ? 'Deposit Received' : 'Deposit Due'; delete b.refundPendingAt; } }
         if (isB) { var ch = setBookingStatus(b, v); notify('change', b.code + ': ' + b.bookingStatus, ch.length ? ch.join(', ') : '', '#booking/' + id, { self: true }); }
         else { if (v === 'Deposit Refunded' && lockRef) { say('Record the refund on Deposits'); return; } setPaymentStatus(b, v === 'None' ? null : v, 'changed by hand'); say('Payment status: ' + v); }
         closeSheet(); render(false, true);
@@ -521,13 +523,15 @@ function doEdit(id) { editBk(id); } /* old name */
 function cancelBk(id) {
   var b = bk(id), p = calcBooking(b), paid = p.received + p.extra, dep = b.paymentStatus === 'Deposit Refunded' ? 0 : p.depositReceived;
   var reasons = ['Customer cancelled', 'No-show', 'Car problem', 'Other'];
+  var hints = { refund: 'It goes on Deposits > To refund, so someone gives it back.', credit: 'It stays as credit for ' + firstName(cust(b.cust).name) + ' and can pay a later booking (Record payment > From deposit > Another booking).', fee: 'The money is kept. Nothing goes back to the customer.' };
   sheet(sheetHead('Cancel ' + b.code + '?', 'The car becomes free for these dates again. You can find it later under Cancelled.') +
     '<div class="field"><span>Why?</span><div class="seg" id="cxr">' + reasons.map(function (r, i) { return '<button type="button" class="' + (i === 0 ? 'on' : '') + '">' + r + '</button>'; }).join('') + '</div></div>' +
     '<label class="field"><span>Note (optional)</span><input class="inp" id="cxn" placeholder="For example: flight moved to next week"></label>' +
-    (paid > 0 && can('bookings.see_amounts') ? '<div class="field"><span><b class="money">' + rm(paid) + '</b> paid. What happens to it?</span><div class="seg" id="cxm"><button type="button" class="on" data-m="refund">Refund</button><button type="button" data-m="credit">Keep as credit</button><button type="button" data-m="fee">Keep as cancellation fee</button></div></div>' : '') +
-    (dep > 0 ? '<div class="banner amber">' + I('bank') + '<div><b class="money">' + rm(dep) + '</b> deposit is still held: return it on Deposits.</div></div>' : '') +
+    (paid > 0 && can('bookings.see_amounts') ? '<div class="field"><span><b class="money">' + rm(paid) + '</b> paid. What happens to it?</span><div class="seg" id="cxm"><button type="button" class="on" data-m="refund">Refund</button><button type="button" data-m="credit">Keep as credit</button><button type="button" data-m="fee">Keep as cancellation fee</button></div><small class="hint" id="cxmh">' + esc(hints.refund) + '</small></div>' : '') +
+    (dep > 0 ? '<div class="banner amber" id="cxdep">' + I('bank') + '<div><b class="money">' + rm(dep) + '</b> deposit is still held: return it on Deposits.</div></div>' : '') +
     '<div class="sheet-foot stack"><button class="btn danger solid" id="cxgo">Cancel booking</button><button class="btn link" onclick="closeSheet()">Keep it</button></div>', function (sh) {
-      segPick('#cxr'); if ($('#cxm', sh)) segPick('#cxm');
+      segPick('#cxr');
+      if ($('#cxm', sh)) segPick('#cxm', function () { var m = ($('#cxm .on', sh) || {}).dataset || {}; $('#cxmh', sh).textContent = hints[m.m] || ''; var d = $('#cxdep', sh); if (d) d.style.display = m.m === 'refund' ? '' : 'none'; });
       $('#cxgo', sh).onclick = function () {
         var r = $('#cxr .on').textContent, n = $('#cxn').value.trim(), m = ($('#cxm .on') || {}).dataset;
         if (r === 'Other' && !n) { say('Write a short note for Other'); $('#cxn').focus(); return; }
@@ -535,15 +539,60 @@ function cancelBk(id) {
       };
     });
 }
+/* money paid on a cancelled booking: refund (goes to Deposits > To refund as Refund Pending), credit (stays on the booking for the customer's next payment
+   through 'From deposit > Another booking'), fee (kept: closed with nothing to return). Returns an undo function. */
+function bkCancelMoney(b, money) {
+  var before = { ps: b.paymentStatus, rp: b.refundPendingAt, dedN: (S.deductions || []).length, refN: (S.refunds || []).length };
+  var undo = function () { b.paymentStatus = before.ps; b.refundPendingAt = before.rp; if (S.deductions) S.deductions.length = before.dedN; if (S.refunds) S.refunds.length = before.refN; };
+  if (typeof Deposit === 'undefined' || b.paymentStatus === 'Deposit Refunded') return undo;
+  var x = Deposit.info(b); if (x.refund || x.net <= 0.004) return undo;
+  if (money === 'credit') { b.cancelMoney = 'credit'; return undo; }
+  b.refundPendingAt = new Date().toISOString(); setPaymentStatus(b, 'Refund Pending', 'money paid on a cancelled booking');
+  if (money === 'fee') {
+    S.deductions = S.deductions || [];
+    S.deductions.push({ id: uid(), booking: b.id, kind: 'Other', amt: x.net, note: 'Kept as cancellation fee', photo: null, by: S.me, at: new Date().toISOString(), paymentId: null });
+    Deposit.closeKept(b, 'Kept as cancellation fee');
+  }
+  return undo;
+}
 function doCancel(id, reason, money, paid) {
   var b = bk(id), prev = b.bookingStatus, prevReason = b.cancelReason;
   b.cancelReason = reason || 'Customer cancelled';
   var mt = money === 'refund' ? ', money paid to be refunded' : money === 'credit' ? ', ' + rm(paid) + ' kept as credit' : money === 'fee' ? ', ' + rm(paid) + ' kept as cancellation fee' : '';
   setBookingStatus(b, 'Cancelled', { text: 'Booking cancelled (' + b.cancelReason + mt + ')' });
   if (money) b.cancelMoney = money;
+  var undoMoney = bkCancelMoney(b, money);
   save(); render(false, true);
-  undoSnack(b.code + ' cancelled', function () { if (SHEETS.length) closeAllSheets(); b.cancelReason = prevReason; delete b.cancelMoney; setBookingStatus(b, prev, { text: 'Cancel undone' }); render(false, true); say('Booking is back'); }, 6000);
-  if (money === 'refund') later(function () { if (bk(id) && bk(id).bookingStatus === 'Cancelled') Deposit.open(id); }, 400);
+  undoSnack(b.code + ' cancelled', function () {
+    if (SHEETS.length) closeAllSheets();
+    var clash = bkClash(b); if (clash) { bkClashSheet(b, clash); return; }
+    undoMoney(); b.cancelReason = prevReason; delete b.cancelMoney; setBookingStatus(b, prev, { text: 'Cancel undone' }); render(false, true); say('Booking is back');
+  }, 6000);
+  if (money === 'refund') later(function () { if (bk(id) && bk(id).bookingStatus === 'Cancelled' && b.paymentStatus === 'Refund Pending') Deposit.open(id); }, 400);
+}
+/* a cancelled or completed booking that goes back to an active status needs its car free again */
+function bkClash(b) {
+  var r = busy(b.car, new Date(b.start), new Date(b.end), b.id);
+  return r.free ? null : r;
+}
+function bkClashSheet(b, r) {
+  var c = car(b.car) || {}, other = r.booking;
+  sheet(sheetHead('The car is not free', b.code + ' · ' + (c.plate || '')) +
+    '<div class="banner red">' + I('warn') + '<div><b>' + esc(c.plate || 'This car') + ' is ' + (other ? 'booked by ' + esc(other.code) : esc(r.reason.toLowerCase())) + '</b> for ' + esc(dShort(b.start)) + ' to ' + esc(dShort(b.end)) + '. Nothing was changed.</div></div>' +
+    '<div class="sheet-foot stack">' + (other ? '<button type="button" class="btn" id="bkcOpen">Open ' + esc(other.code) + '</button>' : '') +
+    '<button type="button" class="btn ' + (other ? 'ghost' : '') + '" id="bkcCar">Change the car</button><button type="button" class="btn link" onclick="closeSheet()">Close</button></div>', function (sh) {
+      var o = $('#bkcOpen', sh); if (o) o.onclick = function () { closeAllSheets(); setTimeout(function () { location.hash = '#booking/' + other.id; }, 60); };
+      $('#bkcCar', sh).onclick = function () { closeSheet(true); setTimeout(function () { bkMoveCar(b.id); }, 60); };
+    });
+}
+/* pick another free car for a cancelled booking, then it can be brought back */
+function bkMoveCar(id) {
+  var b = bk(id); if (!b) return;
+  Pickers.car({ title: 'Choose a free car', start: new Date(b.start), end: new Date(b.end), exceptId: b.id, selected: b.car, onPick: function (c) {
+    var r = busy(c.id, new Date(b.start), new Date(b.end), b.id); if (!r.free) { say(c.plate + ': ' + r.reason); return; }
+    var old = b.car; b.car = c.id; b.rates = Object.assign({}, b.rates, { daily: c.rate, hourly: c.hourly }); if (c.deposit != null) b.rates.deposit = c.deposit;
+    bLog(b, 'Car changed from ' + ((car(old) || {}).plate || '') + ' to ' + c.plate, { car: [(car(old) || {}).plate || '', c.plate] }); save(); render(false, true); say('Car changed to ' + c.plate + '. Set the status again.');
+  } });
 }
 function deleteBk(id) {
   var b = bk(id), ins = b.inspection || {};
