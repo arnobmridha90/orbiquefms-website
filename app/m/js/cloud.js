@@ -11,6 +11,8 @@
    - Other phones' changes arrive through Realtime and show on the next quiet moment (never under an open sheet). */
 var FMS_CLOUD = (function () {
   var cfg = window.FMS_CONFIG || {};
+  /* read before the client starts: it takes the sign-in tokens out of the address once it has read them */
+  var RECOVERY = /type=recovery/.test(location.hash);
   var sb = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'fms.auth' } });
   var COLLS = ['staff', 'quotes', 'cars', 'customers', 'bookings', 'notes', 'downtime', 'jobs', 'vendors', 'papers', 'odometer', 'summons', 'tasks', 'autoRules',
     'deductions', 'refunds', 'bankIns', 'expenses', 'instalments', 'tracker', 'alarms', 'wa', 'staffChat', 'invoices', 'receipts', 'audit', 'schedules', 'answers'];
@@ -50,7 +52,7 @@ var FMS_CLOUD = (function () {
     document.getElementById('clForgot').onclick = function () {
       var addr = em.value.trim();
       if (!/^\S+@\S+\.\S+$/.test(addr)) { signInScreen(start, 'Type your email first, then tap this again.', true); return; }
-      sb.auth.resetPasswordForEmail(addr, { redirectTo: location.origin + location.pathname + '#setpw' }).then(function (r) {
+      sb.auth.resetPasswordForEmail(addr, { redirectTo: location.origin + location.pathname }).then(function (r) {
         signInScreen(start, r.error ? r.error.message : 'We sent a link to ' + addr + '. Open it on this phone to set your password.', !!r.error);
       });
     };
@@ -73,7 +75,7 @@ var FMS_CLOUD = (function () {
   function boot(start) {
     loadingScreen('Opening…');
     sb.auth.onAuthStateChange(function (ev) { if (ev === 'PASSWORD_RECOVERY') setPasswordScreen(start); });
-    if (/type=recovery|#setpw/.test(location.hash)) { setTimeout(function () { sb.auth.getSession().then(function (s) { if (s.data.session) setPasswordScreen(start); else signInScreen(start); }); }, 300); return; }
+    if (RECOVERY) { sb.auth.getSession().then(function (s) { if (s.data.session) setPasswordScreen(start); else signInScreen(start, 'That link has expired or was already used. Tap "Forgot password" for a new one.', true); }); return; }
     sb.auth.getSession().then(function (s) { if (s.data.session) afterSignIn(start); else signInScreen(start); });
   }
   function afterSignIn(start) {
