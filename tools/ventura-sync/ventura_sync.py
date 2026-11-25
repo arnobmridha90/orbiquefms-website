@@ -40,6 +40,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'ventura-import'))
+sys.path.insert(0, os.path.join(HERE, 'vendor', 'PyMySQL-1.1.1-py3-none-any.whl'))   # pure Python, so no pip needed on the server
 import ventura_export  # noqa: E402
 
 BATCH = 300
@@ -71,7 +72,9 @@ class FMS:
         self.key = key
 
     def call(self, method, path, body=None, headers=None, raw=None, ctype='application/json'):
-        h = {'apikey': self.key, 'Authorization': 'Bearer ' + self.key}
+        h = {'apikey': self.key}
+        if self.key.startswith('eyJ'):           # legacy service_role key (a JWT); new sb_secret_ keys go in apikey only
+            h['Authorization'] = 'Bearer ' + self.key
         data = None
         if raw is not None:
             data, h['Content-Type'] = raw, ctype
