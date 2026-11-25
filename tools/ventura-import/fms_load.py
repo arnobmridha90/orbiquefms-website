@@ -28,6 +28,8 @@ def main():
     ap.add_argument('--name')
     ap.add_argument('--out', required=True)
     ap.add_argument('--max', type=int, default=900_000)
+    ap.add_argument('--mirror', help='name of the system the company keeps working in (e.g. "Ventura’s own app"): the company '
+                    'is view-only in FMS (status paused) and ventura_sync.py keeps it up to date')
     a = ap.parse_args()
     d = json.load(open(a.json))
     os.makedirs(a.out, exist_ok=True)
@@ -36,10 +38,13 @@ def main():
             os.remove(os.path.join(a.out, f))
     org = "(select id from public.orgs where slug = %s)" % q(a.slug)
     ident = dict(d['identity'], name=a.name or d['identity']['name'])
+    if a.mirror:
+        ident['mirror'] = {'from': a.mirror, 'every': '5 minutes'}
+    status = 'paused' if a.mirror else 'active'
     head = [
-        "insert into public.orgs (slug, name, identity, next_no) values (%s, %s, %s, %d) "
-        "on conflict (slug) do update set identity = excluded.identity, next_no = greatest(public.orgs.next_no, excluded.next_no);"
-        % (q(a.slug), q(ident['name']), jq(ident), d['nextNo']),
+        "insert into public.orgs (slug, name, identity, next_no, status) values (%s, %s, %s, %d, %s) "
+        "on conflict (slug) do update set identity = excluded.identity, status = excluded.status, next_no = greatest(public.orgs.next_no, excluded.next_no);"
+        % (q(a.slug), q(ident['name']), jq(ident), d['nextNo'], q(status)),
         "insert into public.blobs (org_id, key, data) values (%s, 'settings', %s) on conflict (org_id, key) do update set data = excluded.data;"
         % (org, jq({'v': d['settings']})),
         "insert into public.blobs (org_id, key, data) values (%s, 'assistant', %s) on conflict (org_id, key) do update set data = excluded.data;"

@@ -119,6 +119,7 @@ var FMS_CLOUD = (function () {
       if (!byId(d.staff, w.staffId)) d.staff.push({ id: w.staffId, name: user.email, username: user.email, role: w.role, hasLogin: true, loginActive: true, active: false });
       var meRow = byId(d.staff, w.staffId); meRow.loginActive = true; meRow.hasLogin = true; meRow.role = w.role; if (w.role !== 'owner' && w.codes) meRow.codes = meRow.codes || null;
       d.dueSeen = d.dueSeen || {};
+      MIRROR = idt.mirror || null;
       READY = d;
       load = cloudLoad; save = cloudSave; signOut = cloudSignOut; imgSrc = cloudImg; switchCo = function () {};
       document.title = (d.settings.appName || (idt.short || w.name) + ' Staff');
@@ -126,6 +127,7 @@ var FMS_CLOUD = (function () {
       if (!logoMark()) signQueued();
       subscribe(w.id);
       setTimeout(prefetchFiles, 1500);
+      if (MIRROR) setTimeout(function () { say(mirrorText()); }, 800);
       setInterval(function () { if (dirtyRemote && !SHEETS.length) { dirtyRemote = false; render(false, true); } }, 1500);
     }).catch(function (err) { signInScreen(start, 'Could not load your company: ' + (err.message || err), true); });
   }
@@ -149,7 +151,33 @@ var FMS_CLOUD = (function () {
   function cloudLoad() { var d = READY; S = d; usePrefs(d); return d; }
 
   /* ---------- writing changes back ---------- */
+  /* A company copied from another system (identity.mirror, e.g. Ventura's own app) is view-only here: the copy is refreshed
+     from that system every few minutes, so a change made here would be overwritten. The database refuses such writes too
+     (the company's status is 'paused'); this only explains it and puts the screen back as it was. */
+  var MIRROR = null, mirrorWarned = 0;
+  function mirrorText() {
+    return 'View only: this data is copied from ' + (MIRROR.from || 'the company\u2019s own app') + ' every ' + (MIRROR.every || 'few minutes') + '. Make changes there.';
+  }
+  function undoLocal() {
+    COLLS.forEach(function (c) { S[c] = Object.keys(snap[c]).map(function (id) { return JSON.parse(snap[c][id]); }); });
+    if (blobSnap.settings) S.settings = JSON.parse(blobSnap.settings);
+    sortLists(S);
+  }
   function cloudSave() {
+    if (MIRROR) {
+      try { var keep0 = {}; LOCAL_ONLY.forEach(function (k) { keep0[k] = S[k]; }); localStorage.setItem('fms.local.' + CO, JSON.stringify(keep0)); } catch (x) {}
+      clearTimeout(timer); timer = setTimeout(function () {
+        var changed = COLLS.some(function (c) {
+          var ids = {}; (S[c] || []).forEach(function (r) { ids[r.id] = 1; });
+          return (S[c] || []).some(function (r) { return snap[c][r.id] !== JSON.stringify(r); }) || Object.keys(snap[c]).some(function (id) { return !ids[id]; });
+        }) || (blobSnap.settings && JSON.stringify(S.settings) !== blobSnap.settings);
+        if (!changed) return;
+        undoLocal();
+        if (Date.now() - mirrorWarned > 4000) { mirrorWarned = Date.now(); say(mirrorText() + ' Your change was not kept.'); }
+        if (typeof render === 'function') render(false, true);
+      }, 200);
+      return;
+    }
     try { var keep = {}; LOCAL_ONLY.forEach(function (k) { keep[k] = S[k]; }); localStorage.setItem('fms.local.' + CO, JSON.stringify(keep)); } catch (x) {}
     clearTimeout(timer); timer = setTimeout(flush, 350);
   }

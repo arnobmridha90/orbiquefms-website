@@ -317,7 +317,7 @@ def export(conn, company_code):
         if not cu:
             ic = txt(b['ic_or_passport_no'])
             is_ic = bool(ic and re.fullmatch(r'\d{6}-?\d{2}-?\d{4}', ic))
-            cu = {'id': 'cu%d' % (len(customers) + 1), 'name': txt(b['full_name']) or 'No name', 'phone': fmt_phone(b['phone_number']),
+            cu = {'id': 'cb%d' % b['id'], 'name': txt(b['full_name']) or 'No name', 'phone': fmt_phone(b['phone_number']),
                   'email': txt(b['email']) or '', 'ic': ic if is_ic else '', 'passport': '' if is_ic else (ic or ''),
                   'nationality': txt(b['nationality']) or ('Malaysian' if is_ic else ''), 'licenceNo': txt(b['driver_license_no']) or '',
                   'licenceExp': iso(b['driver_license_expiry']), 'address': txt(b['residential_address']) or '',
@@ -461,7 +461,7 @@ def export(conn, company_code):
         ik, pk = id_key(bl['ic_or_passport']), norm_phone(bl['phone'])
         cu = (ik and cust_by_key.get('ic:' + ik)) or (pk and cust_by_key.get('ph:' + pk))
         if not cu:
-            cu = {'id': 'cu%d' % (len(customers) + 1), 'name': bl['name'] or 'No name', 'phone': fmt_phone(bl['phone']), 'email': '',
+            cu = {'id': 'cbl%d' % bl['id'], 'name': bl['name'] or 'No name', 'phone': fmt_phone(bl['phone']), 'email': '',
                   'ic': txt(bl['ic_or_passport']) or '', 'passport': '', 'nationality': '', 'licenceNo': '', 'licenceExp': None, 'address': '',
                   'emergency': None, 'docs': {}, 'created': iso(bl['created_at']), 'keys': {'ic': ik, 'phone': pk}}
             customers.append(cu)
@@ -474,7 +474,7 @@ def export(conn, company_code):
         cu = (n['ic_key'] and cust_by_key.get('ic:' + n['ic_key'])) or (n['phone_key'] and cust_by_key.get('ph:' + n['phone_key']))
         if not cu:
             x.warn('Customer note %d (%s) matches no customer; kept on a customer of its own.' % (n['id'], n['customer_name']))
-            cu = {'id': 'cu%d' % (len(customers) + 1), 'name': n['customer_name'] or 'No name', 'phone': fmt_phone(n['phone_key']), 'email': '',
+            cu = {'id': 'cn%d' % n['id'], 'name': n['customer_name'] or 'No name', 'phone': fmt_phone(n['phone_key']), 'email': '',
                   'ic': n['ic_key'] or '', 'passport': '', 'docs': {}, 'blacklist': None, 'created': iso(n['created_at']), 'keys': {'ic': n['ic_key'], 'phone': n['phone_key']}}
             customers.append(cu)
         C['notes'].append({'id': 'n%d' % n['id'], 'cust': cu['id'], 'flag': flag.get(n['flag'], 'info'), 'text': n['text'], 'pinned': bool(n['pinned']),
