@@ -16,6 +16,8 @@
 .tk-meta svg { width: 14px; height: 14px; }
 .tk-acts { display: flex; gap: 8px; padding: 0 12px 12px; }
 .tk-acts .btn { flex: 1; }
+.tk-wait { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-radius: 12px; background: #F1F2F5; color: var(--muted); font-size: 14px; font-weight: 600; }
+.tk-wait svg { width: 16px; height: 16px; }
 .tk-big { height: 50px; font-size: 16px; }
 .tk-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 20px; text-align: center; }
 .tk-empty svg { width: 40px; height: 40px; color: var(--faint); }

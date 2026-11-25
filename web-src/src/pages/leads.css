@@ -70,3 +70,16 @@
 .pg-leads .ld-more summary .tabler-chevron-right{transition:transform .15s}
 .pg-leads .ld-more[open] summary .tabler-chevron-right{transform:rotate(90deg)}
 .pg-leads .ld-morein{display:flex;flex-direction:column;gap:14px;padding:8px 0 4px}
+
+/* phones: the assistant card is one row (switch, number state, chevron); the rest opens on the chevron */
+.pg-leads .ld-setto{display:none}
+@media (max-width:640px){
+  .pg-leads .ld-setto{display:inline-flex;margin-left:auto;min-width:40px;min-height:40px;justify-content:center}
+  .pg-leads .ld-setto .ti,.pg-leads .ld-setto i{transition:transform .2s}
+  .pg-leads .ld-set.open .ld-setto i{transform:rotate(180deg)}
+  .pg-leads .ld-set:not(.open) .ld-setmore{display:none}
+  .pg-leads .ld-set .card-b > .row{flex-wrap:nowrap;align-items:center}
+  .pg-leads .ld-set .card-b > .row .ld-numchip{min-width:0;overflow:hidden}
+  .pg-leads .ld-set:not(.open) .ld-numchip.ok{display:none}
+  .pg-leads .ld-set .card-b > .row .chip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+}

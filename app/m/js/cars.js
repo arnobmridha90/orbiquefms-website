@@ -210,7 +210,7 @@ var CarPage = (function () {
     var where = '';
     if (can('tracking.view')) {
       var tk = (S.tracker || []).filter(function (t) { return t.car === c.id; })[0];
-      where = '<div class="sec"><h2>Where is it now</h2><a href="' + hashWith('tracking', { q: c.plate }) + '">All cars</a></div>' + (tk ? '<div class="list"><div class="card2"><div class="c2-main"><div class="c2-t1">' + chip(tk.state, { Moving: 'green', Parked: 'blue', Offline: 'grey' }[tk.state]) + ' ' + (tk.state === 'Moving' ? esc(Math.round(tk.speed) + ' km/h') : '') + '</div><div class="c2-t2">Updated <span data-ago="' + esc(tk.at) + '">' + esc(ago(tk.at)) + '</span></div></div>' +
+      where = '<div class="sec"><h2>Where is it now</h2><a href="' + hashWith('tracking', { q: c.plate }) + '">Show on map</a></div>' + (tk ? '<div class="list"><div class="card2"><div class="c2-main"><div class="c2-t1">' + chip(tk.state, { Moving: 'green', Parked: 'blue', Offline: 'grey' }[tk.state]) + ' ' + (tk.state === 'Moving' ? esc(Math.round(tk.speed) + ' km/h') : '') + '</div><div class="c2-t2">Updated <span data-ago="' + esc(tk.at) + '">' + esc(ago(tk.at)) + '</span></div></div>' +
         '<a class="btn ghost sm cr-maps" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + tk.lat.toFixed(5) + ',' + tk.lng.toFixed(5) + '">' + I('map') + 'Open in Maps</a></div></div>' : '<div class="card cr-none">This car has no tracker.</div>');
     }
     var sm = (S.summons || []).filter(function (s) { return s.car === c.id; }), smOpen = sm.filter(function (s) { return ['Paid', 'Waived'].indexOf(s.status) < 0; }).length;
@@ -324,7 +324,7 @@ var CarPage = (function () {
             if (Object.keys(ch).length) audit('Car ' + c.plate + ' details changed', { car: c.id, link: '#car/' + c.id, changes: ch });
             save(); closeSheet(); render(false, true); say(Object.keys(ch).length ? 'Car details saved' : 'Nothing changed');
           };
-          var fut = S.bookings.filter(function (b) { return b.car === c.id && blocksCar(b) && new Date(b.end) > new Date(); });
+          var fut = S.bookings.filter(function (b) { return b.car === c.id && blocksCar(b) && new Date(bkHoldEnd(b)) > new Date(); });
           if (status !== 'active' && c.status === 'active' && fut.length) confirm({ icon: 'warn', title: fut.length + ' booking' + (fut.length > 1 ? 's' : '') + ' still use this car', text: 'Move ' + (fut.length > 1 ? 'them' : 'it') + ' to another car: ' + fut.slice(0, 3).map(function (b) { return b.code; }).join(', ') + (fut.length > 3 ? ' and more' : '') + '.', ok: 'Save anyway', cancel: 'Go back', primary: 'cancel' }).then(function (ok) { if (ok) go(); });
           else go();
         };

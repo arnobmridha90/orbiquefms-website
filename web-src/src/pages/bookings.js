@@ -483,8 +483,9 @@ function bkExportPop(anchor, f) {
 }
 
 /* ---------------- the booking drawer ----------------
-   Sections, in the order staff fill them: (Check the customer first), Customer, Car and dates, Prices and cover,
-   Pick-up and return, Payment and status, Admin, Documents. Existing bookings also get a side column. */
+   New booking: Customer (Find a customer first), Read IC or licence, Car and dates, Prices and cover, Pick-up and return,
+   Payment method and status, Admin, Customer files. An existing booking starts with Car and dates, Prices and Pick-up
+   (the usual edits), then Customer; it also gets a side column, and on phones a row of jump chips. */
 var BK_DR = null;
 var BK_LENS = [['1', '1 day'], ['2', '2 days'], ['3', '3 days'], ['7', '1 week'], ['h12', '+12 hours']];
 function bkOpenBooking(code, prefill) {
@@ -537,56 +538,58 @@ function bkOpenBooking(code, prefill) {
   var pkgOpts = [['', 'No damage cover']].concat(d.damagePackages.map(function (pk) { return [pk.id, bkPkgLabel(pk)]; })).concat([['manual', 'Set by hand']]);
 
   function checkerHtml() {
-    return '<div class="bkx-chk"><div class="bkx-chk-b">' + [['ic', 'IC', 'id', 'c'], ['icBack', 'IC back', 'id', 'tonal'], ['passport', 'Passport', 'book-2', 'tonal'], ['dl', 'DL', 'license', 'tonal'], ['poa', 'POA', 'home', 'tonal'], ['other', 'Other files', 'paperclip', 'tonal']].map(function (b2) {
-      return '<label class="btn ' + b2[3] + ' sm" title="' + ({ dl: 'Driving licence', poa: 'Proof of address' }[b2[0]] || b2[1]) + '">' + i(b2[2]) + b2[1] + '<input type="file" accept="' + (/^(ic|passport|dl)$/.test(b2[0]) ? 'image/*' : 'image/*,.pdf') + '" hidden data-bkx-chk="' + b2[0] + '"></label>';
-    }).join('') + '</div><p class="b2">The IC, passport and licence are read on our own server. Everything uploaded here is saved with the booking.</p><div id="bkx-chk-out"></div></div>';
+    return '<div class="bkx-chk"><div class="bkx-chk-b">' + [['ic', 'IC front', 'id', 'c'], ['icBack', 'IC back', 'id', 'tonal'], ['passport', 'Passport', 'book-2', 'tonal'], ['dl', 'Driving licence', 'license', 'tonal'], ['poa', 'Proof of address', 'home', 'tonal'], ['other', 'Other files', 'paperclip', 'tonal']].map(function (b2) {
+      return '<label class="btn ' + b2[3] + ' sm">' + i(b2[2]) + b2[1] + '<input type="file" accept="' + (/^(ic|passport|dl)$/.test(b2[0]) ? 'image/*' : 'image/*,.pdf') + '" hidden data-bkx-chk="' + b2[0] + '"></label>';
+    }).join('') + '</div><p class="b2">Reading a card fills in the customer and checks our blacklist. Everything uploaded is saved with the booking.</p><div id="bkx-chk-out"></div></div>';
   }
   function formHtml() {
     var h = '<div class="bkx-form">';
-    if (isNew && can('customers.check_ic')) h += sect('Check the customer first', 'shield-search', checkerHtml(), { id: 'bkx-s-chk' });
+    var hChk = isNew && can('customers.check_ic') ? sect('Read IC or licence', 'shield-search', checkerHtml(), { id: 'bkx-s-chk', coll: true, shut: bkIsPhone() }) : '';
     /* 1. customer */
-    h += sect('Customer', 'user', (isNew && !ro ? '<div class="bkx-cpick" id="bkx-cpick"></div>' : '') + '<div class="bkx-g">' +
+    var hCust = sect('Customer', 'user', (isNew && !ro ? '<div class="bkx-cpick" id="bkx-cpick"></div>' : '') + '<div class="bkx-g">' +
       UI.input({ key: 'name', label: 'Full Name', value: cust.name, required: true, style: 'grid-column:span 2', attrs: { autocomplete: 'off' } }) + UI.input({ key: 'phone', label: 'Phone', type: 'tel', value: cust.phone, required: true, placeholder: '+60 12 345 6789' }) + UI.input({ key: 'email', label: 'Email', type: 'email', value: cust.email }) +
       UI.input({ key: 'ic', label: 'IC / Passport no.', value: cuSeeIc() || isNew ? cust.ic : UI.fmt.ic(cust.ic), readonly: !cuSeeIc() && !isNew, help: !cuSeeIc() && !isNew ? 'Middle hidden for you' : '' }) + UI.input({ key: 'nat', label: 'Nationality', value: cust.nat, placeholder: 'Type to search', attrs: { list: 'bkx-nats' } }) +
       UI.input({ key: 'licenceNo', label: 'Licence no.', value: cust.licenceNo }) + UI.dateField({ key: 'licenceExp', label: 'Licence expiry', value: cust.licenceExp, chips: false }) +
       UI.input({ key: 'address', label: 'Residential Address', value: cust.address, style: 'grid-column:1 / -1' }) +
       '<datalist id="bkx-nats">' + LISTS.nationalities.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>' +
       '<div class="bkx-subh">' + i('phone-call') + 'Emergency contact</div><div class="bkx-g3">' + UI.input({ key: 'emName', label: 'Name', value: cust.emName }) + UI.input({ key: 'emPhone', label: 'Phone', type: 'tel', value: cust.emPhone }) + UI.input({ key: 'emRel', label: 'Relationship', value: cust.emRel, attrs: { list: 'bkx-rels' }, placeholder: 'Relative, Sibling, Colleague' }) + '<datalist id="bkx-rels">' + LISTS.relationships.map(function (n) { return '<option value="' + n + '">'; }).join('') + '</datalist></div>', { id: 'bkx-s-cust' });
-    if (p && can('customer_notes.view')) h += '<section class="bkx-sec" id="bkx-notes"></section>';
-    if (x && can('customers.check_ic')) h += sect('Check IC', 'id-badge-2', '<div id="bkx-ic"></div>', { coll: true, shut: true });
+    if (p && can('customer_notes.view')) hCust += '<section class="bkx-sec" id="bkx-notes"></section>';
+    if (x && can('customers.check_ic')) hCust += sect('Check IC', 'id-badge-2', '<div id="bkx-ic"></div>', { coll: true, shut: true });
     /* 2. car and dates */
-    h += sect('Car and dates', 'car', '<div class="bkx-g"><div class="full" id="bkx-carpick"></div>' +
+    var hCar = sect('Car and dates', 'car', '<div class="bkx-g"><div class="full" id="bkx-carpick"></div>' +
       UI.dateTimeField({ key: 'start', label: 'Rental start', value: v.start, required: true, style: 'grid-column:span 2', disabled: ro }) +
       UI.dateTimeField({ key: 'end', label: 'Rental end', value: v.end, required: true, style: 'grid-column:span 2', chips: false, disabled: ro }) +
       (ro ? '' : '<div class="full bkx-lens" role="group" aria-label="Rental length"><span class="b2">Length</span>' + BK_LENS.map(function (l) { return '<button type="button" class="ui-fchip" data-bkx-len="' + l[0] + '">' + l[1] + '</button>'; }).join('') + '<span class="bkx-durtx" id="bkx-durtx"></span></div>') +
       '<div class="full" id="bkx-alerts"></div></div>', { id: 'bkx-s-car' });
     /* 3. prices and cover */
-    if (seeAmt) h += sect('Prices and cover', 'calculator', '<div class="bkx-g">' + (!amt && !ro ? '<div class="full">' + UI.alert('You can add bookings, but setting the prices needs the "Edit amounts" access. The prices come from the car.', 'pri') + '</div>' : '') +
+    var hPrice = seeAmt ? sect('Prices and cover', 'calculator', '<div class="bkx-g">' + (!amt && !ro ? '<div class="full">' + UI.alert('You can add bookings, but setting the prices needs the "Edit amounts" access. The prices come from the car.', 'pri') + '</div>' : '') +
       money('rate', 'Daily rate', true) + money('hourly', 'Hourly rate', true) + money('dep', 'Deposit', true) + money('disc', 'Discount') +
       UI.select({ key: 'pkg', label: 'Damage cover', options: pkgOpts, value: v.pkg, disabled: !amt, style: 'grid-column:span 2' }) + money('others', 'Others') +
       '<div class="bkx-man full" ' + (v.pkg === 'manual' ? '' : 'hidden') + '><div class="bkx-g3">' + UI.input({ key: 'covName', label: 'Coverage name', value: v.covName, readonly: !amt }) + UI.input({ key: 'covDaily', label: 'Coverage per day', type: 'number', value: v.covDaily, readonly: !amt, prefix: 'RM' }) + UI.input({ key: 'covMax', label: 'Max coverage', type: 'number', value: v.covMax, readonly: !amt, prefix: 'RM' }) + '</div></div>' +
-      '<div class="full bkx-calc" id="bkx-calc"></div></div>', { id: 'bkx-s-price' });
-    else h += '<p class="b2 bkx-hidamt">Amounts are hidden for you.</p>';
+      '<div class="full bkx-calc" id="bkx-calc"></div></div>', { id: 'bkx-s-price' })
+      : '<p class="b2 bkx-hidamt">Amounts are hidden for you.</p>';
     /* 4. pick-up and return */
-    h += sect('Pick-up and return', 'map-pin', '<div class="bkx-g">' + UI.select({ key: 'startOpt', label: 'Start of rental', options: bkHandoverOpts('start', v.startOpt), value: v.startOpt, style: 'grid-column:span 2' }) + UI.select({ key: 'endOpt', label: 'End of rental', options: bkHandoverOpts('end', v.endOpt), value: v.endOpt, style: 'grid-column:span 2' }) +
+    var hHand = sect('Pick-up and return', 'map-pin', '<div class="bkx-g">' + UI.select({ key: 'startOpt', label: 'Start of rental', options: bkHandoverOpts('start', v.startOpt), value: v.startOpt, style: 'grid-column:span 2' }) + UI.select({ key: 'endOpt', label: 'End of rental', options: bkHandoverOpts('end', v.endOpt), value: v.endOpt, style: 'grid-column:span 2' }) +
       (seeAmt ? money('deliv', 'Delivery charge') + money('ret', 'Return charge') + '<p class="b2 bkx-feehint" style="grid-column:span 2">Picking a place fills its delivery or return charge from Settings.</p>' : '') +
       UI.input({ key: 'delNote', label: 'Delivery / pick-up note', value: v.delNote, style: 'grid-column:span 2', placeholder: 'For example: hotel lobby, call on arrival' }) + UI.input({ key: 'retNote', label: 'Return / drop-off note', value: v.retNote, style: 'grid-column:span 2' }) + '</div>' +
       (x ? '<div id="bkx-fees"></div>' : ''), { id: 'bkx-s-hand' });
-    if (x) { var sm = d.summons.filter(function (z) { return z.booking === x.code; }); if (sm.length && can('summons.view')) h += sect('Summons on this booking (' + sm.length + ')', 'gavel', '<div class="bkx-sum">' + sm.map(function (z) { return '<button type="button" class="bkx-sumr" data-bkx-sum="' + z.id + '"><span class="grow"><b>' + esc(z.authority) + ' ' + esc(z.notice) + '</b><small>' + esc(z.offence) + ' · ' + UI.fmt.dateTime(z.at) + '</small></span>' + UI.money(z.fine) + UI.status('summons', z.status, null, { sm: true }) + '</button>'; }).join('') + '</div>'); }
+    if (x) { var sm = d.summons.filter(function (z) { return z.booking === x.code; }); if (sm.length && can('summons.view')) hHand += sect('Summons on this booking (' + sm.length + ')', 'gavel', '<div class="bkx-sum">' + sm.map(function (z) { return '<button type="button" class="bkx-sumr" data-bkx-sum="' + z.id + '"><span class="grow"><b>' + esc(z.authority) + ' ' + esc(z.notice) + '</b><small>' + esc(z.offence) + ' · ' + UI.fmt.dateTime(z.at) + '</small></span>' + UI.money(z.fine) + UI.status('summons', z.status, null, { sm: true }) + '</button>'; }).join('') + '</div>'); }
     /* 5. payment and status */
     var locked = !canPickRefunded({ end: v.end, pay: x ? x.pay : '' });
-    h += sect('Payment and status', 'credit-card', '<div class="bkx-g3">' + UI.select({ key: 'method', label: 'Payment Method', required: true, options: LISTS.bookingMethods || LISTS.methods, value: v.method }) +
+    var hPay = sect('Payment method and status', 'credit-card', '<div class="bkx-g3">' + UI.select({ key: 'method', label: 'Payment Method', required: true, options: LISTS.bookingMethods || LISTS.methods, value: v.method }) +
       bkLockRefunded(UI.select({ key: 'pay', label: 'Payment Status', options: bkPayOptions(locked), value: v.pay, disabled: !chSt }), locked) + UI.select({ key: 'status', label: 'Booking Status', options: LISTS.bookingStatus, value: v.status, disabled: !chSt }) + '</div><p class="b2 bkx-rule" id="bkx-rule"></p>' + (chSt ? '' : '<p class="b2">Changing a status needs the "Change status" access.</p>'), { id: 'bkx-s-pay' });
     /* 6. admin */
-    h += sect('Admin', 'signature', '<div class="bkx-g3"><div class="bkx-sigsel">' + UI.select({ key: 'signature', label: 'Authority Signature', options: [['', 'No signature']].concat(d.signatures.map(function (s) { return [s.id, s.name]; })), value: v.signature, disabled: !can('signatures.use_on_booking') }) + '<span class="bkx-sigimg"></span></div>' +
+    hPay += sect('Admin', 'signature', '<div class="bkx-g3"><div class="bkx-sigsel">' + UI.select({ key: 'signature', label: 'Authority Signature', options: [['', 'No signature']].concat(d.signatures.map(function (s) { return [s.id, s.name]; })), value: v.signature, disabled: !can('signatures.use_on_booking') }) + '<span class="bkx-sigimg"></span></div>' +
       UI.switch({ key: 'filledByAdmin', label: 'Filled by Admin', help: 'Staff typed the customer details', checked: v.filledByAdmin }) + UI.switch({ key: 'submitted', label: 'Is Submitted', help: 'The customer signed the booking form', checked: v.submitted }) + '</div>', { id: 'bkx-s-admin' });
     if (x) {
       var pk = x.pkg ? byId(d.damagePackages, x.pkg) : null, ro2 = function (k, l, val) { return UI.input({ key: 'ri-' + k, label: l, value: val, readonly: true }); };
-      h += sect('Record info', 'history', '<div class="bkx-g">' + ro2('c', 'Created At', UI.fmt.dateTime(x.created)) + ro2('u', 'Updated At', UI.fmt.dateTime(x.updated || x.created)) + ro2('s', 'Submitted At', x.submittedAt ? UI.fmt.dateTime(x.submittedAt) : '-') + ro2('ip', 'IP Address', x.ip || '-') +
+      hPay += sect('Record info', 'history', '<div class="bkx-g">' + ro2('c', 'Created At', UI.fmt.dateTime(x.created)) + ro2('u', 'Updated At', UI.fmt.dateTime(x.updated || x.created)) + ro2('s', 'Submitted At', x.submittedAt ? UI.fmt.dateTime(x.submittedAt) : '-') + ro2('ip', 'IP Address', x.ip || '-') +
         ro2('pk', 'Damage Package', pk ? pk.name : x.cov ? x.cov.name : '-') + ro2('pd', 'Damage Daily Rate', pk ? UI.fmt.money(pk.daily) : x.cov ? UI.fmt.money(x.cov.daily) : '-') + ro2('pm', 'Max Coverage', pk ? UI.fmt.money(pk.max) : x.cov ? UI.fmt.money(x.cov.max) : '-') + ro2('pt', 'Total Coverage', UI.fmt.money(x.dmg || 0)) + '</div>', { coll: true, shut: true });
     }
     /* 7. documents */
-    if (can('bookings.view_documents')) h += sect('Documents', 'files', '<div id="bkx-docs"></div>', { coll: true, shut: isNew, id: 'bkx-s-docs' });
+    var hFiles = !can('bookings.view_documents') ? '' : sect('Customer files', 'files', '<div id="bkx-docs"></div>', { coll: true, shut: isNew, id: 'bkx-s-docs' });
+    /* a new booking starts with the customer; an existing one with the car, the dates and the money (the usual edits) */
+    h += isNew ? hCust + hChk + hCar + hPrice + hHand + hPay + hFiles : hCar + hPrice + hHand + hCust + hPay + hFiles;
     return h + '</div>';
   }
   /* handover fees recorded on this booking (from expenses): who recorded which fee */
@@ -631,7 +634,9 @@ function bkOpenBooking(code, prefill) {
     actions: x ? UI.iconBtn('copy', 'Copy the booking form link', { attrs: { 'data-bs': 'copy' } }) + (can('bookings.view_documents') ? UI.iconBtn('file-type-pdf', 'Agreement PDF', { attrs: { 'data-bs': 'pdf' } }) : '') + (can('bookings.delete') ? UI.iconBtn('trash', 'Delete this booking', { attrs: { 'data-bs': 'del' } }) : '') : '',
     body: function (el, ctl) {
       dr = ctl;
-      el.innerHTML = '<div class="bkx-dl' + (x ? ' two hb' : '') + '"><div class="bkx-banner">' + (p && typeof cuBanner === 'function' ? cuBanner(p) : '') + '</div>' + (x ? '<aside class="bkx-side" id="bkx-side">' + sideHtml() + '</aside>' : '') + '<div class="bkx-main">' + formHtml() + '</div></div>';
+      /* phones and tablets: one row of jump chips that stays on top, so the car, the money and the files are one tap away */
+      var jump = x ? '<nav class="bkx-jump" data-srow aria-label="Go to a part of the booking">' + [['bkx-s-car', 'Car and dates', 'car'], [seeAmt ? 'bkx-s-price' : '', 'Money', 'calculator'], ['bkx-s-cust', 'Customer', 'user'], ['bkx-side', 'Status and papers', 'list-details'], [can('bookings.view_documents') ? 'bkx-s-docs' : '', 'Files', 'files']].filter(function (j) { return j[0]; }).map(function (j) { return '<button type="button" class="ui-fchip" data-bkx-jump="' + j[0] + '">' + i(j[2]) + j[1] + '</button>'; }).join('') + '</nav>' : '';
+      el.innerHTML = jump + '<div class="bkx-dl' + (x ? ' two hb' : '') + '"><div class="bkx-banner">' + (p && typeof cuBanner === 'function' ? cuBanner(p) : '') + '</div>' + (x ? '<aside class="bkx-side" id="bkx-side">' + sideHtml() + '</aside>' : '') + '<div class="bkx-main">' + formHtml() + '</div></div>';
       var n = el.querySelector('#bkx-notes'); if (n && typeof cuNotesMount === 'function') cuNotesMount(n, p, { booking: x ? x.code : null, onChange: function () { drawBanner(); } });
       var ic = el.querySelector('#bkx-ic'); if (ic && typeof cuIcMount === 'function') cuIcMount(ic, p, { bookingName: function () { var f = el.querySelector('[data-key="name"]'); return f ? f.value : p.name; } });
       mountDocs(isNew && pre ? pre.docs : null);
@@ -832,6 +837,13 @@ function bkOpenBooking(code, prefill) {
 
   /* ---- events ---- */
   dr.el.addEventListener('input', function (ev) { var t = ev.target; if (t.closest('.bkx-form') && !t.closest('#bkx-notes,#bkx-ic')) { dirty = true; var k = t.getAttribute('data-key'); if (k) clearErr(k); if (k !== 'start' && k !== 'end') recalc(); } });
+  dr.el.addEventListener('click', function (ev) {
+    var j = ev.target.closest('[data-bkx-jump]'); if (!j) return;
+    var sec = dr.body.querySelector('#' + j.getAttribute('data-bkx-jump')); if (!sec) return;
+    sec.classList.remove('shut');
+    var nav = dr.body.querySelector('.bkx-jump'), top = sec.getBoundingClientRect().top - dr.body.getBoundingClientRect().top + dr.body.scrollTop - (nav ? nav.offsetHeight + 8 : 0);
+    dr.body.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  });
   dr.el.addEventListener('paste', function (ev) {
     var t = ev.target; if (!t.matches || !t.matches('[data-key="phone"],[data-key="emPhone"]')) return;
     var txt = (ev.clipboardData || window.clipboardData).getData('text'); if (!txt) return;
@@ -981,7 +993,7 @@ function bkSendForm(x) {
 }
 /* the money box: total, received, still due, with a bar */
 function bkMoneyBox(m) {
-  return '<div class="bkx-mon t-' + m.tone + '"><div><span>Total</span><b>' + UI.money(m.total) + '</b></div><div><span>Received</span><b>' + UI.money(m.rec) + '</b></div><div><span>' + (m.due > 0 ? 'Still due' : m.due < 0 ? 'Extra' : 'Paid') + '</span><b>' + (m.due === 0 ? 'Paid in full' : UI.money(Math.abs(m.due))) + '</b></div><i style="--w:' + m.pct + '%"></i></div>';
+  return '<div class="bkx-mon t-' + m.tone + '"><div><span>Total</span><b>' + UI.money(m.total) + '</b></div><div><span>Received</span><b>' + UI.money(m.rec) + '</b></div><div><span>' + (m.due > 0 ? 'Still due' : m.over > 0 ? 'To give back' : m.due < 0 ? 'Extra charges paid' : 'Paid') + '</span><b>' + (m.due === 0 ? 'Paid in full' : UI.money(m.due > 0 ? m.due : m.over > 0 ? m.over : -m.due)) + '</b></div><i style="--w:' + m.pct + '%"></i></div>';
 }
 /* ---------------- the read-only summary a phone card opens ---------------- */
 function bkSummary(x) {

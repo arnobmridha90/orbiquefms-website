@@ -68,3 +68,5 @@
 .m4-inst { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
 .m4-inst .c2-end { padding-top: 2px; }
 .m4-led .c2-t1 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+.m4-search { margin-top: 4px; }
+.m4-more { width: 100%; margin-top: 10px; }

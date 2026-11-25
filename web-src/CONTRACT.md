@@ -80,11 +80,13 @@ UI.drawer({ title: 'Log a service', body: function (el) {
   `onChange(value, item, ctrl)`, `disabled`, `full`. Item: `{value, label, sub, badge: {text, tone} | html, icon, html, kw, group, disabled, hint}`.
   Returns `{el, value(), item(), set(v, silent), open(q), close(), refresh(), setItems(items), setError(msg)}`.
 - `UI.carPicker(el, {key: 'car', label, start, end, exceptId, value, onChange(id, car), cars, hideInactive, badges, required})`:
-  rows are the plate in bold, then model and colour, then a badge: `Free` (or `Free, back at 9:00 AM, 1 hr before`),
+  rows are the plate in bold, then model and colour, then a badge: `Free` (or, inside the company gap between rentals,
+  `Check: back 20 Oct, 9:00 AM, 1 hr before pick-up (gap is 3 hrs)`, the same verdict as Availability's "Check" group),
   `Booked KLT-00468 until 23 Oct`, `In workshop until 23 Oct`, `Not in use`, `Sold`. With dates free cars come first.
   Plate search ignores spaces and dashes (`vkp4418`). Extra: `ctrl.setDates(start, end, exceptId)`, `ctrl.car()`, `ctrl.busy()`.
   Without dates only fleet status and a workshop period covering now show.
-- `UI.bookingPicker(el, {key: 'booking', label, value, filter(b), onChange(code, booking), showCancelled, bookings})`:
+- `UI.bookingPicker(el, {key: 'booking', label, value, filter(b), rank(b) -> [order, group label], onChange(code, booking), showCancelled, bookings})`:
+  `rank` sorts and groups the list (lower first), e.g. the expense form puts the picked car's booking on the expense day first.
   finds by code in any form (`3`, `00003`, `KLT 3`), name words, phone digits in any format, or plate. Every match shows
   (no cap), newest first. A "Show cancelled bookings" switch; if only cancelled ones match it says so with a "Show them" button.
   Extra: `ctrl.booking()`.
@@ -124,7 +126,8 @@ UI.drawer({ title: 'Log a service', body: function (el) {
 - Toasts: on a phone they sit above the footer buttons of the open drawer or dialog. A dialog's own messages close with
   it (a message shown as it closes, like "Saved", stays), and a page change drops the old page's messages
   (`UI.clearToasts(ms)`). Hovering only keeps a toast up with a real mouse.
-- Unsaved changes: `UI.isDirty()` is true when an open layer's `dirty()` says so. Every page change (`go`, the company
+- Unsaved changes: `UI.isDirty()` is true when an open layer's `dirty()` says so, or `UI.pageDirty()` (a form right on a
+  page, like Settings, sets it and checks it is still on screen). Every page change (`go`, the company
   switch, the address, signing out) goes through `UI.leave(run)`, which asks "Leave without saving?" first. So give
   drawers and dialogs with a form a `dirty` function, and the shell protects them.
 
@@ -197,7 +200,17 @@ status chips keep their fixed colours.
 - `handovers()` rows carry `place` (the place's current name) and label place deliveries `Delivery to <place name>`.
 - `roundRM(v)` rounds halves up (RM 262.50 -> RM 263), so `bkCalc` does too.
 - Bara's sold car has no rentals in the last 5 weeks or later.
-- `cashHeldBy(userId)` = cash payments given to them - their bank-ins - cash deposit refunds they handed back.
+- `cashHeldBy(userId)` = the person's balance of company cash, one figure everywhere (Bank in cash, Cash held by staff,
+  Deposit refunds, Staff income and expenses): cash from customers + payments from the company - expenses they paid in
+  cash or with their own money (`expense.own`) - their handover fees - cash deposit refunds - bank-ins. Negative = the
+  company owes them. `cashEntries(userId, from, to)`, `cashParts(list)`, `cashBalance(parts)` give the parts and the ledger.
+- `expense.own`: for a Card, Bank transfer, E-wallet or Other expense, true when it was the person's own money (the form
+  asks "Whose card?"). A company card or transfer does not change anyone's cash.
+- `bookingOverpaid(x, payable?)`: money paid towards the booking's own charges (not Extension or Other payments) above its
+  total. Lists show it as "RM 550.00 to give back"; the bookings list has a "To give back" quick chip and the dashboard a
+  "Paid more than the total" group.
+- `workshopClashes()`: `[{b, w}]` live bookings that overlap a workshop period of their car (dashboard "Booking clashes
+  with the workshop", red outline on both calendar bars).
 
 ### 3.4 Expense categories and handover fees
 
@@ -220,13 +233,13 @@ status chips keep their fixed colours.
 | Helper | What it does |
 |---|---|
 | `bkCalc({start, end, rate, hourly, dep, covDaily, deliv, ret, others, disc})` | `{hrs, days, fullDays, remHours, rent, cover, dur, payable}`. Under 24 h: exact hours x hourly. Else whole days x rate + exact remaining hours x hourly (no rounding up). Rent and payable rounded to whole RM as the backend does (half to even: 262.5 -> 262, 263.5 -> 264). Example: 2 days 1.5 h at RM 120/day and RM 15/h = 240 + 22.5 = RM 262 (the old code said RM 270). Cover: under 24 h = 1 day, else whole days + 1 for a part day. `bookings.js` still has its own `bkCalc`, which overrides this one until W1 removes it. |
-| `applyStatusRules(before, patch)` | copy of `patch` with the automatic changes and `notes []`: submitted + Pending/Confirmed/Agreement Sent -> Agreement Signed and Deposit due (unless Deposit Received, Full Payment Received, Refund Pending or Deposit Refunded); a change to Car Returned -> Refund Pending, or Deposit Refunded when the deposit is 0 (unless already Deposit Refunded). |
+| `applyStatusRules(before, patch)` | copy of `patch` with the automatic changes and `notes []`: submitted + Pending/Confirmed/Agreement Sent -> Agreement Signed and Deposit due (unless Deposit Received, Full Payment Received, Refund Pending or Deposit Refunded); a change to Car Returned -> Refund Pending when a deposit was received (a recorded deposit payment, or a status saying so), Deposit Refunded when the deposit is 0, else the payment status stays (unless already Deposit Refunded). The bookings page also asks before Car Returned on a booking that never went out, and stops Completed before the pick-up (asks when money is due). |
 | `nextPaymentStatus(current, kind, coversTotal, coversDeposit)` | status a payment kind moves to, or null; never down. |
 | `payStatusAfter(booking, payment)` | runs it for every item of a payment (after the payment is in `D().payments`). |
 | `bookingPaid(b)`, `coversTotal(b)`, `coversDeposit(b)` | money recorded (non-void), and whether it reaches the total (99 sen grace) / the deposit. |
 | `depositDueAfterVoid(booking)` | after a void: `'Deposit due'` if the booking is Deposit Received and its deposit is no longer covered, else null. Save it yourself and say so in the confirm. |
 | `canPickRefunded(booking)` | false for bookings ending on or after `company.refundLockDate` unless already Deposit Refunded. Show the option disabled as "Deposit Refunded (set by recording the refund on the deposits page)". |
-| `busy(car, start, end, exceptCode)` | `{free, kind: 'booking' \| 'workshop' \| 'fleet' \| null, reason, booking, downtime, soon}`; blocks on Not in use / Sold, overlapping bookings that are not Completed/Cancelled, and workshop downtime (no end = never ends). Touching periods do not clash. |
+| `busy(car, start, end, exceptCode)` | `{free, kind: 'booking' \| 'workshop' \| 'fleet' \| null, reason, booking, downtime, soon, gapH}` (`soon`: back, or going out again, within the company gap: `Back 20 Oct, 9:00 AM, 1 hr before pick-up`); blocks on Not in use / Sold, overlapping bookings that are not Completed/Cancelled, and workshop downtime (no end = never ends). Touching periods do not clash. |
 | `matchBookingCode(q, code)` | `'3'`, `'00003'`, `'KLT 3'`, `'klt-00003'` all match `KLT-00003` exactly. |
 | `tidySearch(q)` | trims; a pasted phone becomes digits. |
 | `normPhone(p)`, `phoneHas(phone, q)` | digits with 0 / 60 / +60 the same. |

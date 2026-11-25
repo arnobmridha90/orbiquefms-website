@@ -107,9 +107,10 @@ function tkCard(t, big) {
   var team = (t.staff || []).map(staff).filter(Boolean);
   var acts = '';
   if (big && taskCanWork(t) && (t.status === 'Pending' || t.status === 'In Progress')) {
-    var ho = tkHandoverBtn(t);
-    acts = '<div class="tk-acts">' + (t.status === 'Pending' ? '<button type="button" class="btn ghost tk-big" data-st="In Progress" data-id="' + t.id + '">' + I('clock') + 'Start</button>' : '') +
-      (ho || '<button type="button" class="btn tk-big" data-st="Completed" data-id="' + t.id + '">' + I('check', 2.4) + 'Done</button>') + '</div>';
+    var ho = tkHandoverBtn(t), hoJob = t.booking && bk(t.booking) && /^(Delivery|Return)/.test(t.type || '');
+    /* a delivery or return job on a booking is closed only by the handover checklist: until the car can be handed over or taken back there is nothing to tap */
+    var main = ho || (hoJob ? '<span class="tk-wait">' + I('clock') + (/^Return/.test(t.type) ? (UPCOMING.indexOf(bk(t.booking).bookingStatus) >= 0 ? 'Car not out yet' : 'Nothing to take back') : 'Not ready to hand over') + '</span>' : '<button type="button" class="btn tk-big" data-st="Completed" data-id="' + t.id + '">' + I('check', 2.4) + 'Done</button>');
+    acts = '<div class="tk-acts">' + (t.status === 'Pending' ? '<button type="button" class="btn ghost tk-big" data-st="In Progress" data-id="' + t.id + '">' + I('clock') + 'Start</button>' : '') + main + '</div>';
   }
   return '<div class="tk-card' + (late ? ' late' : '') + (t.status === 'Completed' || t.status === 'Cancelled' ? ' closed' : '') + '"><a class="tk-main" href="#task/' + t.id + '">' +
     '<div class="tk-l1"><b>' + esc(t.name || 'Task') + '</b>' + chip(t.status, TASK_TONE[t.status]) + '</div>' +
@@ -164,7 +165,7 @@ VIEWS.tasks = function () {
   }
   var html = topbar('Tasks', { back: '#more', sub: mode === 'mine' ? 'My jobs' : 'All tasks' }) + '<main class="tk">' +
     (manager ? '<div class="seg2"><a href="javascript:void 0" role="button" data-mode="mine" class="' + (mode === 'mine' ? 'on' : '') + '">My jobs</a><a href="javascript:void 0" role="button" data-mode="all" class="' + (mode === 'all' ? 'on' : '') + '">All</a></div>' : '') +
-    body + '</main>' + (can('tasks.create') ? '<a class="fab" href="#task/new" aria-label="New task">' + I('plus', 2.4) + '</a>' : '');
+    body + '</main>' + (can('tasks.create') ? '<a class="fab fab-x" href="#task/new" aria-label="New task">' + I('task', 2.2) + '<span>Task</span></a>' : '');
   return { html: html, after: tkListWire };
 };
 function tkListWire() {
@@ -195,15 +196,16 @@ function tkInit(r) {
     tkEd = { key: key, isNew: true, t: t, orig: null, dirty: false };
   } else {
     var o = byId(S.tasks || [], r.a);
-    tkEd = o ? { key: key, isNew: false, t: JSON.parse(JSON.stringify(o)), orig: o, dirty: false } : { key: key, missing: true };
+    tkEd = o ? { key: key, isNew: false, t: JSON.parse(JSON.stringify(o)), orig: o, origBooking: o.booking || null, dirty: false } : { key: key, missing: true };
   }
   return tkEd;
 }
+/* { here: agents set up for the booking's own locations (get 'works at this place'), others: the other field agents (listed next, no hint) } */
 function tkPreferIds(t) {
-  var b = t.booking ? bk(t.booking) : null, ids = [];
-  if (b) [['pick', b.pickKind, b.pickLoc], ['ret', b.retKind, b.retLoc]].forEach(function (x) { if (x[1] === 'our') { var l = loc(x[2]); (l && l.agents || []).forEach(function (s) { if (ids.indexOf(s) < 0) ids.push(s); }); } });
-  S.staff.forEach(function (p) { if (p.isAgent && ids.indexOf(p.id) < 0) ids.push(p.id); });
-  return ids;
+  var b = t.booking ? bk(t.booking) : null, here = [], others = [];
+  if (b) [['pick', b.pickKind, b.pickLoc], ['ret', b.retKind, b.retLoc]].forEach(function (x) { if (x[1] === 'our') { var l = loc(x[2]); (l && l.agents || []).forEach(function (s) { if (here.indexOf(s) < 0) here.push(s); }); } });
+  S.staff.forEach(function (p) { if (p.isAgent && here.indexOf(p.id) < 0) others.push(p.id); });
+  return { here: here, others: others };
 }
 function tkWaHtml(t) {
   var ids = t.staff || [];
@@ -292,7 +294,8 @@ function tkEdWire() {
   var bx = $('#tkBkX'); if (bx) bx.onclick = function () { tkCollect(); t.booking = null; tkEd.dirty = true; render(false, true); };
   var sf = $('#tkStaff'); if (sf) sf.onclick = function () {
     tkCollect();
-    Pickers.staff({ multi: true, title: 'Who does it?', selected: t.staff || [], preferIds: tkPreferIds(t), onPick: function (list) { t.staff = list.map(function (p) { return p.id; }); tkEd.dirty = true; render(false, true); } });
+    var pref = tkPreferIds(t);
+    Pickers.staff({ multi: true, title: 'Who does it?', selected: t.staff || [], preferIds: pref.here, upIds: pref.others, onPick: function (list) { t.staff = list.map(function (p) { return p.id; }); tkEd.dirty = true; render(false, true); } });
   };
   segPick('#tkSt', function (s) { t.status = s; tkEd.dirty = true; });
   var ph = $('#tkPh'); if (ph) ph.onclick = function () { tkCollect(); Media.photo({ maxPx: 900, quality: .6 }).then(function (r) { if (!tkEd || tkEd.t !== t) return; t.photos.push({ src: r.dataUrl, caption: '' }); if (r.note) say(r.note); tkEd.dirty = true; render(false, true); var c = $$('[data-cap]'); if (c.length) c[c.length - 1].focus(); }, function () {}); };
@@ -332,7 +335,13 @@ function tkSave() {
   if (added.length) taskSendWa(o, added);
   (o.wa && Object.keys(o.wa) || []).forEach(function (sid) { if ((o.staff || []).indexOf(sid) < 0) delete o.wa[sid]; });
   var b = o.booking ? bk(o.booking) : null;
-  if (b) { b.assigned = b.assigned || []; (o.staff || []).forEach(function (s) { if (b.assigned.indexOf(s) < 0) b.assigned.push(s); }); bLog(b, (isNew ? 'Task made: ' : 'Task changed: ') + o.name + ' (' + o.staff.map(who).join(', ') + ')', tkEd.ch && Object.keys(tkEd.ch).length ? tkEd.ch : null); }
+  /* someone taken off this job comes off the booking too, unless another open task on it still lists them */
+  var removed = before.filter(function (s) { return (o.staff || []).indexOf(s) < 0; });
+  var oldB = tkEd.orig && tkEd.origBooking && tkEd.origBooking !== o.booking ? bk(tkEd.origBooking) : null;
+  var drop = function (bb, ids) { if (!bb || !bb.assigned) return; ids.forEach(function (s) { var still = (S.tasks || []).some(function (x) { return x.booking === bb.id && x.status !== 'Cancelled' && x.status !== 'Completed' && (x.staff || []).indexOf(s) >= 0; }); if (!still) bb.assigned = bb.assigned.filter(function (a) { return a !== s; }); }); };
+  if (b) drop(b, o.status === 'Cancelled' ? before.concat(o.staff || []) : removed);
+  if (oldB) drop(oldB, before);
+  if (b) { b.assigned = b.assigned || []; if (o.status !== 'Cancelled') (o.staff || []).forEach(function (s) { if (b.assigned.indexOf(s) < 0) b.assigned.push(s); }); bLog(b, (isNew ? 'Task made: ' : 'Task changed: ') + o.name + ' (' + o.staff.map(who).join(', ') + ')', tkEd.ch && Object.keys(tkEd.ch).length ? tkEd.ch : null); }
   else audit((isNew ? 'Task made: ' : 'Task changed: ') + o.name, { link: '#task/' + o.id });
   save();
   var msg = isNew ? 'Task saved' + (added.length ? '. WhatsApp sent to ' + added.map(function (s) { return firstName(who(s)); }).join(', ') : '') : 'Changes saved' + (added.length ? '. WhatsApp sent to ' + added.map(function (s) { return firstName(who(s)); }).join(', ') : '');

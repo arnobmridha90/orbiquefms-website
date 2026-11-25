@@ -27,3 +27,7 @@
 .tr-amap { color: var(--brand-ink); flex: none; width: 44px; height: 44px; }
 /* the page itself keeps main's padding (and room above the bottom nav); .tr-main is only the row link */
 main.tr-page { padding-left: 16px; padding-right: 16px; }
+
+.tr-alarm.handled { opacity: .7; }
+.tr-alarm.handled .tr-aic { color: var(--t-green); background: var(--t-green-bg); }
+.tr-handle { margin-top: 6px; min-height: 40px; }

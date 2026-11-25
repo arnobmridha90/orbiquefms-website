@@ -406,7 +406,7 @@ function rptExpBook(rows, periodLabel, filterLine) {
 var RPT_GROUPS = [['income', 'Income'], ['profit', 'Profit'], ['cash', 'Cash'], ['fleet', 'Fleet']];
 var RPT_LIST = [
   { id: 'bookings', g: 'income', name: 'Bookings and income', icon: 'file-spreadsheet', per: 'this', desc: 'One row per booking, income per car and per day. Ready to print or to send to your accountant.' },
-  { id: 'money', g: 'income', name: 'Money in', icon: 'cash', per: 'last', desc: 'Every payment received in the period, one row each, with the booking ID and the car plate. Use it next to the bank statement and the payment slips.' },
+  { id: 'money', g: 'income', name: 'Money in', icon: 'cash', per: 'this', desc: 'Every payment received in the period, one row each, with the booking ID and the car plate. Use it next to the bank statement and the payment slips.' },
   { id: 'handover', g: 'income', name: 'Delivery and return income', icon: 'truck-delivery', per: 'this', desc: 'Each booking with a delivery or return charge, the Grab and Bolt fares staff recorded under it, and what is left.' },
   { id: 'invoices', g: 'income', name: 'Invoices and receipts', icon: 'file-invoice', per: 'this', desc: 'Every invoice and receipt issued in the period, void ones marked. The register for the accountant.' },
   { id: 'carprofit', g: 'profit', name: 'Car-wise income and expense', icon: 'car', per: 'this', desc: 'Each car\'s income, its expenses by kind and its profit, also month by month. Delivery and return charges are not counted as income, and Grab and Bolt fares are not a car expense.' },

@@ -1,15 +1,17 @@
 /* availability screens (M1). Shared classes live in base.css. */
-.av-form { padding: 12px 14px 4px; }
-.av-lbl { font-size: 13px; font-weight: 620; color: #454C59; margin: 0 0 5px; }
-.av-form .two { margin-bottom: 12px; grid-template-columns: 1.3fr 1fr; }
-.av-lens { display: flex; gap: 6px; margin-bottom: 8px; }
-.av-lens .fchip { flex: 1 1 0; min-width: 0; padding: 0 4px; justify-content: center; white-space: nowrap; }
-.av-lens .fchip:last-child { flex-grow: 1.6; }
-.av-h12 { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-bottom: 8px; font-weight: 600; font-size: 14.5px; }
-.av-form .err-text { margin: -6px 0 10px; }
-.av-sum { margin: 12px 2px 10px; font-size: 14px; color: var(--muted); line-height: 1.45; }
-.av-sum b { color: var(--text); font-weight: 650; }
-.av-sum:empty { display: none; }
+.av-form { padding: 10px 12px; }
+.av-row { display: grid; grid-template-columns: auto minmax(0, 1.35fr) minmax(0, 1fr); gap: 6px; align-items: center; }
+.av-lbl { font-size: 13px; font-weight: 650; color: #454C59; min-width: 34px; }
+.av-row .inp { min-width: 0; height: 42px; padding: 0 8px; }
+.av-lens { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin: 8px 0 4px; }
+.av-lens .fchip { min-width: 0; height: 40px; padding: 0 2px; justify-content: center; white-space: nowrap; }
+.av-lens .av-h12 { font-weight: 700; }
+.av-toline { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 4px 2px; background: none; border: 0; text-align: left; font: inherit; font-size: 14px; color: var(--muted); line-height: 1.35; cursor: pointer; }
+.av-toline b { color: var(--text); font-weight: 650; }
+.av-toline .grow { flex: 1; min-width: 0; }
+.av-toline svg { width: 16px; height: 16px; flex: none; color: var(--muted); }
+.av-torow { margin-top: 2px; }
+.av-form .err-text { margin: 6px 0 2px; }
 .av-search { margin-bottom: 4px; }
 .av-sec { margin-top: 14px; }
 .av-sec h2 { color: inherit; }

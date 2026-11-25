@@ -35,7 +35,10 @@ VIEWS.company = function () {
 function switchCo(k) {
   resetViewState(); closeAllSheets();
   CO = k; try { localStorage.setItem('fms.co', k); } catch (e) {}
-  S = load(); save(); applyTheme();
+  S = load();
+  /* never carry a session into another company: only someone who signed in there on this phone stays signed in (the demo's ready-made owner does not) */
+  if (S.me && S.signedIn !== S.me) { S.me = null; S.tempSession = null; usePrefs(); }
+  save(); applyTheme();
   $('#manifestLink').href = 'manifest-' + k + '.webmanifest'; $('#appleIcon').href = 'icons/' + k + '-180.png'; $('#favIcon').href = 'icons/' + k + '-192.png';
   document.title = B().appName; $('#appleTitle').content = B().appName;
   var signedIn = S.me && staff(S.me) && me().loginActive;

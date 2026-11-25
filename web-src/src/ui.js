@@ -460,7 +460,10 @@ var UI = (function () {
   U.closeAll = function (o) { closingAll = true; keepHist = !!(o && o.keepHistory); try { stack.slice().reverse().forEach(function (s) { s.close(true); }); } finally { closingAll = false; keepHist = false; } U.closePops(); };
   var closingAll = false, keepHist = false;
   /* true when an open drawer or dialog has changes that are not saved (its dirty() says so) */
-  U.isDirty = function () { return stack.some(function (s) { return s.isDirty && s.isDirty(); }); };
+  U.isDirty = function () { return stack.some(function (s) { return s.isDirty && s.isDirty(); }) || !!(U.pageDirty && U.pageDirty()); };
+  /* UI.pageDirty: a page with a form right on it (not in a drawer) can set a function that says it has unsaved changes;
+     it should check that the page is still on screen. UI.leave, the back button and closing the tab then ask first. */
+  U.pageDirty = null;
   /* UI.leave(run): before a page change. With unsaved changes it asks first; run() only happens when the person agrees
      (or nothing is unsaved). Returns a promise of true (went) / false (stayed). */
   var leaving = null;
@@ -965,8 +968,11 @@ var UI = (function () {
     opts.toggles = [{ key: 'cancelled', label: 'Show cancelled bookings', value: !!o.showCancelled }];
     opts.items = function (st) {
       var list = (o.bookings || D().bookings).filter(function (b) { return (st.toggles.cancelled || b.status !== 'Cancelled' || b.code === opts.value) && (!o.filter || o.filter(b) || b.code === opts.value); });
-      return list.slice().sort(function (x, y) { return y.start - x.start; }).map(function (b) {
-        return { value: b.code, label: b.code, sub: b.cust.name + ' · ' + b.car.plate + ' · ' + U.fmt.date(b.start) + ' to ' + U.fmt.date(b.end), badge: '<span class="ui-cbx-badge">' + schip(b.status, BOOKING_COLORS[b.status] || '#94a3b8') + '</span>', b: b,
+      /* o.rank(b) -> [order, group label]: e.g. the car already picked first, the booking covering the day on top */
+      var rk = function (b) { return o.rank ? o.rank(b) || [9, ''] : [0, '']; };
+      return list.slice().sort(function (x, y) { return rk(x)[0] - rk(y)[0] || y.start - x.start; }).map(function (b) {
+        var g = rk(b)[1];
+        return { value: b.code, label: b.code, group: g || undefined, sub: b.cust.name + ' · ' + b.car.plate + ' · ' + U.fmt.date(b.start) + ' to ' + U.fmt.date(b.end), badge: '<span class="ui-cbx-badge">' + schip(b.status, BOOKING_COLORS[b.status] || '#94a3b8') + '</span>', b: b,
           html: '<span class="ui-cbx-t"><b>' + e(b.code) + ' <span class="ui-cbx-nm">' + e(b.cust.name) + '</span></b><small>' + e(b.car.plate) + ' · ' + e(carName(b.car)) + ' · ' + e(U.fmt.date(b.start)) + ' to ' + e(U.fmt.date(b.end)) + '</small></span>' };
       });
     };

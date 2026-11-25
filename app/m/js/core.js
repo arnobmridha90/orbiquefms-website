@@ -461,6 +461,8 @@ function canPickRefunded(b) { if (b.paymentStatus === 'Deposit Refunded') return
 /* ---------------- availability: the one rule ---------------- */
 var TURNAROUND_H = 3;
 function blocksCar(b) { return b.bookingStatus !== 'Completed' && b.bookingStatus !== 'Cancelled'; }
+/* when a booking stops holding its car: a car that came back early is free from the real return time */
+function bkHoldEnd(b) { return b.bookingStatus === 'Car Returned' && b.actualEnd && new Date(b.actualEnd) < new Date(b.end) ? b.actualEnd : b.end; }
 /* { free, reason, soon, booking, downtime }. Touching periods do not clash. */
 function busy(carId, start, end, exceptId) {
   var s = new Date(start).getTime(), e = new Date(end).getTime(), c = car(carId), out = { free: true, reason: '', soon: '' };
@@ -468,15 +470,15 @@ function busy(carId, start, end, exceptId) {
   if (c.status === 'sold') return { free: false, reason: 'Sold' };
   if (c.status === 'inactive') return { free: false, reason: 'Not in use' };
   var hit = null;
-  S.bookings.forEach(function (b) { if (hit || b.car !== carId || b.id === exceptId || !blocksCar(b)) return; if (new Date(b.start).getTime() < e && new Date(b.end).getTime() > s) hit = b; });
-  if (hit) return { free: false, reason: 'Booked: ' + hit.code + ' until ' + dShort(hit.end), booking: hit };
+  S.bookings.forEach(function (b) { if (hit || b.car !== carId || b.id === exceptId || !blocksCar(b)) return; if (new Date(b.start).getTime() < e && new Date(bkHoldEnd(b)).getTime() > s) hit = b; });
+  if (hit) return { free: false, reason: 'Booked: ' + hit.code + ' until ' + dShort(bkHoldEnd(hit)), booking: hit };
   var dt = null;
   (S.downtime || []).forEach(function (d) { if (dt || d.car !== carId) return; var f = new Date(d.from).getTime(), t = d.to ? new Date(d.to).getTime() : Infinity; if (f < e && t > s) dt = d; });
   if (dt) return { free: false, reason: dt.to ? 'Workshop until ' + dShort(dt.to) : 'Workshop, no return date yet', downtime: dt };
   var gap = TURNAROUND_H * HOUR;
   S.bookings.forEach(function (b) {
     if (out.soon || b.car !== carId || b.id === exceptId || b.bookingStatus === 'Cancelled') return;
-    var be = new Date(b.end).getTime(), bs = new Date(b.start).getTime();
+    var be = new Date(bkHoldEnd(b)).getTime(), bs = new Date(b.start).getTime();
     if (be <= s && s - be < gap) { var h = Math.max(1, Math.round((s - be) / HOUR)); out.soon = 'Returned at ' + hm(be) + ', ' + (s === be ? 'right at the start' : h + ' hr' + (h > 1 ? 's' : '') + ' before'); out.booking = b; }
     else if (bs >= e && bs - e < gap) { var h2 = Math.max(1, Math.round((bs - e) / HOUR)); out.soon = 'Next rental at ' + hm(bs) + ', ' + (bs === e ? 'right at the end' : h2 + ' hr' + (h2 > 1 ? 's' : '') + ' after'); out.booking = b; }
   });
@@ -484,7 +486,7 @@ function busy(carId, start, end, exceptId) {
 }
 function isFree(carId, start, end, exceptId) { return busy(carId, start, end, exceptId).free; }
 function carNow(carId) { /* the booking the car is on now, or null */
-  var n = Date.now(); return S.bookings.filter(function (b) { return b.car === carId && (b.bookingStatus === 'Car Delivered' || (blocksCar(b) && new Date(b.start) <= n && new Date(b.end) > n)); })[0] || null;
+  var n = Date.now(); return S.bookings.filter(function (b) { return b.car === carId && (b.bookingStatus === 'Car Delivered' || (blocksCar(b) && new Date(b.start) <= n && new Date(bkHoldEnd(b)) > n)); })[0] || null;
 }
 function carPaper(carId, type) { /* latest paper of a type ('Road tax', 'Insurance', 'PUSPAKOM', 'Grant', 'Permit') */
   return (S.papers || []).filter(function (p) { return p.car === carId && p.type === type; }).sort(function (a, b) { return new Date(b.until) - new Date(a.until); })[0] || null;
@@ -644,7 +646,7 @@ function placeToasts() {
   if (SHEETS.length) {
     var sh = SHEETS[SHEETS.length - 1].sh, r = sh.getBoundingClientRect(), vh = window.innerHeight;
     if (r.top > 90 && !sh.classList.contains('full')) { box.style.bottom = 'auto'; box.style.top = 'calc(var(--safe-t) + 10px)'; return; }
-    var foot = sh.querySelector('.sheet-foot'), fb = 10;
+    var foot = Array.prototype.filter.call(sh.querySelectorAll('.sheet-foot'), function (f) { return f.getClientRects().length; }).pop(), fb = 10; /* the visible footer (a sheet can swap its body and hide the first one) */
     if (foot && foot.getClientRects().length) { var fr = foot.getBoundingClientRect(); if (fr.top < vh && fr.bottom > 0) fb = Math.max(10, vh - fr.top + 8); }
     else fb = Math.max(10, vh - Math.min(vh, r.bottom) + 10);
     box.style.top = 'auto'; box.style.bottom = fb + 'px'; return;
@@ -752,9 +754,11 @@ function goBack(fallback) { if (history.length > 1 && window.__nav > 0) { window
 window.__nav = 0;
 window.addEventListener('hashchange', function () { window.__nav++; });
 function nav(active) {
+  if (!can('bookings.create') && can('tasks.view') && /^tasks?$/.test(route().name)) active = 'tasks';
   var it = function (k, href, icon, label, extra) { return '<a href="' + href + '" class="' + (active === k ? 'on' : '') + '">' + I(icon, active === k ? 2.2 : 1.9) + label + (extra || '') + '</a>'; };
-  return '<nav class="nav"><div class="nav-in">' + it('home', '#home', 'home', 'Home') + it('bookings', '#bookings', 'list', 'Bookings') +
-    '<a href="#new" aria-label="New booking"><span class="plus">' + I('plus', 2.4) + '</span></a>' +
+  return '<nav class="nav"><div class="nav-in' + (can('bookings.create') || can('tasks.view') ? '' : ' four') + '">' + it('home', '#home', 'home', 'Home') + it('bookings', '#bookings', 'list', 'Bookings') +
+    /* the big plus is only for people who can make bookings; a driver gets Tasks there, anyone else a four-item bar */
+    (can('bookings.create') ? '<a href="#new" aria-label="New booking"><span class="plus">' + I('plus', 2.4) + '</span></a>' : can('tasks.view') ? it('tasks', '#tasks', 'task', 'Tasks') : '') +
     it('chat', '#chat', 'chat', 'Chat', '<span class="dot" id="chatDot" style="display:none"></span>') + it('more', '#more', 'grid', 'More') + '</div></nav>';
 }
 
@@ -766,6 +770,16 @@ function stubView(name, title, back) {
   VIEWS[name] = function () { return { html: topbar(title, { back: back || '#more' }) + '<main><div class="empty soon">' + I('clock') + '<div><b>' + esc(title) + '</b><br>Coming soon</div></div></main>' }; };
 }
 function comingSoon(what) { say((what ? what + ': ' : '') + 'coming soon'); }
+var _lastView = null;
+/* true while a view builds for a new visit (another screen was on before): a filter set by a link applies to that visit only */
+function freshVisit(name) { return _lastView !== name; }
+/* a clear (x) button inside a .search box: searchClearBtn(id) in the html, wireSearchClear(input, onClear) after */
+function searchClearBtn(forId, on) { return '<button type="button" class="sr-clear" data-clear="' + forId + '" aria-label="Clear the search"' + (on ? '' : ' hidden') + '>' + I('x', 2.2) + '</button>'; }
+function wireSearchClear(input, onClear) {
+  if (!input) return; var b = $('[data-clear="' + input.id + '"]'); if (!b) return;
+  input.addEventListener('input', function () { b.hidden = !input.value; });
+  b.onclick = function () { input.value = ''; b.hidden = true; onClear(); var n = $('#' + input.id); if (n) n.focus(); };
+}
 function render(nav_) {
   if (!S) return;
   var r = route(), v = VIEWS[r.name] || VIEWS.home, out;
@@ -775,8 +789,11 @@ function render(nav_) {
   $('#app').innerHTML = out.html + (withNav ? nav(TAB_OF[r.name]) : '');
   var m = $('main'); if (m) { m.classList.toggle('no-nav', !withNav); if (nav_) m.classList.add('fade-in'); }
   if (out.after) out.after();
+  if (m && $('.fab')) m.classList.add('has-fab');
   refreshBadges(); placeToasts();
-  if (nav_ && !out.keepScroll) window.scrollTo(0, 0);
+  /* keepScroll only holds the place when the same screen redraws (a filter or tab in its hash); opening another screen always starts at the top */
+  var same = _lastView === r.name; _lastView = r.name;
+  if (nav_ && !(out.keepScroll && same)) window.scrollTo(0, 0);
 }
 var _render = render;
 render = function (navd, keep) { var y = window.scrollY; _render(navd); if (keep) window.scrollTo(0, y); };

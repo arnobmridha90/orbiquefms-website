@@ -258,7 +258,14 @@ function depOpen(code) {
   };
   var foot = function () {
     var due = Math.max(0, depBasis(z) - depAllKept(z, allDraft())), dirty = isDirty(), r = z.refund;
-    return '<div class="dep-foot"><div class="grow"><small>' + (r ? 'Returned' : 'Amount to return') + '</small><b>' + UI.money(r ? r.amount : due) + '</b></div>' + (!r && depState(z) === 'waiting' && canEdit ? UI.btn(dirty ? 'Save deductions' : 'Deductions saved', { icon: 'device-floppy', disabled: !dirty, attrs: { 'data-save': '1' } }) : '') + '</div>';
+    /* the footer's button is the next job: Save deductions while there are unsaved edits, else Record refund (or Close
+       without a refund when the deductions take it all) */
+    var btn = '';
+    if (!r && depState(z) === 'waiting') {
+      if (dirty && canEdit) btn = UI.btn('Save deductions', { icon: 'device-floppy', attrs: { 'data-save': '1' } });
+      else if (can('deposits.refund')) btn = due > 0 || (!depReceived(code) && x.dep > 0) ? UI.btn('Record refund of ' + UI.fmt.money(due), { icon: 'cash-banknote', attrs: { 'data-refund': '1' } }) : depBasis(z) > 0 ? UI.btn('Close without a refund', { kind: 'o', icon: 'circle-check', attrs: { 'data-close0': '1' } }) : '';
+    }
+    return '<div class="dep-foot"><div class="grow"><small>' + (r ? 'Returned' : 'Amount to return') + '</small><b>' + UI.money(r ? r.amount : due) + '</b></div>' + btn + '</div>';
   };
   var dr = UI.drawer({ title: 'Deposit for ' + code, subtitle: x.cust.name, width: 600, body: body, foot: foot(), dirty: isDirty, dirtyTitle: 'Leave without saving the deductions?' });
   var redraw = function () { keep(dr.body); var sc = dr.body.scrollTop; dr.setBody(body); dr.body.scrollTop = sc; dr.setFoot(foot()); };

@@ -5,6 +5,8 @@
    Pay.viewSlips(bookingId, paymentId)            slip viewer
    Payment fields on top of newPayment(): slips [{src, hash, at, by, note, name}] (the first is also kept in slip/slipHash), made (when it was typed in),
    items[].after (card: the part after the card charge). A 'From deposit' payment adds S.deductions {kind 'Used for a payment', paymentId}. Receipts: invoices.js. */
+/* the line a card charge comes off: the rent first, then any line that is not the deposit, else the last one */
+function payChargeLine(lines) { return lines.filter(function (l) { return l.kind === 'Rental payment'; })[0] || lines.filter(function (l) { return l.kind !== 'Security deposit'; })[0] || lines[lines.length - 1]; }
 
 function normRef(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 function payDepositLeft(b) {
@@ -213,9 +215,8 @@ var Pay = (function () {
       return h;
     }
     /* the line the card charge comes off: rent first, else any line but the deposit, else (only the deposit ticked) the deposit itself */
-    function chargeLine(lines) { return lines.filter(function (l) { return l.kind === 'Rental payment'; })[0] || lines.filter(function (l) { return l.kind !== 'Security deposit'; })[0] || lines[lines.length - 1]; }
     function cardHint() {
-      var tk = ticked(), ln = chargeLine(tk), tot = total(), af = cardAfter(tot), fee = af != null ? Math.round((tot - af) * 100) / 100 : 0;
+      var tk = ticked(), ln = payChargeLine(tk), tot = total(), af = cardAfter(tot), fee = af != null ? Math.round((tot - af) * 100) / 100 : 0;
       if (ln && ln.kind === 'Security deposit') { var d = parseMoney(ln.amt) || 0; return '<span class="tone-amber-text">Only the deposit is ticked, so the ' + (fee ? rm(fee) + ' ' : '') + 'card charge (' + feeText() + ') comes off the deposit' + (fee && d ? ' (' + rm(Math.max(0, d - fee)) + ' to return)' : '') + '. To keep the deposit whole, tick Rent and charges too.</span>'; }
       return 'The card charge is ' + feeText() + '. It comes off ' + (ln ? ln.kind.toLowerCase() : 'the rent') + ', so the deposit stays whole.';
     }
@@ -294,7 +295,7 @@ var Pay = (function () {
       }
       var lines = tk.map(function (i) { return { kind: i.kind, amt: parseMoney(i.amt) }; });
       if (st.method === 'Card' && after != null) {
-        var charge = Math.round((tot - after) * 100) / 100, take = chargeLine(lines);
+        var charge = Math.round((tot - after) * 100) / 100, take = payChargeLine(lines);
         if (charge >= 0 && take && take.amt >= charge) lines.forEach(function (l) { l.after = Math.round((l.amt - (l === take ? charge : 0)) * 100) / 100; });
       }
       payOverAsk(payOver(b, lines)).then(function (go) {
@@ -668,7 +669,7 @@ var Pay = (function () {
         var d = payFindDup(c.hash, c.ref); if (d) { c.dup = d; drawCard(c); return next(); }
         var b = bk(c.booking), ll = lineList(c), lines = ll.lines;
         /* card on a split slip: the parts are of the amount after charge, so the amount paid goes on the rent part */
-        if (ll.scale) { var charge = Math.round((parseMoney(c.amount) - ll.after) * 100) / 100, take = chargeLine(lines); if (charge >= 0 && take && take.amt >= charge) lines.forEach(function (l) { l.after = Math.round((l.amt - (l === take ? charge : 0)) * 100) / 100; }); }
+        if (ll.scale) { var charge = Math.round((parseMoney(c.amount) - ll.after) * 100) / 100, take = payChargeLine(lines); if (charge >= 0 && take && take.amt >= charge) lines.forEach(function (l) { l.after = Math.round((l.amt - (l === take ? charge : 0)) * 100) / 100; }); }
         else if (c.method === 'Card' && ll.after != null) { lines[0].after = ll.after; }
         payOverAsk(payOver(b, lines), 'Slip ' + (cards.indexOf(c) + 1) + ' · ' + b.code).then(function (go) {
           if (!go) { c.status = 'error'; c.msg = 'Not recorded: the amount is more than the booking says. Check it, then record again.'; drawCard(c); return next(); }

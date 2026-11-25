@@ -46,14 +46,15 @@ var Summons = (function () {
   /* ---------- the list ---------- */
   function view(r) {
     if (!can('summons.view')) return { html: topbar('Summons', { back: '#more' }) + '<main>' + noAccess('summons.view') + '</main>' };
-    if (r.q && (r.q.q != null || r.q.f)) { SMS.q = r.q.q || ''; SMS.f = r.q.f || 'all'; try { history.replaceState(history.state, '', location.pathname + location.search + '#summons'); } catch (e) {} }
+    if (freshVisit('summons') && SMS.deep && !(r.q && (r.q.q != null || r.q.f))) { SMS.q = ''; SMS.f = 'all'; SMS.deep = false; }
+    if (r.q && (r.q.q != null || r.q.f)) { SMS.q = r.q.q || ''; SMS.f = r.q.f || 'all'; SMS.deep = true; try { history.replaceState(history.state, '', location.pathname + location.search + '#summons'); } catch (e) {} }
     var all = S.summons || [], open = all.filter(isOpen).length;
     var html = topbar('Summons', { back: '#more', sub: open + ' open' }) + '<main class="sm-main">' +
-      '<div class="cr-sticky"><label class="search">' + I('search') + '<input id="smq" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="Notice, plate, customer or booking" value="' + esc(SMS.q) + '"></label>' +
+      '<div class="cr-sticky"><label class="search">' + I('search') + '<input id="smq" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="Notice, plate, customer or booking" value="' + esc(SMS.q) + '">' + searchClearBtn('smq', SMS.q) + '</label>' +
       '<div class="chiprow" id="smchips"></div></div>' +
       (can('summons.upload') ? '<button type="button" class="btn sm-snapbtn" onclick="Summons.snap()">' + I('camera') + 'Snap a summons</button>' : '') +
       '<div id="smlist"></div></main>';
-    return { html: html, after: function () { var q = $('#smq'), t = null; q.oninput = function () { clearTimeout(t); t = setTimeout(function () { SMS.q = q.value; draw(); }, 100); }; draw(); } };
+    return { html: html, after: function () { var q = $('#smq'), t = null; q.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { SMS.q = q.value; SMS.deep = false; draw(); }, 100); }); wireSearchClear(q, function () { SMS.q = ''; SMS.deep = false; draw(); }); draw(); } };
   }
   function matches(s, q) {
     if (!q) return true;
@@ -101,6 +102,7 @@ var Summons = (function () {
     var pool = bookingId && bk(bookingId) ? [bk(bookingId)] : S.bookings.filter(function (b) { return ['Car Delivered', 'Car Returned', 'Completed'].indexOf(b.bookingStatus) >= 0 && new Date(b.start) < new Date() && new Date(b.end) > Date.now() - 45 * DAY; });
     var b = pool.length ? pick(pool) : S.bookings[0], c = car(b.car) || S.cars[0], idle = !bookingId && R() < .2;
     var s = new Date(b.start).getTime(), e = Math.min(new Date(b.end).getTime(), Date.now() - HOUR), t = idle ? e + 9 * HOUR : s + (e - s) * (.15 + R() * .7);
+    t = Math.min(t, Date.now() - 30 * MIN); /* a reading is never in the future */
     var off = pick([['PDRM', 'Speeding 98 km/h in an 80 km/h zone', 150], ['JPJ', 'Beating the red light', 300], ['DBKL', 'Parking without a coupon', 30], ['PDRM', 'Using a phone while driving', 300], ['MBPP', 'Double parking', 50], ['PDRM', 'No seat belt', 300]]);
     var sure = function (lo) { return lo + Math.floor(R() * (100 - lo)); };
     var f = { authority: { v: off[0], sure: sure(88) }, notice: { v: off[0] + '/' + Math.floor(100000 + R() * 899999), sure: sure(70) }, plate: { v: c.plate, sure: sure(75) },

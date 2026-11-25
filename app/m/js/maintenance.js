@@ -17,6 +17,8 @@ var Maint = (function () {
   function types() { return (B().serviceTypes || []).map(function (t) { return t.name; }); }
   function typeDef(name) { return (B().serviceTypes || []).filter(function (t) { return t.name === name; })[0] || null; }
   function vendor(id) { return byId(S.vendors, id); }
+  /* a new job starts on the workshop this car used last time, or on 'Not said': never on a workshop nobody chose */
+  function mtLastVendor(carId) { if (!carId) return ''; var j = (S.jobs || []).filter(function (x) { return x.car === carId && x.vendor && vendor(x.vendor); }).sort(function (a, b) { return new Date(b.at) - new Date(a.at); })[0]; return j ? j.vendor : ''; }
   function seeCost() { return can('maintenance.see_costs'); }
   function endOfDay(ymdS) { return new Date(ymdS + 'T18:00:00'); }
   function dueWords(days, kmLeft, expires) {
@@ -69,11 +71,16 @@ var Maint = (function () {
     return items.filter(function (i) { return !hid[i.key]; }).sort(function (a, b) { return LV[a.level] - LV[b.level] || a.days - b.days || a.car.plate.localeCompare(b.car.plate); });
   }
   function workshopNow() { var n = Date.now(); return (S.downtime || []).filter(function (d) { return !d.to || new Date(d.to).getTime() > n; }).sort(function (a, b) { return new Date(a.from) - new Date(b.from); }); }
+  /* the expense kinds that are upkeep of a car (from the company's expense kinds) */
+  function carCostKinds() { return (B().expenseKinds || []).filter(function (k) { return ['service', 'repair', 'tyres'].indexOf(k.id) >= 0; }).map(function (k) { return k.name; }); }
   function spentThisMonth() {
     var d0 = new Date(), m0 = new Date(d0.getFullYear(), d0.getMonth(), 1).getTime(), s = 0;
     (S.jobs || []).forEach(function (j) { if (j.status === 'done' && new Date(j.doneAt || j.at).getTime() >= m0) s += +j.cost || 0; });
     (S.papers || []).forEach(function (p) { if (new Date(p.at).getTime() >= m0 && new Date(p.at).getTime() <= Date.now()) s += +p.cost || 0; });
-    return s;
+    /* service, repair and tyre costs the team recorded in Expenses against a car count too (one figure for what the cars cost to keep) */
+    var kinds = carCostKinds();
+    (S.expenses || []).forEach(function (e) { if (!e.voided && e.car && kinds.indexOf(e.kind) >= 0 && new Date(e.at).getTime() >= m0 && new Date(e.at).getTime() <= Date.now()) s += +e.amt || 0; });
+    return Math.round(s * 100) / 100;
   }
   /* bookings that would clash with workshop time from..to (to null = open ended) */
   function clashes(carId, from, to) {
@@ -90,19 +97,20 @@ var Maint = (function () {
   /* ---------- the screen ---------- */
   function view(r) {
     if (!can('maintenance.view')) return { html: topbar('Maintenance', { back: '#more' }) + '<main>' + noAccess('maintenance.view') + '</main>' };
-    if (r.q && r.q.tab) { MT.tab = r.q.tab; MT.q = r.q.q || ''; if (MT.tab === 'log') MT.logF = 'all'; try { history.replaceState(history.state, '', location.pathname + location.search + '#maintenance'); } catch (e) {} }
+    if (freshVisit('maintenance') && MT.deep && !(r.q && r.q.tab)) { MT.tab = 'due'; MT.q = ''; MT.deep = false; }
+    if (r.q && r.q.tab) { MT.tab = r.q.tab; MT.q = r.q.q || ''; MT.deep = !!r.q.q; if (MT.tab === 'log') MT.logF = 'all'; try { history.replaceState(history.state, '', location.pathname + location.search + '#maintenance'); } catch (e) {} }
     var due = dueItems(), ws = workshopNow(), now = Date.now(), wsNow = ws.filter(function (d) { return new Date(d.from).getTime() <= now; }).length;
     var papersDue = due.filter(function (i) { return i.kind === 'paper'; }).length;
     /* the tiles are the tabs for To do, Workshop and Papers; the To do tile counts what is overdue (the same number as the More badge) */
     var tile = function (tab, icon, k, v, tone, small) { return '<button type="button" class="tile mt-tile' + (MT.tab === tab ? ' on' : '') + '" data-tab="' + tab + '" aria-pressed="' + (MT.tab === tab) + '"><div class="k">' + I(icon) + esc(k) + '</div><div class="v' + (tone ? ' ' + tone : '') + '">' + v + '</div>' + (small ? '<small class="mt-tsub">' + esc(small) + '</small>' : '') + '</button>'; };
     var nOver = due.filter(function (i) { return i.level === 'overdue'; }).length, nSoon = due.length - nOver;
     var tiles = '<div class="tiles mt-tiles">' + tile('due', 'warn', 'Overdue', nOver, nOver ? 'tone-red-text' : '', nSoon ? nSoon + ' soon' : 'Nothing soon') + tile('workshop', 'wrench', 'In the workshop', wsNow) +
-      tile('papers', 'file', 'Papers expiring', papersDue, papersDue ? 'tone-amber-text' : '') + (seeCost() ? '<div class="tile mt-tile"><div class="k">' + I('cash') + 'Spent this month</div><div class="v money mt-spent">' + rm(spentThisMonth()) + '</div></div>' : '') + '</div>';
+      tile('papers', 'file', 'Papers expiring', papersDue, papersDue ? 'tone-amber-text' : '') + (seeCost() ? '<div class="tile mt-tile"><div class="k">' + I('cash') + 'Spent on cars this month</div><div class="v money mt-spent">' + rm(spentThisMonth()) + '</div><small class="mt-tsub">Jobs, papers, service expenses</small></div>' : '') + '</div>';
     var tabs = [['log', 'Service log'], ['vendors', 'Workshops list']];
     var html = topbar('Maintenance', { back: '#more', sub: S.cars.filter(function (c) { return c.status === 'active'; }).length + ' active cars' }) + '<main class="mt-main">' + tiles +
       '<div class="mt-tabs chiprow">' + tabs.map(function (t) { return '<button type="button" class="mt-tab' + (MT.tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div id="mtbody"></div></main>' +
-      (can('maintenance.create') ? '<button class="fab" onclick="Maint.log({})" aria-label="Log a service">' + I('wrench') + '</button>' : '');
+      (can('maintenance.create') ? '<button class="fab fab-x" onclick="Maint.log({})" aria-label="Log a service">' + I('wrench', 2.2) + '<span>Service</span></button>' : '');
     return { html: html, after: function () {
       $$('[data-tab]').forEach(function (b) { b.onclick = function () { MT.tab = b.dataset.tab; render(false, true); }; });
       var on = $('.mt-tab.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
@@ -211,10 +219,11 @@ var Maint = (function () {
     var rn = $('#mtrenew'); if (rn) rn.onclick = function () { renew({}); };
     $$('.mt-pap').forEach(function (b) { b.onclick = function () { if (can('maintenance.manage_documents')) renew({ car: b.dataset.car, type: b.dataset.type }); else CarPage.open(b.dataset.car); }; });
   }
-  function searchBox(ph) { return '<label class="search mt-search">' + I('search') + '<input id="mtq" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search" placeholder="' + esc(ph) + '" value="' + esc(MT.q) + '"></label>'; }
+  function searchBox(ph) { return '<label class="search mt-search">' + I('search') + '<input id="mtq" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search" placeholder="' + esc(ph) + '" value="' + esc(MT.q) + '">' + searchClearBtn('mtq', MT.q) + '</label>'; }
   function wireSearch(redraw) {
     var q = $('#mtq'), t = null; if (!q) return;
-    q.oninput = function () { clearTimeout(t); t = setTimeout(function () { MT.q = q.value; var pos = q.selectionStart; redraw(); var n = $('#mtq'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } }, 150); };
+    wireSearchClear(q, function () { MT.q = ''; MT.deep = false; redraw(); });
+    q.oninput = function () { clearTimeout(t); t = setTimeout(function () { MT.q = q.value; MT.deep = false; var pos = q.selectionStart; redraw(); var n = $('#mtq'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } }, 150); };
   }
 
   /* Log */
@@ -274,7 +283,7 @@ var Maint = (function () {
     o = o || {};
     if (!can('maintenance.create')) { say('Ask the owner for Log services access'); return; }
     var c0 = o.car ? car(o.car) : null, td = o.type ? typeDef(o.type) : null;
-    var f = { car: c0 ? c0.id : null, type: o.type || '', status: o.status || 'done', date: toLocalInput(new Date()), cost: '', km: '', vendor: (S.vendors || [])[0] ? S.vendors[0].id : '', block: true, back: '', photo: null, remind: !!(td && (td.km || td.days)), remindKm: td && td.km ? String(td.km) : '', remindDays: td && td.days ? String(td.days) : '', note: '' };
+    var f = { car: c0 ? c0.id : null, type: o.type || '', status: o.status || 'done', date: toLocalInput(new Date()), cost: '', km: '', vendor: mtLastVendor(c0 ? c0.id : null), block: true, back: '', photo: null, remind: !!(td && (td.km || td.days)), remindKm: td && td.km ? String(td.km) : '', remindDays: td && td.days ? String(td.days) : '', note: '' };
     if (o.status === 'planned') f.date = toLocalInput(new Date(Date.now() + DAY));
     var allTypes = types(); if (f.type && allTypes.indexOf(f.type) < 0) allTypes.push(f.type);
     var sh = sheet(sheetHead({ done: 'Log a service', planned: 'Plan a job', workshop: 'Car goes into the workshop' }[f.status] || 'Log a service') +

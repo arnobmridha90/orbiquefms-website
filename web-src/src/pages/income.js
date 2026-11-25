@@ -61,7 +61,7 @@ PAGES['income'] = {
       onRowClick: function (r) { if (r.booking && API.openBooking) API.openBooking(r.booking); },
       columns: [
         { key: 'day', label: 'Date', render: function (r) { return '<span class="nowrap">' + esc(UI.fmt.date(r.day)) + '</span>'; } },
-        { key: 'booking', label: 'Booking', render: function (r) { return r.booking ? '<button type="button" class="inv-link" data-bk="' + esc(r.booking) + '">' + esc(r.booking) + '</button>' : '-'; } },
+        { key: 'booking', label: 'Booking', render: function (r) { return r.booking ? '<button type="button" class="inv-link nowrap" data-bk="' + esc(r.booking) + '">' + esc(r.booking) + '</button>' : '-'; } },
         { key: 'car', label: 'Car', render: function (r) { return r.plate ? '<b>' + esc(r.plate) + '</b><small class="inc-sm">' + esc(r.car) + '</small>' : '-'; } },
         { key: 'kind', label: 'Kind', render: function (r) { return esc(r.kind); } },
         { key: 'who', label: 'Recorded by', render: function (r) { return everyone && !st.person ? '<button type="button" class="inv-link" data-pp="' + esc(r.by) + '" title="Show only ' + esc(r.who) + '">' + esc(r.who) + '</button>' : esc(r.who); } },

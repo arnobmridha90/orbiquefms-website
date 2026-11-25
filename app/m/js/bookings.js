@@ -6,8 +6,9 @@
 /* ---------------- list state ---------------- */
 var bkSearch = '';
 var BKF = { bs: [], ps: [], car: '', from: '', to: '' };
+var BK_PAGE = 120, bkMax = {}; /* rows shown per chip; 'Show more' adds a page */
 var _bkTimer = null;
-VIEW_STATE.push(function () { bkSearch = ''; BKF = { bs: [], ps: [], car: '', from: '', to: '' }; });
+VIEW_STATE.push(function () { bkSearch = ''; BKF = { bs: [], ps: [], car: '', from: '', to: '' }; bkMax = {}; });
 /* entering the tab from the bottom nav starts with a clean search */
 document.addEventListener('click', function (e) {
   var a = e.target && e.target.closest && e.target.closest('.nav a[href="#bookings"]'); if (!a) return;
@@ -103,19 +104,27 @@ function bkDraw(f) {
   var list = base.filter(BK_TESTS[f]);
   var newest = f === 'done' || f === 'all' || f === 'cancelled';
   list.sort(function (a, b) { return newest ? new Date(b.start) - new Date(a.start) : f === 'back' || f === 'road' || f === 'late' || f === 'notback' ? new Date(a.end) - new Date(b.end) : new Date(a.start) - new Date(b.start); });
-  $('#bklist').innerHTML = bkList(list, f);
+  $('#bklist').innerHTML = bkList(list, f, base);
+  var mb = $('#bkmore'); if (mb) mb.onclick = function () { bkMax[f] = (bkMax[f] || BK_PAGE) + BK_PAGE; var y = window.scrollY; bkDraw(f); window.scrollTo(0, y); };
 }
+/* the first chip that has bookings for the current search and filters (for an empty chip) */
+function bkChipWith(base, except) { var hit = null; BK_CHIPS.forEach(function (l) { if (!hit && l[0] !== except && l[0] !== 'all' && base.filter(BK_TESTS[l[0]]).length) hit = l; }); if (!hit && except !== 'all' && base.length) hit = ['all', 'All']; return hit; }
 /* chip taps replace the hash: the chips are a view setting, not a Back step */
 function bkGo(e, f) { e.preventDefault(); bkDraw._done = true; history.replaceState(history.state, '', location.pathname + location.search + '#bookings/' + f); bkDraw(f); }
 function bkClearFilters() { BKF = { bs: [], ps: [], car: '', from: '', to: '' }; render(false, true); }
-function bkList(list, f) {
-  if (!list.length) return '<div class="empty">No bookings here' + (bkSearch ? ' for “' + esc(bkSearch) + '”' : '') + '.' + (bkFilterCount() ? '<br><button class="btn link" onclick="bkClearFilters()">Clear the filters</button>' : '') + '</div>';
-  var out = '', last = '', max = 120;
+function bkList(list, f, base) {
+  if (!list.length) {
+    var other = base && bkChipWith(base, f), curL = (BK_CHIPS.concat(Object.keys(BK_EXTRA).map(function (k) { return [k, BK_EXTRA[k]]; })).filter(function (l) { return l[0] === f; })[0] || [f, f])[1];
+    return '<div class="empty">No bookings here' + (bkSearch ? ' for “' + esc(bkSearch) + '”' : '') + (bkFilterCount() || bkSearch ? ' under ' + esc(curL) : '') + '.' +
+      (other ? '<br><a class="btn link" href="#bookings/' + other[0] + '" onclick="bkGo(event,\'' + other[0] + '\')">See them under ' + esc(other[1]) + ' (' + base.filter(BK_TESTS[other[0]]).length + ')</a>' : '') +
+      (bkFilterCount() ? '<br><button class="btn link" onclick="bkClearFilters()">Clear the filters</button>' : '') + '</div>';
+  }
+  var out = '', last = '', max = bkMax[f] || BK_PAGE;
   list.slice(0, max).forEach(function (b) {
     if (f === 'upcoming') { var d = dayWord(b.start); if (d !== last) { out += '<div class="sec bk-day"><h2>' + d + '</h2></div>'; last = d; } }
     out += bkCard(b);
   });
-  if (list.length > max) out += '<div class="empty small">Showing the first ' + max + ' of ' + list.length + '. Search or filter to find the rest.</div>';
+  if (list.length > max) out += '<button type="button" class="btn ghost bk-more" id="bkmore">Show ' + Math.min(BK_PAGE, list.length - max) + ' more <span class="muted">(' + (list.length - max) + ' left)</span></button>';
   return out;
 }
 function bkCard(b) {
@@ -155,7 +164,11 @@ function bkFilterSheet() {
         var f = $('#ffrom').value, t = $('#fto').value;
         if (f && t && t < f) { var x = f; f = t; t = x; }
         BKF = { bs: $$('#fbs .on', sh).map(function (x) { return x.dataset.v; }), ps: $$('#fps .on', sh).map(function (x) { return x.dataset.v; }), car: d.car, from: f, to: t };
-        closeSheet(); render(false, true);
+        closeSheet();
+        /* the chip left out every match (Completed under Upcoming): move to a chip that has them */
+        var cur = route().name === 'bookings' && BK_TESTS[route().a] ? route().a : 'upcoming', base = bkBase();
+        if (base.length && !base.filter(BK_TESTS[cur]).length) { var to = bkChipWith(base, cur); if (to) { setTimeout(function () { history.replaceState(history.state, '', location.pathname + location.search + '#bookings/' + to[0]); render(false); say('Showing them under ' + to[1]); }, 60); return; } }
+        render(false, true);
       };
     });
 }
@@ -317,7 +330,7 @@ function bkDepositChip(b) {
     return '<div class="bk-dep wait">' + I('bank') + '<div class="grow"><b>' + (b.bookingStatus === 'Cancelled' ? 'Money paid: waiting to be returned' : 'Deposit: waiting to be returned') + '</b><small>' + rm(Math.max(0, x.net)) + (Math.abs(x.net - x.basis) > 0.009 ? ' of ' + rm(x.basis) : '') + ' to return' + (b.refundPendingAt ? ' · since ' + dShort(b.refundPendingAt) : '') + '</small></div><button class="btn sm" onclick="Deposit.open(\'' + b.id + '\')">' + (b.bookingStatus === 'Cancelled' ? 'Return the money' : 'Return the deposit') + '</button></div>';
   }
   if (b.bookingStatus === 'Cancelled' && b.cancelMoney === 'credit' && typeof Deposit !== 'undefined') { var xc = Deposit.info(b); if (!xc.refund && xc.net > 0.004) return '<div class="bk-dep wait">' + I('cash') + '<div class="grow"><b>Kept as credit for the customer</b><small>' + rm(xc.net) + ' left to use on a later booking</small></div><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">Details</button></div>'; }
-  if (ps === 'Deposit Refunded') return '<div class="bk-dep done">' + I('check', 2.2) + '<div class="grow"><b>Deposit: returned to the customer</b></div><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">See details</button></div>';
+  if (ps === 'Deposit Refunded') return '<div class="bk-dep done">' + I('check', 2.2) + '<div class="grow"><b>' + (function () { var xr = typeof Deposit !== 'undefined' ? Deposit.info(b) : null, cx = b.bookingStatus === 'Cancelled'; if (xr && xr.state === 'used') return (cx ? 'Money paid' : 'Deposit') + ': used for payments'; if (xr && xr.refund && !(+xr.refund.amt > 0)) return cx ? (b.cancelMoney === 'fee' ? 'Money paid: kept as cancellation fee' : 'Money paid: kept, nothing returned') : 'Deposit: kept, nothing returned'; return cx ? 'Money paid: returned to the customer' : 'Deposit: returned to the customer'; })() + '</b></div><button class="btn sm ghost" onclick="Deposit.open(\'' + b.id + '\')">See details</button></div>';
   return '';
 }
 function bkInspection(b) {

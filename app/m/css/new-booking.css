@@ -160,3 +160,4 @@
 .nb-leadd > summary::-webkit-details-marker { display: none; }
 .nb-leadd > summary svg { width: 16px; height: 16px; transition: transform .15s; }
 .nb-leadd[open] > summary svg { transform: rotate(180deg); }
+.nb-free { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

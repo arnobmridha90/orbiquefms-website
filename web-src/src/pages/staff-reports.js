@@ -3,7 +3,7 @@
    Each staff member's income (handover fees), expenses (everyday kinds they paid) and the balance they have in hand:
      + cash they received from customers (cash payments they took)
      + payments from the company to them (the "Payment to staff" kind, which names the person)
-     - what they paid for the company (their everyday expenses)
+     - what they paid for the company in cash or with their own money (not a company card or transfer)
      - deposits they handed back in cash
      - cash handed in (their bank-ins, not voided)
      - their handover fees (they keep their fee out of the cash they hold)
@@ -14,36 +14,11 @@ var SR_PARTS = [['income', 'Income'], ['expenses', 'Expenses'], ['from_owners', 
 function srDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function srIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function srParse(s) { if (!s) return null; var p = String(s).split('-'); return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null; }
-/* every entry behind a person's figures between two moments (from inclusive, to exclusive; null = open) */
-function srEntries(uid, from, to) {
-  var d = D(), u = byId(d.users, uid); if (!u) return [];
-  var inR = function (t) { return (!from || t >= from) && (!to || t < to); }, out = [];
-  d.expenses.forEach(function (e) {
-    if (e.source && e.source !== 'recorded') return;
-    var c = byId(d.expenseCats, e.cat); if (!c || !inR(e.day)) return;
-    var car = carById(e.car), base = { date: e.day, at: new Date(e.day.getFullYear(), e.day.getMonth(), e.day.getDate(), 12), booking: e.booking || '', plate: car ? car.plate : '', note: e.note || '', ref: e.id, amount: e.amount };
-    if (c.agentFee && e.by === uid) out.push(Object.assign({ part: 'income', kind: c.name, way: 'out', desc: c.name }, base));
-    else if (!c.agentFee && !c.paysStaff && c.group !== 'Office and admin' && e.by === uid) out.push(Object.assign({ part: 'expenses', kind: c.name, way: 'out', desc: 'Expense paid: ' + c.name }, base));
-    if (c.paysStaff && e.staff === uid) out.push(Object.assign({ part: 'from_owners', kind: c.name, way: 'in', desc: 'From the company: ' + c.name }, base));
-  });
-  d.payments.forEach(function (p) {
-    if (p.void || p.method !== 'Cash' || (p.heldBy || p.by) !== u.name || !inR(p.at)) return;
-    var x = findBooking(p.booking);
-    out.push({ part: 'cash_received', kind: p.kind, way: 'in', desc: 'Cash from customer: ' + p.kind, date: p.at, at: p.at, booking: p.booking || '', plate: x ? x.car.plate : '', note: x ? x.cust.name : '', amount: p.amount, ref: p.id });
-  });
-  d.deposits.forEach(function (z) {
-    var f = z.refund; if (!f || f.method !== 'Cash' || f.by !== u.name || !(f.amount > 0) || !inR(f.at)) return;
-    var x = findBooking(z.booking);
-    out.push({ part: 'refunds_given', kind: 'Deposit refund', way: 'out', desc: 'Deposit handed back', date: f.at, at: f.at, booking: z.booking, plate: x ? x.car.plate : '', note: x ? x.cust.name : '', amount: f.amount, ref: z.id });
-  });
-  (d.bankIns || []).forEach(function (b) {
-    if (b.voided || b.staff !== uid || !inR(b.at)) return;
-    out.push({ part: 'handed_in', kind: 'Cash banked in', way: 'out', desc: 'Cash banked in', date: b.at, at: b.at, booking: '', plate: '', note: b.note || (b.ref ? 'Ref ' + b.ref : ''), amount: b.amount, ref: b.id });
-  });
-  return out;
-}
-function srFigures(list) { var f = {}; SR_PARTS.slice(0, 6).forEach(function (p) { f[p[0]] = 0; }); list.forEach(function (e) { f[e.part] += e.amount; }); return f; }
-function srInHand(f) { return Math.round((f.cash_received + f.from_owners - f.expenses - f.refunds_given - f.handed_in - f.income) * 100) / 100; }
+/* every entry behind a person's figures, and the balance: the shared cashEntries / cashBalance in data.js, so this page,
+   Bank in cash and Cash held by staff always show the same figure */
+function srEntries(uid, from, to) { return cashEntries(uid, from, to); }
+function srFigures(list) { return cashParts(list); }
+function srInHand(f) { return cashBalance(f); }
 /* the report for a period: {people [{id, name, ...parts, opening, closing}], detail for one person} */
 function srBuild(from, to, person, everyone) {
   var end = new Date(to.getTime() + DAY), ids = everyone ? D().users.map(function (u) { return u.id; }) : [me().id];

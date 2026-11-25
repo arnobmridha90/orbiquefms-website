@@ -1069,65 +1069,84 @@ function invCompany() {
 
 /* ===================================================================
    Cash held by staff and "Bank in cash"
-   Held = cash payments given to the person - what they banked in (with the slip) - cash deposit refunds they handed back.
+   Held = the shared cashHeldBy (data.js): cash from customers and from the company, less what they paid for the company
+   in cash, their own handover fees, cash deposit refunds and bank-ins. The same figure as Staff income and expenses.
    =================================================================== */
 function invCashRows() {
   var d = D();
   return d.users.map(function (u) {
-    var pays = d.payments.filter(function (p) { return !p.void && p.method === 'Cash' && (p.heldBy || p.by) === u.name; });
-    var bins = (d.bankIns || []).filter(function (b) { return !b.voided && b.staff === u.id; });
-    var refunds = (d.deposits || []).filter(function (z) { return z.refund && z.refund.method === 'Cash' && z.refund.by === u.name; });
-    return { id: u.id, name: u.name, user: u, held: cashHeldBy(u.id), n: pays.length, cashIn: sum(pays.map(function (p) { return p.amount; })), banked: sum(bins.map(function (b) { return b.amount; })), refunded: sum(refunds.map(function (z) { return z.refund.amount; })), last: bins.length ? bins.reduce(function (a, b) { return b.at > a ? b.at : a; }, bins[0].at) : null };
+    var list = cashEntries(u.id, null, null), f = cashParts(list), bins = list.filter(function (e) { return e.part === 'handed_in'; });
+    return { id: u.id, name: u.name, user: u, held: cashBalance(f), n: list.filter(function (e) { return e.part === 'cash_received'; }).length, cashIn: f.cash_received + f.from_owners, fromCo: f.from_owners, banked: f.handed_in, refunded: f.refunds_given, spent: f.expenses, fees: f.income, paidOut: f.expenses + f.income + f.refunds_given, last: bins.length ? bins.reduce(function (a, b) { return b.at > a ? b.at : a; }, bins[0].at) : null };
   }).filter(function (r) { return Math.abs(r.held) > .004; }).sort(function (a, b) { return b.held - a.held; });
 }
+/* "RM 740.00" for cash held, "Owed RM 20.50" when the company owes them */
+function invHeldText(v) { return v < -0.004 ? 'owed ' + UI.fmt.money(-v) : 'holds ' + UI.fmt.money(v); }
 function invCanVoidBankIn(b) { if (b.voided) return false; if (can('billing.manage_cash')) return true; return b.by === me().id && NOW() - (b.recordedAt || b.at) < DAY; }
 function invBankInSheet(personId) {
   var office = can('billing.manage_cash'), mine = me();
   if (!office && !can('billing.record_payment') && !can('expenses.view')) { UI.toast('You cannot record bank-ins.', { tone: 'warn' }); return; }
   var now0 = NOW(); now0.setSeconds(0, 0);
-  var st = { staff: office && personId ? personId : mine.id, slip: null, reading: false, readNote: '', amount: '', at: now0, ref: '', note: '', err: '', used: null };
+  var st = { staff: office && personId ? personId : mine.id, slip: null, reading: false, readNote: '', amount: '', slipAmt: null, at: now0, ref: '', note: '', err: '', errs: {}, used: null };
   var heldOf = function (id) { return cashHeldBy(id); };
   var people = function () { var ids = invCashRows().map(function (r) { return r.id; }); D().users.forEach(function (u) { if (u.active && ids.indexOf(u.id) < 0) ids.push(u.id); }); if (ids.indexOf(st.staff) < 0) ids.unshift(st.staff); return ids.map(function (id) { return byId(D().users, id); }).filter(Boolean); };
   var keep = function (el) { var f = UI.form(el); if (f.staff) st.staff = f.staff; if (f.amount !== undefined) st.amount = f.amount; if (f.at) st.at = UI.parseDate(f.at); if (f.ref !== undefined) st.ref = f.ref; if (f.note !== undefined) st.note = f.note; };
   var body = function () {
     var held = heldOf(st.staff), who = byId(D().users, st.staff), amt = Number(String(st.amount).replace(/,/g, '')) || 0;
     var h = '<div class="col gap16">';
-    h += office ? UI.select({ key: 'staff', label: 'Whose cash', value: st.staff, options: people().map(function (u) { return [u.id, (u.id === mine.id ? 'Mine (' + u.name + ')' : u.name) + ', holds ' + UI.fmt.money(heldOf(u.id))]; }) })
-      : '<div class="inv-bin-who">' + UI.avatar(mine.name) + '<div><b>' + esc(mine.name) + '</b><small>You hold ' + UI.money(held) + ' in cash from customers</small></div></div>';
-    h += '<div class="inp"><label>Bank slip <span class="ui-req">*</span></label>' + (st.slip ? '<div class="inv-slip1">' + (/pdf/.test(st.slip.type) ? i('file-type-pdf') : '<img src="' + st.slip.dataUrl + '" alt="">') + '<span class="grow"><b>' + esc(st.slip.name) + '</b><small>' + UI.fmt.size(st.slip.size) + (st.slip.shrunk ? ' · made smaller' : '') + '</small>' + (st.reading ? '<small>' + i('loader-2', 'inv-spin') + ' Reading the slip...</small>' : '') + '</span>' + UI.btn('Remove', { kind: 't', size: 'sm', attrs: { 'data-slip-rm': '1' } }) + '</div>' : '<div data-dz></div>') + '<span class="help">Take a photo of the slip from the bank or the cash deposit machine.</span></div>';
+    h += office ? UI.select({ key: 'staff', label: 'Whose cash', value: st.staff, options: people().map(function (u) { return [u.id, (u.id === mine.id ? 'Mine (' + u.name + ')' : u.name) + ', ' + invHeldText(heldOf(u.id))]; }), help: 'The same balance as Staff income and expenses.' })
+      : '<div class="inv-bin-who">' + UI.avatar(mine.name) + '<div><b>' + esc(mine.name) + '</b><small>' + (held < -0.004 ? 'The company owes you ' + UI.money(-held) : 'You hold ' + UI.money(held) + ' of company cash') + '</small></div></div>';
+    h += '<div class="inp' + (st.errs.slip ? ' bad' : '') + '" data-bin-slip><label>Bank slip <span class="ui-req">*</span></label>' + (st.slip ? '<div class="inv-slip1">' + (/pdf/.test(st.slip.type) ? i('file-type-pdf') : '<img src="' + st.slip.dataUrl + '" alt="">') + '<span class="grow"><b>' + esc(st.slip.name) + '</b><small>' + UI.fmt.size(st.slip.size) + (st.slip.shrunk ? ' · made smaller' : '') + '</small>' + (st.reading ? '<small>' + i('loader-2', 'inv-spin') + ' Reading the slip...</small>' : '') + '</span>' + UI.btn('Remove', { kind: 't', size: 'sm', attrs: { 'data-slip-rm': '1' } }) + '</div>' : '<div data-dz></div>') + (st.errs.slip ? '<span class="ui-err">' + esc(st.errs.slip) + '</span>' : '') + '<span class="help">Take a photo of the slip from the bank or the cash deposit machine.</span></div>';
     if (st.readNote) h += UI.alert(st.readNote, 'info', { icon: 'scan' });
     if (st.used) h += invUsedHtml(st.used);
-    h += '<div class="inv-fgrid">' + UI.input({ key: 'amount', label: 'Amount banked in (RM)', prefix: 'RM', value: st.amount, placeholder: held > 0 ? held.toFixed(2) : '0.00', attrs: { inputmode: 'decimal', autocomplete: 'off' }, help: 'Any amount: part of the cash is fine.' }) +
-      UI.dateTimeField({ key: 'at', label: 'Day and time', value: st.at, max: NOW(), chips: [{ label: 'Today', days: 0 }, { label: 'Yesterday', days: -1 }] }) + '</div>';
-    if (amt > held + .004 && held >= 0) h += UI.alert('This is more than the cash from customers ' + (st.staff === mine.id ? 'you hold' : (who ? who.name.split(' ')[0] + ' holds' : 'they hold')) + ' (' + UI.fmt.money(held) + '). Check the amount.', 'warn');
+    h += '<div class="inv-fgrid">' + UI.input({ key: 'amount', label: 'Amount banked in (RM)', prefix: 'RM', value: st.amount, required: true, error: st.errs.amount || '', placeholder: held > 0 ? 'Up to ' + held.toFixed(2) : '0.00', attrs: { inputmode: 'decimal', autocomplete: 'off' }, help: held > 0 ? 'Up to ' + UI.fmt.money(held) + '. Part of the cash is fine.' : 'Nothing is held now, so check before banking anything in.' }) +
+      UI.dateTimeField({ key: 'at', label: 'Day and time', value: st.at, max: NOW(), error: st.errs.at || '', chips: [{ label: 'Today', days: 0 }, { label: 'Yesterday', days: -1 }] }) + '</div>';
+    if (amt > held + .004) h += UI.alert('This is more than ' + (st.staff === mine.id ? 'you hold' : (who ? who.name.split(' ')[0] + ' holds' : 'they hold')) + ' (' + (held < 0 ? 'nothing; the company owes ' + UI.fmt.money(-held) : UI.fmt.money(held)) + '). Check the amount. You will be asked for a reason.', 'warn');
+    if (amt > 0 && st.slipAmt != null && Math.abs(amt - st.slipAmt) > .004) h += UI.alert('The slip says ' + UI.fmt.money(st.slipAmt) + '. Check the amount.', 'warn');
     h += UI.input({ key: 'ref', label: 'Bank reference (optional)', value: st.ref, placeholder: 'For example CDM482913' }) + UI.textarea({ key: 'note', label: 'Note (optional)', rows: 2, value: st.note });
     if (st.err) h += UI.alert(st.err, 'bad');
     return h + '</div>';
   };
-  var sub = function () { var u = byId(D().users, st.staff); return (st.staff === mine.id ? 'You hold ' : (u ? u.name : '') + ' holds ') + UI.fmt.money(heldOf(st.staff)) + ' in cash'; };
-  var save = function (d) {
-    keep(d.body); st.err = '';
+  var sub = function () { var u = byId(D().users, st.staff), h0 = heldOf(st.staff); return h0 < -0.004 ? 'The company owes ' + (st.staff === mine.id ? 'you ' : (u ? u.name + ' ' : '')) + UI.fmt.money(-h0) : (st.staff === mine.id ? 'You hold ' : (u ? u.name : '') + ' holds ') + UI.fmt.money(h0) + ' in cash'; };
+  var save = function (d, sure) {
+    keep(d.body); st.err = ''; st.errs = {};
     var amt = invR2(String(st.amount).replace(/,/g, ''));
-    if (!(amt > 0)) st.err = 'Enter the amount you paid into the bank.';
-    else if (!st.at) st.err = 'Choose the day and time you paid the cash in.';
-    else if (st.at > new Date(NOW().getTime() + 15 * 6e4)) st.err = 'The day and time cannot be in the future.';
-    else if (!st.slip) st.err = 'Add a photo or PDF of the bank slip.';
-    else if (st.used) st.err = invUsedText(st.used);
-    if (st.err) { d.refresh(); return false; }
+    /* every field at once: the slip, the amount and the time; the sheet scrolls to the first one and puts the cursor there */
+    if (!st.slip) st.errs.slip = 'Add a photo or PDF of the bank slip.';
+    if (!(amt > 0)) st.errs.amount = 'Enter the amount you paid into the bank.';
+    if (!st.at) st.errs.at = 'Choose the day and time you paid the cash in.';
+    else if (st.at > new Date(NOW().getTime() + 15 * 6e4)) st.errs.at = 'The day and time cannot be in the future.';
+    if (st.used) st.err = invUsedText(st.used);
+    var keys = ['slip', 'amount', 'at'].filter(function (k) { return st.errs[k]; });
+    if (keys.length || st.err) {
+      d.refresh();
+      if (keys.length) UI.toast(keys.length > 1 ? 'Add the ' + keys.map(function (k) { return { slip: 'slip', amount: 'amount', at: 'day and time' }[k]; }).join(' and the ') + '.' : st.errs[keys[0]], { tone: 'warn' });
+      var w = keys.length ? d.body.querySelector(keys[0] === 'slip' ? '[data-bin-slip]' : '[data-key="' + keys[0] + '"]') : d.body.querySelector('.alert.bad');
+      if (w) { var box = w.closest('.inp') || w; try { box.scrollIntoView({ block: 'center' }); } catch (e1) { box.scrollIntoView(); } var fo = keys[0] === 'slip' ? box.querySelector('input[type="file"], button, [tabindex]') : box.querySelector('input:not([type="hidden"]), select'); if (fo) try { fo.focus({ preventScroll: true }); } catch (e2) { /* ignore */ } }
+      return false;
+    }
+    /* more than the person holds, or not what the slip says: ask, with a reason that is kept on the bank-in */
+    var held = heldOf(st.staff), who0 = byId(D().users, st.staff), whoN = st.staff === mine.id ? 'you hold' : (who0 ? who0.name.split(' ')[0] : 'They') + ' holds';
+    var probs = [];
+    if (amt > held + .004) probs.push(UI.fmt.money(amt) + ' is more than ' + whoN + ' (' + (held < 0 ? 'nothing; the company owes ' + UI.fmt.money(-held) : UI.fmt.money(held)) + ').');
+    if (st.slipAmt != null && Math.abs(amt - st.slipAmt) > .004) probs.push('The slip says ' + UI.fmt.money(st.slipAmt) + ', not ' + UI.fmt.money(amt) + '.');
+    if (probs.length && !sure) return UI.confirm({ title: 'Save this bank-in anyway?', text: probs.join(' ') + ' Save it anyway?', ok: 'Save anyway', cancel: 'Check the amount', input: { label: 'Reason', placeholder: 'For example: also banked in cash from last week', required: true, error: 'Say why the amount is different.' } })
+      .then(function (why) { if (!why) return false; st.why = why; return save(d, true) !== false; });
     var who = byId(D().users, st.staff), n = (D().bankIns || []).length + 1; while (byId(D().bankIns, 'bin-' + n)) n++;
-    DB.add('bankIns', { id: 'bin-' + n, staff: st.staff, amount: amt, at: st.at, slip: { name: st.slip.name, size: st.slip.size, type: st.slip.type, dataUrl: st.slip.dataUrl, hash: st.slip.hash }, ref: (st.ref || '').trim(), note: (st.note || '').trim(), voided: null, by: mine.id, recordedAt: NOW(), payments: [] },
+    var note = [(st.note || '').trim(), sure && st.why ? 'Reason for the amount: ' + st.why : ''].filter(Boolean).join(' · ');
+    DB.add('bankIns', { id: 'bin-' + n, staff: st.staff, amount: amt, at: st.at, slip: { name: st.slip.name, size: st.slip.size, type: st.slip.type, dataUrl: st.slip.dataUrl, hash: st.slip.hash }, ref: (st.ref || '').trim(), note: note, slipAmount: st.slipAmt, voided: null, by: mine.id, recordedAt: NOW(), payments: [] },
       { first: true, where: 'Bank-in', text: mine.name + ' banked in ' + UI.fmt.money(amt) + ' cash' + (st.staff !== mine.id && who ? ' for ' + who.name : '') });
     UI.toast('Bank-in of ' + UI.fmt.money(amt) + ' saved.');
   };
-  var dr = UI.drawer({ title: 'Bank in cash', subtitle: sub(), width: 460, body: function (el) { el.innerHTML = body(); setTimeout(mount, 0); }, foot: [{ label: 'Cancel', kind: 'o' }, { label: 'Save bank-in', icon: 'building-bank', onClick: save }], dirty: function () { return !!st.slip || !!st.amount; } });
+  var dr = UI.drawer({ title: 'Bank in cash', subtitle: sub(), width: 460, body: function (el) { el.innerHTML = body(); setTimeout(mount, 0); }, foot: [{ label: 'Cancel', kind: 'o' }, { label: 'Save bank-in', icon: 'building-bank', onClick: function (d) { return save(d); } }], dirty: function () { return !!st.slip || !!st.amount; } });
   dr.el.classList.add('inv-bin');
   var redraw = function () { keep(dr.body); dr.refresh(); dr.setTitle('Bank in cash', sub()); };
-  function mount() { var z = dr.body.querySelector('[data-dz]'); if (z && !z.firstChild) UI.dropzone(z, { accept: 'image/*,.pdf', label: 'Add the bank slip', hint: 'A photo or PDF. Big photos are made smaller.', camera: true, onFiles: function (fs) { UI.readImage(fs[0]).then(function (r) { keep(dr.body); st.slip = invFileSlip(r); st.used = (D().bankIns || []).filter(function (b) { return !b.voided && b.slip && invSlipHash(b.slip) === st.slip.hash; }).map(function (b) { return { what: 'bank-in', booking: staffName(b.staff) + '\'s bank-in', at: b.at, payment: b.id }; })[0] || null; st.reading = !st.used && !/pdf/.test(r.type || ''); st.readNote = ''; dr.refresh(); if (st.reading) setTimeout(read, 1100); }); } }); }
+  function mount() { var z = dr.body.querySelector('[data-dz]'); if (z && !z.firstChild) UI.dropzone(z, { accept: 'image/*,.pdf', label: 'Add the bank slip', hint: 'A photo or PDF. Big photos are made smaller.', camera: true, onFiles: function (fs) { UI.readImage(fs[0]).then(function (r) { keep(dr.body); st.errs.slip = ""; st.slip = invFileSlip(r); st.used = (D().bankIns || []).filter(function (b) { return !b.voided && b.slip && invSlipHash(b.slip) === st.slip.hash; }).map(function (b) { return { what: 'bank-in', booking: staffName(b.staff) + '\'s bank-in', at: b.at, payment: b.id }; })[0] || null; st.reading = !st.used && !/pdf/.test(r.type || ''); st.readNote = ''; dr.refresh(); if (st.reading) setTimeout(read, 1100); }); } }); }
   /* reading the slip is only a help (made up here): the amount, the day and the reference; the person checks them */
   function read() {
     if (dr.closed) return; keep(dr.body); st.reading = false;
     var held = heldOf(st.staff), parts = [];
-    if (!st.amount && held > 0) { st.amount = held.toFixed(2); parts.push(UI.fmt.money(held)); }
+    /* made up for the demo: the slip shows what the person holds. It fills an empty amount box, and is kept to compare */
+    if (held > 0) { st.slipAmt = held; parts.push(UI.fmt.money(held)); if (!st.amount) st.amount = held.toFixed(2); }
     var t = new Date(NOW().getTime() - 40 * 6e4); t.setMinutes(Math.floor(t.getMinutes() / 15) * 15, 0, 0); st.at = t; parts.push(UI.fmt.dateTime(t));
     if (!st.ref) st.ref = 'CDM' + String(100000 + (Math.floor(NOW().getTime() / 1000) % 900000));
     st.readNote = parts.length ? 'Read from the slip: ' + parts.join(', ') + '. Check they are right.' : '';
@@ -1135,7 +1154,7 @@ function invBankInSheet(personId) {
   }
   dr.body.addEventListener('change', function (ev) { var k = ev.target.getAttribute('data-key'); if (k === 'staff') redraw(); else if (k === 'amount') invRedrawSoon(dr.body, redraw); });
   invUsedWire(dr.body);
-  dr.body.addEventListener('click', function (ev) { if (ev.target.closest('[data-slip-rm]')) { keep(dr.body); st.slip = null; st.used = null; st.readNote = ''; dr.refresh(); } });
+  dr.body.addEventListener('click', function (ev) { if (ev.target.closest('[data-slip-rm]')) { keep(dr.body); st.slip = null; st.used = null; st.readNote = ''; st.slipAmt = null; dr.refresh(); } });
   return dr;
 }
 function invBankInSlip(b) { invSlipViewer({ title: 'Bank-in slip: ' + UI.fmt.money(b.amount) + ', ' + staffName(b.staff), amount: b.amount, booking: '', slips: [Object.assign({}, b.slip || { name: 'bank-in-slip.jpg', size: 0 }, { dataUrl: (b.slip && b.slip.dataUrl) || invBankInSvg(b) })] }); }
@@ -1213,16 +1232,17 @@ PAGES['invoices'] = {
     var tEl = root.querySelector('#inv-t');
     if (tab === 'cash') {
       var np = sum(held.map(function (g) { return g.n; }));
-      root.querySelector('#inv-f').innerHTML = '<div class="inv-cash-h"><div class="grow"><h3>Cash held by staff</h3><p class="b2">Cash from customers that a member of staff has and is not in the bank yet. Staff record what they pay in with "Bank in cash" and the slip: any amount, at any time.' + (held.length ? ' In total ' + UI.fmt.money(heldTotal) + ', from ' + plural(np, 'cash payment') + '.' : '') + '</p></div>' + UI.btn('Bank in cash', { icon: 'building-bank', attrs: { 'data-bankin': '' } }) + '</div>';
+      root.querySelector('#inv-f').innerHTML = '<div class="inv-cash-h"><div class="grow"><h3>Cash held by staff</h3><p class="b2">Company cash a member of staff has and is not in the bank yet: cash from customers and from the company, less what they paid for the company in cash and their own handover fees. It is the same balance as Staff income and expenses. Staff record what they pay in with "Bank in cash" and the slip: any amount, at any time.' + (held.length ? ' In total ' + UI.fmt.money(heldTotal) + ', from ' + plural(np, 'cash payment') + '.' : '') + '</p></div>' + UI.btn('Bank in cash', { icon: 'building-bank', attrs: { 'data-bankin': '' } }) + '</div>';
       UI.table(tEl, { rows: held, rowKey: 'id', pageSize: false, minWidth: 760, density: 'compact',
         columns: [{ key: 'name', label: 'Staff', render: function (g) { return '<span class="row gap8">' + UI.avatar(g.name) + '<b class="fw5">' + esc(g.name) + '</b></span>'; } },
           { key: 'n', label: 'Cash payments', align: 'center', render: function (g) { return String(g.n); } },
-          { key: 'cashIn', label: 'Cash received', money: true },
-          { key: 'banked', label: 'Banked in', money: true, render: function (g) { return UI.money(g.banked) + (g.refunded ? '<div class="b2 nw">' + UI.fmt.money(g.refunded) + ' refunds paid</div>' : ''); } },
-          { key: 'held', label: 'Held', money: true, render: function (g) { return '<b class="' + (g.held < 0 ? 'inv-badt' : '') + '">' + UI.money(g.held) + '</b>'; } },
+          { key: 'cashIn', label: 'Cash received', money: true, render: function (g) { return UI.money(g.cashIn) + (g.fromCo ? '<div class="b2 nw">' + UI.fmt.money(g.fromCo) + ' from the company</div>' : ''); } },
+          { key: 'paidOut', label: 'Spent or kept', money: true, render: function (g) { var bits = [g.spent ? UI.fmt.money(g.spent) + ' expenses' : '', g.fees ? UI.fmt.money(g.fees) + ' own fees' : '', g.refunded ? UI.fmt.money(g.refunded) + ' refunds' : ''].filter(Boolean); return UI.money(g.paidOut) + (bits.length ? '<div class="b2">' + bits.join(', ') + '</div>' : ''); } },
+          { key: 'banked', label: 'Banked in', money: true },
+          { key: 'held', label: 'Held', money: true, render: function (g) { return g.held < 0 ? '<b class="inv-badt">Owed ' + UI.money(-g.held) + '</b>' : '<b>' + UI.money(g.held) + '</b>'; } },
           { key: 'last', label: 'Last bank-in', render: function (g) { return g.last ? esc(UI.fmt.date(g.last)) + '<div class="b2">' + esc(UI.fmt.ago(g.last)) + '</div>' : '<span class="faint">None yet</span>'; } },
           { key: 'act', label: '', align: 'right', render: function (g) { return UI.btn('Bank in', { kind: 'o', size: 'sm', icon: 'building-bank', attrs: { 'data-bankin': g.id, 'data-stop': '1' } }); } }],
-        card: function (g) { return '<div class="row gap8">' + UI.avatar(g.name) + '<div class="grow"><b>' + esc(g.name) + '</b><div class="b2">' + plural(g.n, 'cash payment') + (g.banked ? ' · banked in ' + UI.fmt.money(g.banked) : '') + '</div></div><b class="nw">' + UI.money(g.held) + '</b></div><div class="row" style="justify-content:flex-end;margin-top:8px">' + UI.btn('Bank in', { kind: 'o', size: 'sm', icon: 'building-bank', attrs: { 'data-bankin': g.id } }) + '</div>'; },
+        card: function (g) { return '<div class="row gap8">' + UI.avatar(g.name) + '<div class="grow"><b>' + esc(g.name) + '</b><div class="b2">' + plural(g.n, 'cash payment') + (g.banked ? ' · banked in ' + UI.fmt.money(g.banked) : '') + '</div></div><b class="nw">' + (g.held < 0 ? 'Owed ' + UI.money(-g.held) : UI.money(g.held)) + '</b></div><div class="row" style="justify-content:flex-end;margin-top:8px">' + UI.btn('Bank in', { kind: 'o', size: 'sm', icon: 'building-bank', attrs: { 'data-bankin': g.id } }) + '</div>'; },
         empty: { icon: 'wallet-off', title: 'No cash is being held', text: 'When a payment is recorded as cash to a member of staff, it appears here until they bank it in.' } });
     } else if (tab === 'bankins') {
       var bq = { q: P.q || '', status: P.status || '' };

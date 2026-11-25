@@ -44,3 +44,8 @@
   .pg-availability .av-dates{grid-template-columns:1fr}
   .pg-availability .av-grid{grid-template-columns:1fr}
 }
+
+/* daily rate and the rent for the period on each free or "check" car */
+.pg-availability .av-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:8px 0 2px;font-size:14px}
+.pg-availability .av-price b{font-weight:600;color:var(--text)}
+.pg-availability .av-price span{color:var(--text2)}

@@ -49,12 +49,29 @@ function nbSetCar(c) {
   if (can('bookings.edit_amounts')) { NB.r.daily = money2(c.rate); NB.r.hourly = money2(c.hourly); NB.r.deposit = money2(c.deposit); }
 }
 /* #new?car=&start=&end=&cust=&lead=&draft=1 fills the form once, then the hash goes back to #new */
+/* the first start (from s, same length) when the car is free, after the bookings or workshop time in the way plus the turnaround; null when s is free already or nothing is found */
+function nbFirstFree(carId, s, len) {
+  var t = new Date(s), moved = false;
+  for (var i = 0; i < 40; i++) {
+    var bz = busy(carId, t, new Date(t.getTime() + len));
+    if (bz.free) return moved ? t : null;
+    var next = bz.booking ? new Date(bkHoldEnd(bz.booking)).getTime() + TURNAROUND_H * HOUR : bz.downtime && bz.downtime.to ? new Date(bz.downtime.to).getTime() : NaN;
+    if (isNaN(next)) return null;
+    next = Math.ceil(next / (30 * MIN)) * 30 * MIN; if (next <= t.getTime()) next = t.getTime() + HOUR;
+    t = new Date(next); moved = true;
+  }
+  return null;
+}
 function nbFromQuery(q) {
   if (q.draft) { var d = nbReadDraft(); if (d) { d.restored = d.at; return d; } }
   var n = nbFresh(), prev = NB; NB = n;
   if (q.start && !isNaN(new Date(q.start))) { n.s = new Date(q.start).toISOString(); n.e = new Date(new Date(q.start).getTime() + 2 * DAY).toISOString(); }
   if (q.end && !isNaN(new Date(q.end)) && new Date(q.end) > new Date(n.s)) n.e = new Date(q.end).toISOString();
-  if (q.car && car(q.car)) nbSetCar(car(q.car));
+  if (q.car && car(q.car)) {
+    nbSetCar(car(q.car));
+    /* opened from a busy car with no dates: start at its first free time */
+    if (!q.start) { var ff = nbFirstFree(q.car, new Date(n.s), new Date(n.e) - new Date(n.s)); if (ff) { n.e = new Date(ff.getTime() + (new Date(n.e) - new Date(n.s))).toISOString(); n.s = ff.toISOString(); } }
+  }
   if (q.cust && byId(S.customers, q.cust)) { n.cust = q.cust; n.f = nbFillFromCust(cust(q.cust)); }
   if (q.lead) {
     var w = byId(S.wa, q.lead), L = w && w.lead;
@@ -283,7 +300,7 @@ function nbCarSection(probs) {
   if (NB.car) {
     var cc = car(NB.car), bz = ok ? busy(cc.id, s, e) : { free: true };
     block = '<button type="button" class="carfield picked-car' + (!bz.free ? ' nb-busy' : '') + '" id="nb_car"><span class="pk-car">' + carSVG(cc.color, cc.shape) + '</span><span class="grow"><span class="pk-plate">' + esc(cc.plate) + '</span><span class="pk-sub">' + esc(cc.make + ' ' + cc.model + ' · ' + cc.color) + '</span>' + (nbMoneyMode() !== 'hidden' ? '<span class="pk-sub nb-rate"><span class="money">' + rm(cc.rate) + '</span> a day</span>' : '') + '</span><span class="btn sm ghost">Change</span></button>' +
-      (!bz.free ? '<div class="banner red nb-carbad">' + I('warn') + '<div><b>This car is not available for the selected dates:</b> ' + esc(bz.reason.replace(/^Booked: /, 'Booked ')) + '</div></div>' : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '');
+      (!bz.free ? (function () { var ff = nbFirstFree(NB.car, new Date(NB.s), new Date(NB.e) - new Date(NB.s)); return '<div class="banner red nb-carbad">' + I('warn') + '<div><b>This car is not available for the selected dates:</b> ' + esc(bz.reason.replace(/^Booked: /, 'Booked ')) + (ff ? '<div class="nb-free">Free from ' + esc(dLong(ff) + ', ' + hm(ff)) + '. <button type="button" class="btn sm ghost" id="nb_usefree" data-at="' + ff.toISOString() + '">Use these dates</button></div>' : '') + '</div></div>'; })() : bz.soon ? '<div class="banner amber">' + I('clock') + '<div>Check the turnaround: ' + esc(bz.soon) + '.</div></div>' : '');
   } else block = '<button type="button" class="carfield empty-car' + nbBad(probs, 'car') + '" id="nb_car">' + I('search') + '<span class="grow">Search a car by plate, model or colour</span>' + I('chev') + '</button>' + (NB.tried ? nbErr(probs, 'car') : '');
   return '<div class="formcard" id="nbs_car"><h3><span class="stepn">3</span>Car</h3><div class="field" id="nbf_car">' + block +
     '<div class="nb-freeline"><span class="small muted">' + (ok ? free + ' of ' + usable.length + ' cars free' + (check ? ' (' + check + ' need' + (check === 1 ? 's' : '') + ' a check)' : '') + ' for these dates' : 'Fix the dates to see free cars') + '</span><a class="btn link sm" href="' + hashWith('availability', { start: NB.s, end: NB.e }) + '">' + I('cal') + 'Check availability</a></div></div></div>';
@@ -393,7 +410,8 @@ function nbWire() {
   var on = function (sel, ev, fn) { var el = $(sel); if (el) el.addEventListener(ev, function (e) { if (NB) return fn.call(this, e); }); };
   on('#nb_discard', 'click', function () {
     if (!nbMeaningful(NB)) { NB = null; nbClearDraft(); goBack('#bookings'); return; }
-    confirm({ icon: 'warn', title: 'Discard this booking?', text: 'What you typed here will be lost.', ok: 'Discard', cancel: 'Keep editing', danger: true }).then(function (y) { if (!y) return; NB = null; nbClearDraft(); nbAfterSheet(function () { replaceHash('#bookings'); say('Booking discarded'); }); });
+    var fromLead = NB && NB.leadId && byId(S.wa, NB.leadId) ? NB.leadId : null;
+    confirm({ icon: 'warn', title: 'Discard this booking?', text: 'What you typed here will be lost.', ok: 'Discard', cancel: 'Keep editing', danger: true }).then(function (y) { if (!y) return; NB = null; nbClearDraft(); nbAfterSheet(function () { replaceHash(fromLead ? '#chat/wa/' + fromLead : '#bookings'); say('Booking discarded'); }); });
   });
   on('#nb_fresh', 'click', function () { var keep = JSON.stringify(NB); NB = nbFresh(); nbClearDraft(); render(false, true); undoSnack('Started a new booking', function () { NB = JSON.parse(keep); nbSaveDraft(); render(false, true); }); });
   var ld = $('.nb-leadd'); if (ld) ld.addEventListener('toggle', function () { if (NB) NB.open.lead = ld.open; });
@@ -443,6 +461,7 @@ function nbWire() {
   $$('.nb-lens [data-len]').forEach(function (b) { b.onclick = function () { NB.e = new Date(new Date(NB.s).getTime() + +b.dataset.len).toISOString(); nbRe(); }; });
   $$('.nb-lens [data-add]').forEach(function (b) { b.onclick = function () { var e0 = new Date(NB.e), s0 = new Date(NB.s); NB.e = new Date(Math.max(e0, s0) + +b.dataset.add).toISOString(); nbRe(); }; });
   /* car */
+  on('#nb_usefree', 'click', function () { var len = new Date(NB.e) - new Date(NB.s), at = new Date(this.dataset.at); NB.s = at.toISOString(); NB.e = new Date(at.getTime() + len).toISOString(); nbRe(); say('Dates moved to ' + dShort(at) + ', ' + hm(at)); });
   on('#nb_car', 'click', function () {
     var s = new Date(NB.s), e = new Date(NB.e);
     Pickers.car({ start: e > s ? s : null, end: e > s ? e : null, selected: NB.car, onPick: function (c) { if (!NB) return; nbSetCar(c); nbRe(); } });
@@ -455,12 +474,19 @@ function nbWire() {
         NB.pick = v;
         /* the return follows the pick-up while they were the same */
         var same = old === NB.ret || (!NB.ret && !old);
-        if (same && (v === '' || placeChoices('ret').some(function (o) { return o.v === v; }))) { NB.ret = v; NB.r['return'] = money2(nbPlaceFee(v, 'ret')); }
+        if (same && (v === '' || placeChoices('ret').some(function (o) { return o.v === v; }))) { NB.ret = v; NB.r['return'] = money2(nbPlaceFee(v, 'ret')); if (v === 'client' && !String(NB.retNote || '').trim()) NB.retNote = NB.pickNote || ''; }
         NB.r.delivery = money2(nbPlaceFee(v, 'pick'));
       } else { NB.ret = v; NB.r['return'] = money2(nbPlaceFee(v, 'ret')); }
       nbRe();
     });
-    on('#nb_' + end + 'note', 'input', function () { if (end === 'pick') NB.pickNote = this.value; else NB.retNote = this.value; nbSaveDraft(); var er = this.parentNode.querySelector('.err'); if (er && this.value.trim()) { er.remove(); this.classList.remove('bad'); } if (NB.tried) nbPaint(); });
+    on('#nb_' + end + 'note', 'input', function () {
+      if (end === 'pick') {
+        /* collected from the same client address: the collection address follows while the two were the same */
+        if (NB.pick === 'client' && NB.ret === 'client' && (NB.retNote || '') === (NB.pickNote || '')) { NB.retNote = this.value; var rn = $('#nb_retnote'); if (rn) { rn.value = this.value; var er2 = rn.parentNode.querySelector('.err'); if (er2 && this.value.trim()) { er2.remove(); rn.classList.remove('bad'); } } }
+        NB.pickNote = this.value;
+      } else NB.retNote = this.value;
+      nbSaveDraft(); var er = this.parentNode.querySelector('.err'); if (er && this.value.trim()) { er.remove(); this.classList.remove('bad'); } nbPaint();
+    });
   });
   /* cover */
   $$('[data-cov]').forEach(function (b) { b.onclick = function () { var v = b.dataset.cov; if (v.indexOf('pkg:') === 0) { NB.cover.mode = 'pkg'; NB.cover.pkg = v.slice(4); } else NB.cover.mode = v; nbRe(); }; });
@@ -650,7 +676,8 @@ function nbCommit(n) {
   if (nd) b.log.push({ at: nowIso, by: S.me, text: 'Added ' + nd + ' paper' + (nd > 1 ? 's' : '') + ' with the booking' + (n.icCheck ? ' (' + n.icCheck.label + ')' : '') });
   S.bookings.push(b);
   audit('Made booking ' + b.code, { booking: b.id, cust: cid, car: b.car });
-  if (n.leadId) { var w = byId(S.wa, n.leadId); if (w) { w.status = 'Booked'; w.bookingId = b.id; if (w.lead) { w.lead.state = 'booked'; w.lead.bookingId = b.id; } } }
+  /* saving the booking is what claims the lead (opening New booking from it changes nothing) */
+  if (n.leadId) { var w = byId(S.wa, n.leadId); if (w) { w.status = 'Booked'; w.bookingId = b.id; w.handled = 'staff'; if (w.lead) { w.lead.state = 'booked'; w.lead.bookingId = b.id; if (!w.lead.takenBy) { w.lead.takenBy = S.me; w.lead.takenAt = nowIso; } } } }
   S.recentBookings = [b.id].concat((S.recentBookings || []).filter(function (x) { return x !== b.id; })).slice(0, 5);
   save();
   return b;

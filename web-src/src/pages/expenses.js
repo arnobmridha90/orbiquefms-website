@@ -85,7 +85,7 @@ function expOpen(id) {
       (cat && cat.paysStaff ? UI.kv('To staff', esc(e.staff ? staffName(e.staff) : '-') + '<small>Money they hold, not a car cost</small>') : '') +
       UI.kv('Car', car ? esc(car.plate) + '<small>' + esc(carName(car)) + '</small>' : 'Not tied to a car') +
       UI.kv('Booking', x ? '<button type="button" class="exp-bk" data-bk="' + esc(x.code) + '">' + esc(x.code) + i('external-link') + '</button><small>' + esc(x.cust.name) + '</small>' : 'None') +
-      UI.kv('Paid with', esc(e.method || '-')) + UI.kv(e.source === 'recorded' ? 'Paid to' : 'Details', esc(e.source === 'recorded' ? e.paidTo || '-' : [e.paidTo, e.note].filter(Boolean).join(' · ') || '-')) +
+      UI.kv('Paid with', esc((e.method || '-') + (e.method && e.method !== 'Cash' ? (e.own ? ' (own money, the company pays it back)' : ' (company money)') : ''))) + UI.kv(e.source === 'recorded' ? 'Paid to' : 'Details', esc(e.source === 'recorded' ? e.paidTo || '-' : [e.paidTo, e.note].filter(Boolean).join(' · ') || '-')) +
       (e.source === 'recorded' && e.note ? UI.kv('Note', esc(e.note)) : '') + '</div>';
     h += '<section class="exp-sec"><h4>Receipt</h4>';
     if (e.source !== 'recorded') h += '<p class="b2">The receipt is kept with the ' + (e.source === 'job' ? 'service record' : 'paper') + '.</p>' + (rc ? '<div class="exp-rc"><span class="exp-rc-th">' + i('file-type-pdf') + '</span><div class="grow"><b>' + esc(rc.name) + '</b><small>PDF · ' + UI.fmt.size(rc.size || 0) + '</small></div></div>' : '');
@@ -135,8 +135,8 @@ function expOpen(id) {
 var EXP_LAST = null;
 function expSheet(rec, prefill) {
   var edit = !!rec, today = new Date(NOW().getFullYear(), NOW().getMonth(), NOW().getDate()), yest = new Date(today.getTime() - DAY), uid = (me() || {}).id;
-  var blank = function () { return { day: today, dayTouched: false, amount: '', cat: '', lines: [], car: '', booking: '', staff: '', method: 'Cash', paidTo: '', note: '', receipt: null, shrink: '', dup: '', rcErr: '', reading: false, readText: '', readTone: '', total: null, q: '', all: false }; };
-  var st = Object.assign(blank(), rec ? { day: rec.day, dayTouched: true, amount: (Number(rec.amount) || 0).toFixed(2), cat: rec.cat, car: rec.car || '', booking: rec.booking || '', staff: rec.staff || '', method: rec.method || 'Cash', paidTo: rec.paidTo || '', note: rec.note || '', receipt: rec.receipt } : {});
+  var blank = function () { return { day: today, dayTouched: false, amount: '', cat: '', lines: [], car: '', booking: '', staff: '', method: 'Cash', own: false, paidTo: '', note: '', receipt: null, shrink: '', dup: '', rcErr: '', reading: false, readText: '', readTone: '', total: null, q: '', all: false }; };
+  var st = Object.assign(blank(), rec ? { day: rec.day, dayTouched: true, amount: (Number(rec.amount) || 0).toFixed(2), cat: rec.cat, car: rec.car || '', booking: rec.booking || '', staff: rec.staff || '', method: rec.method || 'Cash', own: !!rec.own, paidTo: rec.paidTo || '', note: rec.note || '', receipt: rec.receipt } : {});
   if (!rec && prefill) {
     ['car', 'booking', 'paidTo', 'note', 'staff', 'method'].forEach(function (k) { if (prefill[k]) st[k] = prefill[k]; });
     if (prefill.day) { st.day = prefill.day; st.dayTouched = true; }
@@ -149,7 +149,7 @@ function expSheet(rec, prefill) {
     if (c.fixedAmount) return c.locked ? { cat: c.id, amount: Number(c.fixedAmount).toFixed(2), fixed: true } : { cat: c.id, amount: Number(c.fixedAmount).toFixed(2) };
     return { cat: c.id, amount: amount ? String(amount) : '' };
   }
-  var sig = function () { return JSON.stringify([+st.day, st.amount, st.cat, st.lines, st.car, st.booking, st.staff, st.method, st.paidTo, st.note, st.receipt && st.receipt.name]); };
+  var sig = function () { return JSON.stringify([+st.day, st.amount, st.cat, st.lines, st.car, st.booking, st.staff, st.method, st.own, st.paidTo, st.note, st.receipt && st.receipt.name]); };
   var start = sig(), saved = 0, readTicket = 0;
   var lineCats = function () { return st.lines.map(function (l) { return expCat(l.cat); }).filter(Boolean); };
   var editCat = function () { return expCat(st.cat); };
@@ -272,7 +272,10 @@ function expSheet(rec, prefill) {
       UI.select({ id: 'exp-cat', key: 'cat', placeholder: 'Choose a kind of expense', value: st.cat, aria: 'Kind of expense', options: EXP_GROUPS.reduce(function (a, g) { return a.concat(cs.filter(function (c) { return expGroupOf(c) === g; }).map(function (c) { return { value: c.id, label: c.name + (c.hidden ? ' (hidden)' : ''), group: g }; })); }, []) }) + '</div>';
     return h;
   };
-  var methodHtml = function () { return '<div class="exp-f"><label class="exp-l">Paid with</label><div class="exp-qc">' + [['Cash', 'cash'], ['Card', 'credit-card'], ['Bank transfer', 'building-bank'], ['E-wallet', 'device-mobile'], ['Other', 'dots']].map(function (m) { return '<button type="button" class="exp-chip" data-pm="' + m[0] + '" aria-pressed="' + (st.method === m[0]) + '">' + i(m[1]) + m[0] + '</button>'; }).join('') + '</div></div>'; };
+  var methodHtml = function () { return '<div class="exp-f"><label class="exp-l">Paid with</label><div class="exp-qc">' + [['Cash', 'cash'], ['Card', 'credit-card'], ['Bank transfer', 'building-bank'], ['E-wallet', 'device-mobile'], ['Other', 'dots']].map(function (m) { return '<button type="button" class="exp-chip" data-pm="' + m[0] + '" aria-pressed="' + (st.method === m[0]) + '">' + i(m[1]) + m[0] + '</button>'; }).join('') + '</div>' +
+    /* cash comes off the cash the person holds; a card, transfer or e-wallet only does when it is their own money */
+    (st.method === 'Cash' ? '<p class="b2 exp-own-h">Paid from the cash you hold, so it comes off your balance at hand.</p>' :
+      '<label class="exp-l" style="margin-top:10px">Whose ' + esc(st.method === 'Card' ? 'card' : st.method === 'E-wallet' ? 'e-wallet' : st.method === 'Bank transfer' ? 'account' : 'money') + '?</label><div class="exp-qc">' + [['0', 'The company\'s', 'building'], ['1', 'My own (pay me back)', 'user']].map(function (o) { return '<button type="button" class="exp-chip" data-own="' + o[0] + '" aria-pressed="' + (!!st.own === (o[0] === '1')) + '">' + i(o[2]) + o[1] + '</button>'; }).join('') + '</div><p class="b2 exp-own-h">' + (st.own ? 'The company owes you this: it is added to your balance in Staff income and expenses.' : 'Paid with company money, so your cash at hand does not change.') + '</p>') + '</div>'; };
   var body = function (el) {
     var h = '';
     if (edit) { var ed = expEditInfo(rec); if (ed.ok && ed.note) h += '<p class="exp-edit ok">' + i('clock') + esc(ed.note) + '</p>'; }
@@ -296,8 +299,16 @@ function expSheet(rec, prefill) {
     var bk = el.querySelector('[data-bkp]');
     if (bk) {
       var needBk = !noBooking() && cats().some(function (c) { return c.needsBooking && !c.noBooking; });
-      UI.bookingPicker(bk, { key: 'booking', label: 'Booking' + (needBk ? '' : ' (optional)'), required: needBk, value: st.booking || null, placeholder: needBk ? 'Booking ID, name, phone or plate' : 'No booking (optional)', onChange: function (v, b) {
+      UI.bookingPicker(bk, { key: 'booking', label: 'Booking' + (needBk ? '' : ' (optional)'), required: needBk, value: st.booking || null, placeholder: needBk ? 'Booking ID, name, phone or plate' : 'No booking (optional)',
+        /* once a car is picked: its booking on the expense day first, then its other bookings, then every other car */
+        rank: function (b) {
+          if (!st.car) return null; var c0 = carById(st.car); if (!c0 || b.car.id !== st.car) return [3, 'Other cars'];
+          var d0 = st.day, d1 = new Date(d0.getTime() + DAY);
+          return b.start < d1 && b.end >= d0 ? [1, c0.plate + ' on ' + UI.fmt.date(d0)] : [2, 'Other bookings of ' + c0.plate];
+        },
+        onChange: function (v, b) {
         st.booking = v || '';
+        if (b && b.car && st.car && b.car.id !== st.car) { var c1 = carById(st.car); UI.toast(b.code + ' was for ' + b.car.plate + ', not ' + (c1 ? c1.plate : 'the car picked') + '. Check the car or the booking.', { tone: 'warn', ms: 5000 }); }
         if (b && b.car && !st.car) st.car = b.car.id;
         setTimeout(redraw, 0);
       } });
@@ -414,19 +425,23 @@ function expSheet(rec, prefill) {
   });
 
   /* ----- saving ----- */
-  var save = function (again) {
+  var save = function (again, sure) {
     keep(dr.body);
     var c = check();
     if (!c.ok) { UI.toast(c.clashes[0] || hint(c), { tone: 'warn' }); redraw(); return; }
     var b = bookingObj(), car = st.car || (b ? b.car.id : null);
-    var base = { day: st.day, car: car || null, booking: noBooking() ? null : (st.booking || null), method: st.method, paidTo: st.paidTo.trim(), note: st.note.trim(), receipt: st.receipt };
+    var base = { day: st.day, car: car || null, booking: noBooking() ? null : (st.booking || null), method: st.method, own: st.method !== 'Cash' && !!st.own, paidTo: st.paidTo.trim(), note: st.note.trim(), receipt: st.receipt };
     if (edit) {
       var c1 = expCat(st.cat), data = Object.assign({}, base, { amount: Math.round(expAmt(st.amount) * 100) / 100, cat: st.cat, staff: c1 && c1.paysStaff ? st.staff : null });
       DB.update('expenses', rec, data, { where: 'Expense', text: me().name + ' changed an expense: ' + c1.name + ' ' + UI.fmt.money(data.amount) + ' on ' + UI.fmt.date(data.day) });
       start = sig(); dr.close(true); UI.toast('Changes saved'); return;
     }
     var key = JSON.stringify([+base.day, base.car, st.lines.map(function (l) { return l.cat + ':' + l.amount; })]);
-    if (EXP_LAST && EXP_LAST.sig === key && Date.now() - EXP_LAST.at < 6000) { UI.toast('That one was already saved a moment ago, so it was not added twice.', { tone: 'info' }); return; }
+    /* the same expense again within a minute: maybe a double tap, maybe a real second ticket. Ask, never refuse */
+    if (!sure && EXP_LAST && EXP_LAST.sig === key && Date.now() - EXP_LAST.at < 60000) {
+      UI.confirm({ title: 'Save it again?', text: 'You just saved ' + st.lines.map(function (l) { var c3 = expCat(l.cat); return (c3 ? c3.name : 'an expense') + ' ' + UI.fmt.money(expAmt(l.amount)); }).join(', ') + '. Save the same again, for example a second ticket?', ok: 'Save again', cancel: 'Cancel' }).then(function (y) { if (y) save(again, true); });
+      return;
+    }
     EXP_LAST = { sig: key, at: Date.now() };
     var total = 0, n = st.lines.length;
     st.lines.forEach(function (l) {
@@ -437,7 +452,7 @@ function expSheet(rec, prefill) {
     saved += n;
     var msg = n > 1 ? n + ' expenses saved (' + UI.fmt.money(total) + ' in total)' : 'Expense saved';
     if (again) {
-      var keepDay = st.day, keepT = st.dayTouched, keepM = st.method; st = blank(); st.day = keepDay; st.dayTouched = keepT; st.method = keepM; start = sig(); readTicket++;
+      var keepDay = st.day, keepT = st.dayTouched, keepM = st.method, keepO = st.own; st = blank(); st.day = keepDay; st.dayTouched = keepT; st.method = keepM; st.own = keepO; start = sig(); readTicket++;
       dr.setBody(body); dr.body.scrollTop = 0; dr.setFoot(foot()); UI.toast(msg + '. Add the next one.');
     } else { start = sig(); dr.close(true); UI.toast(msg); }
   };
@@ -446,6 +461,7 @@ function expSheet(rec, prefill) {
     if ((b = t.closest('[data-day]'))) { keep(dr.body); st.day = b.getAttribute('data-day') === 't' ? today : yest; st.dayTouched = true; redraw(); return; }
     if ((b = t.closest('[data-qc]'))) { keep(dr.body); st.cat = b.getAttribute('data-qc'); redraw(); return; }
     if ((b = t.closest('[data-pm]'))) { keep(dr.body); st.method = b.getAttribute('data-pm'); redraw(); return; }
+    if ((b = t.closest('[data-own]'))) { keep(dr.body); st.own = b.getAttribute('data-own') === '1'; redraw(); return; }
     if (t.closest('[data-lall]')) { st.all = !st.all; drawLines(); return; }
     if (t.closest('[data-pick]')) { pick(false); return; }
     if (t.closest('[data-cam]')) { pick(true); return; }

@@ -138,13 +138,14 @@ VIEWS.home = function () {
   if (can('billing.record_payment')) qa.push(['js:slip', 'receipt', 'Upload slip']);
   if (can('expenses.add')) qa.push(['js:expense', 'tag', 'Add expense']);
   var bankOk = can('expenses.add') || can('expenses.staff_reports_all');
-  if (bankOk && typeof BankIn !== 'undefined') qa.push(['js:bankin', 'bank', 'Bank in cash']);
+  var myHeld = bankOk && typeof cashHeld === 'function' ? (cashHeld()[S.me] || { held: 0 }).held : 0;
+  if (bankOk && typeof BankIn !== 'undefined' && myHeld > 0.009) qa.push(['js:bankin', 'bank', 'Bank in cash']); /* nothing to bank in when you hold no cash */
   var quick = qa.length ? '<div class="hm-quick">' + qa.map(function (q) {
     return q[0].indexOf('js:') === 0 ? '<button type="button" class="gtile" data-qa="' + q[0].slice(3) + '"><span class="gi">' + I(q[1]) + '</span>' + q[2] + '</button>' : '<a class="gtile" href="' + q[0] + '"><span class="gi">' + I(q[1]) + '</span>' + q[2] + '</a>';
   }).join('') + '</div>' : '';
   if (bankOk && typeof cashHeld === 'function') {
-    var held = (cashHeld()[S.me] || { held: 0 }).held;
-    quick = quick.replace(/<\/div>$/, '<a class="gtile hm-cash" href="#cash"><span class="hm-cash-k">Cash I hold</span><b class="money">' + rm(held) + '</b></a></div>');
+    var held = myHeld, owed = held < -0.009; if (!quick) quick = '<div class="hm-quick"></div>';
+    quick = quick.replace(/<\/div>$/, '<a class="gtile hm-cash' + (owed ? ' owed' : '') + '" href="#cash"><span class="hm-cash-k">' + (owed ? 'Company owes you' : 'Cash I hold') + '</span><b class="money">' + rm(Math.abs(held)) + '</b></a></div>');
   }
   /* drafts */
   var drafts = '';

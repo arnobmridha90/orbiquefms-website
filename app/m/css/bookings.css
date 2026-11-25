@@ -129,3 +129,4 @@
 .bk-money-card .bk-depleft span:first-child { display: flex; flex-direction: column; }
 .bk-money-card .bk-depleft small { color: var(--muted); font-size: 12px; }
 .banner .bk-openclash { display: flex; margin-top: 8px; min-height: 40px; white-space: normal; text-align: left; }
+.bk-more { width: 100%; margin: 10px 0 4px; }

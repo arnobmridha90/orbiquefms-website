@@ -75,7 +75,7 @@ function staffEntries() {
   (S.expenses || []).forEach(function (e) {
     if (e.voided) return;
     if (e.toStaff) add(e.toStaff, { at: e.at, part: 'from_owners', side: 'in', amt: +e.amt || 0, desc: 'From the company: ' + e.kind, note: e.note || '', code: '', exp: e });
-    else if (e.agentFee) add(e.by, { at: e.at, part: 'income', side: 'out', amt: +e.amt || 0, desc: e.kind, code: e.booking ? (bk(e.booking) || {}).code || '' : '', exp: e });
+    else if (e.agentFee) add(e.by, { at: e.at, part: 'income', side: 'out', amt: +e.amt || 0, desc: 'Fee kept from cash: ' + e.kind, code: e.booking ? (bk(e.booking) || {}).code || '' : '', exp: e });
     else if (everyday[e.kind]) add(e.by, { at: e.at, part: 'expenses', side: 'out', amt: +e.amt || 0, desc: 'Expense paid: ' + e.kind, note: e.note || e.paidTo || '', code: e.booking ? (bk(e.booking) || {}).code || '' : '', exp: e });
   });
   (S.refunds || []).forEach(function (r) { if (r.voided || r.method !== 'Cash' || !(+r.amt > 0)) return; var b = bk(r.booking) || {}; add(r.refundBy || r.by, { at: r.at, part: 'refunds_given', side: 'out', amt: +r.amt, desc: 'Deposit handed back', code: b.code || '', link: b.id ? '#booking/' + b.id : '' }); });
@@ -115,9 +115,15 @@ function m4payCard(r) {
   var p = r.p, b = r.b, kinds = (p.items || []).map(function (i) { return m4kindShort(i.kind); }).filter(function (k, i, a) { return a.indexOf(k) === i; }).join(', ');
   return '<a class="card2 m4-a" href="#booking/' + b.id + '"><div class="c2-main"><div class="c2-t1">' + esc(cust(b.cust).name) + ' · ' + esc(b.code) + '</div><div class="c2-t2">' + esc(dShort(p.at)) + ', ' + hm(p.at) + ' · ' + esc(kinds) + ' · ' + esc(m4method(p.method)) + '</div></div><div class="c2-end">' + rm(payTotal(p)) + '</div></a>';
 }
-function m4outRows(per) {
-  var rows = [];
-  (S.expenses || []).forEach(function (e) { if (!e.voided && !e.toStaff && m4inRange(e.at, per.from, per.to) && new Date(e.at) <= new Date()) rows.push({ at: e.at, amt: +e.amt || 0, t1: e.kind, t2: (e.agentFee ? 'Handover fee · ' + who(e.by) : (e.paidTo || who(e.by))) + (e.car ? ' · ' + ((car(e.car) || {}).plate || '') : ''), kind: e.agentFee ? 'fee' : 'exp', link: e.booking ? '#booking/' + e.booking : '' }); });
+/* the one definition of money out (Money, Reports): recorded expenses and handover fees, finished service jobs and car papers with a cost
+   (the same rows Expenses counts as spent), deposits given back and the charges the card company keeps. opts.hideHP leaves out car instalments. */
+function m4outRows(per, opts) {
+  var rows = [], hideHP = opts && opts.hideHP;
+  if (typeof exRows === 'function') exRows(per.from, per.to ? new Date(per.to.getTime() + 1) : null, { all: true }).forEach(function (x) {
+    if (x.src === 'recorded' || new Date(x.at) > new Date()) return;
+    rows.push({ at: x.at, amt: x.amt, t1: x.kind, t2: (x.src === 'job' ? 'Service job' : 'Car papers') + (x.paidTo ? ' · ' + x.paidTo : '') + (x.car ? ' · ' + ((car(x.car) || {}).plate || '') : ''), kind: x.src, link: x.car ? '#car/' + x.car : '' });
+  });
+  (S.expenses || []).forEach(function (e) { if (!e.voided && !e.toStaff && !(hideHP && e.kind === 'Hire purchase') && m4inRange(e.at, per.from, per.to) && new Date(e.at) <= new Date()) rows.push({ at: e.at, amt: +e.amt || 0, t1: e.kind, t2: (e.agentFee ? 'Handover fee · ' + who(e.by) : (e.paidTo || who(e.by))) + (e.car ? ' · ' + ((car(e.car) || {}).plate || '') : ''), kind: e.agentFee ? 'fee' : 'exp', link: e.booking ? '#booking/' + e.booking : '' }); });
   (S.refunds || []).forEach(function (r) { if (!r.voided && +r.amt > 0 && m4inRange(r.at, per.from, per.to)) { var b = bk(r.booking) || {}; rows.push({ at: r.at, amt: +r.amt, t1: 'Deposit returned', t2: (b.code || '') + ' · ' + (b.cust ? cust(b.cust).name : '') + ' · ' + r.method, kind: 'ref', link: b.id ? '#booking/' + b.id : '' }); } });
   /* the card company keeps its charge: Money in counts the full card payment, so the charge goes out here and Net matches what reaches the bank */
   S.bookings.forEach(function (b) { (b.payments || []).forEach(function (p) {
@@ -132,9 +138,9 @@ function m4figures(per) {
   var ix = Deposit.index(), held = [], give = [];
   S.bookings.forEach(function (b) {
     if (b.paymentStatus === 'Deposit Refunded') return;
-    var m = calcBooking(b); if (m.depositReceived <= 0 && b.paymentStatus !== 'Refund Pending') return;
+    var m = calcBooking(b), cx = b.bookingStatus === 'Cancelled'; if (m.depositReceived <= 0 && b.paymentStatus !== 'Refund Pending' && !cx) return;
     var x = Deposit.info(b, ix);
-    if (x.net > 0 || m.depositReceived > 0) held.push({ b: b, x: x });
+    if (x.net > 0 || (!cx && m.depositReceived > 0)) held.push({ b: b, x: x }); /* a cancelled booking holds whatever was paid on it until it is refunded or used */
     if (b.paymentStatus === 'Refund Pending') give.push({ b: b, x: x });
   });
   var ch = cashHeld(), cashT = m4sum(Object.keys(ch).map(function (k) { return ch[k].held; }).filter(function (v) { return v > 0; }));
@@ -152,7 +158,7 @@ VIEWS.money = function () {
     '<button type="button" class="card m4-hero" data-open="in"><div class="m4-hero-k">Money in · ' + esc(per.label) + '</div><div class="m4-hero-v money">' + rm(F.inn.total) + '</div>' +
     '<div class="m4-hero-split"><span><small>Rent and charges</small><b class="money">' + rm(F.inn.income) + '</b></span><span><small>Deposits taken</small><b class="money">' + rm(F.inn.deposits) + '</b></span><span><small>Payments</small><b>' + pays.length + '</b></span></div></button>' +
     '<div class="tiles m4-tiles">' +
-    tile('out', 'out', 'Money out', rm(F.outT), 'Expenses and refunds') +
+    tile('out', 'out', 'Money out', rm(F.outT), 'Expenses, service and refunds') +
     tile('net', 'chart', 'Net', rm(F.net), F.net < 0 ? 'More out than in' : 'In minus out', F.net < 0 ? 'neg' : '') +
     tile('due', 'clock', 'Balance to collect', rm(F.dueT), F.due.length + ' booking' + (F.due.length === 1 ? '' : 's'), F.dueT > 0 ? 'warnv' : '') +
     tile('held', 'shield', 'Deposits held', rm(F.heldT), F.held.length + ' booking' + (F.held.length === 1 ? '' : 's')) +
@@ -177,7 +183,7 @@ function m4open(k, per, F) {
   if (k === 'give') { location.hash = '#deposits'; return; }
   if (k === 'cash') { location.hash = '#cash'; return; }
   if (k === 'inst') { moneyV.inst = { f: 'overdue', month: null }; location.hash = '#instalments'; return; }
-  var title, sub = per.label, body = '';
+  var title, sub = per.label, body = '', paged = null;
   if (k === 'in') {
     var rows = m4payRows(per), by = {};
     rows.forEach(function (r) { (r.p.items || []).forEach(function (i) { var g = m4kindShort(i.kind); by[g] = (by[g] || 0) + (+i.amt || 0); }); });
@@ -185,18 +191,20 @@ function m4open(k, per, F) {
     title = 'Money in';
     body = '<div class="card m4-sum">' + Object.keys(by).map(function (g) { return '<div class="sumline"><span>' + esc(g) + '</span><span class="money">' + rm(by[g]) + '</span></div>'; }).join('') + '<div class="sumline big"><span>Total</span><span class="money">' + rm(F.inn.total) + '</span></div></div>' +
       '<div class="m4-meths">' + Object.keys(byM).map(function (m) { return '<span>' + esc(m) + ' <b class="money">' + rm(byM[m]) + '</b></span>'; }).join('') + '</div>' +
-      '<div class="sec"><h2>' + rows.length + ' payment' + (rows.length === 1 ? '' : 's') + '</h2></div><div class="list">' + (rows.length ? rows.slice(0, 200).map(m4payCard).join('') : '<div class="empty">No payments in this period</div>') + '</div>';
+      '<div class="sec"><h2>' + rows.length + ' payment' + (rows.length === 1 ? '' : 's') + '</h2></div>' + (rows.length ? m4pagedShell('Name, booking ID, plate or reference') : '<div class="list"><div class="empty">No payments in this period</div></div>');
+    paged = { items: rows, html: m4payCard, match: function (r, q) { var c = car(r.b.car) || {}; return Pickers.bookingMatches(r.b, q) || wordsMatch(q, (r.p.ref || '') + ' ' + (c.plate || '')) || (normPlate(q).length >= 3 && normPlate(c.plate).indexOf(normPlate(q)) >= 0); } };
   } else if (k === 'out' || k === 'net') {
-    var out = F.out, ex = m4sum(out.filter(function (r) { return r.kind === 'exp'; }), function (r) { return r.amt; }), fee = m4sum(out.filter(function (r) { return r.kind === 'fee'; }), function (r) { return r.amt; }), rf = m4sum(out.filter(function (r) { return r.kind === 'ref'; }), function (r) { return r.amt; }), cc = m4sum(out.filter(function (r) { return r.kind === 'card'; }), function (r) { return r.amt; });
+    var out = F.out, ex = m4sum(out.filter(function (r) { return r.kind === 'exp'; }), function (r) { return r.amt; }), jb = m4sum(out.filter(function (r) { return r.kind === 'job' || r.kind === 'paper'; }), function (r) { return r.amt; }), fee = m4sum(out.filter(function (r) { return r.kind === 'fee'; }), function (r) { return r.amt; }), rf = m4sum(out.filter(function (r) { return r.kind === 'ref'; }), function (r) { return r.amt; }), cc = m4sum(out.filter(function (r) { return r.kind === 'card'; }), function (r) { return r.amt; });
     title = k === 'out' ? 'Money out' : 'Net';
     body = '<div class="card m4-sum">' + (k === 'net' ? '<div class="sumline"><span>Money in</span><span class="money">' + rm(F.inn.total) + '</span></div>' : '') +
-      '<div class="sumline"><span>Expenses</span><span class="money">' + (k === 'net' ? '-' : '') + rm(ex) + '</span></div><div class="sumline"><span>Handover fees</span><span class="money">' + (k === 'net' ? '-' : '') + rm(fee) + '</span></div><div class="sumline"><span>Deposits returned</span><span class="money">' + (k === 'net' ? '-' : '') + rm(rf) + '</span></div>' +
+      '<div class="sumline"><span>Expenses</span><span class="money">' + (k === 'net' ? '-' : '') + rm(ex) + '</span></div>' + (jb ? '<div class="sumline"><span>Service jobs and car papers</span><span class="money">' + (k === 'net' ? '-' : '') + rm(jb) + '</span></div>' : '') + '<div class="sumline"><span>Handover fees</span><span class="money">' + (k === 'net' ? '-' : '') + rm(fee) + '</span></div><div class="sumline"><span>Deposits returned</span><span class="money">' + (k === 'net' ? '-' : '') + rm(rf) + '</span></div>' +
       (cc ? '<div class="sumline"><span>Card charges</span><span class="money">' + (k === 'net' ? '-' : '') + rm(cc) + '</span></div>' : '') +
       '<div class="sumline big"><span>' + (k === 'net' ? 'Net' : 'Total') + '</span><span class="money">' + rm(k === 'net' ? F.net : F.outT) + '</span></div></div>' +
-      (k === 'net' ? '<p class="small muted m4-note">Money in counts every payment received, deposits included. Money out counts expenses, handover fees, deposits given back and the charges the card company keeps.</p>' : '') +
-      '<div class="sec"><h2>' + out.length + ' item' + (out.length === 1 ? '' : 's') + '</h2></div><div class="list">' + (out.length ? out.slice(0, 200).map(function (r) {
+      (k === 'net' ? '<p class="small muted m4-note">Money in counts every payment received, deposits included. Money out counts expenses, service jobs and car papers, handover fees, deposits given back and the charges the card company keeps. Reports uses the same figures.</p>' : '') +
+      '<div class="sec"><h2>' + out.length + ' item' + (out.length === 1 ? '' : 's') + '</h2></div>' + (out.length ? m4pagedShell('Name, booking ID, plate or what for') : '<div class="list"><div class="empty">Nothing paid out in this period</div></div>');
+    paged = { items: out, html: function (r) {
         return '<' + (r.link ? 'a href="' + r.link + '"' : 'div') + ' class="card2 m4-a"><div class="c2-main"><div class="c2-t1">' + esc(r.t1) + '</div><div class="c2-t2">' + esc(dShort(r.at)) + ' · ' + esc(r.t2) + '</div></div><div class="c2-end">' + rm(r.amt) + '</div></' + (r.link ? 'a' : 'div') + '>';
-      }).join('') : '<div class="empty">Nothing paid out in this period</div>') + '</div>';
+      }, match: function (r, q) { var t = r.t1 + ' ' + r.t2; return wordsMatch(q, t) || (normPlate(q).length >= 3 && normPlate(t).indexOf(normPlate(q)) >= 0) || (/^#?[a-z]{0,5}[\s-]*\d+$/i.test(q.trim()) && r.link && r.link.indexOf('#booking/') === 0 && matchBookingCode(q, bk(r.link.slice(9)))); } };
   } else if (k === 'due') {
     title = 'Balance to collect'; sub = 'Cars out, back, or going out in the next 2 days';
     var list = F.due.slice().sort(function (a, b) { return calcBooking(b).due - calcBooking(a).due; });
@@ -206,7 +214,24 @@ function m4open(k, per, F) {
     var hl = F.held.slice().sort(function (a, b) { return new Date(a.b.end) - new Date(b.b.end); });
     body = '<div class="list">' + (hl.length ? hl.map(function (r) { return '<button type="button" class="card2" data-dep="' + r.b.id + '"><div class="c2-main"><div class="c2-t1">' + esc(cust(r.b.cust).name) + ' · ' + esc(r.b.code) + '</div><div class="c2-t2">' + esc(r.b.paymentStatus || 'No payment status') + ' · back ' + esc(dShort(r.b.end)) + '</div></div><div class="c2-end">' + rm(r.x.net) + '</div></button>'; }).join('') : '<div class="empty">No deposits held</div>') + '</div>';
   }
-  sheet(sheetHead(title, sub) + body, function (sh) { $$('[data-dep]', sh).forEach(function (el) { el.onclick = function () { Deposit.open(el.dataset.dep, { stack: true }); }; }); $$('a[href^="#"]', sh).forEach(function (a) { a.addEventListener('click', function () { closeAllSheets(); }); }); }, { full: true });
+  sheet(sheetHead(title, sub) + body, function (sh) { if (paged) m4pagedWire(sh, paged); $$('[data-dep]', sh).forEach(function (el) { el.onclick = function () { Deposit.open(el.dataset.dep, { stack: true }); }; }); $$('a[href^="#"]', sh).forEach(function (a) { a.addEventListener('click', function () { closeAllSheets(); }); }); }, { full: true });
+}
+
+/* a long list in a sheet: a search box, the first 50 rows and 'Show 50 more' (every row can be reached) */
+var M4_PAGE = 50;
+function m4pagedShell(ph) { return '<label class="search m4-search">' + I('search') + '<input type="search" class="m4-q" placeholder="' + esc(ph) + '" autocomplete="off" enterkeyhint="search"></label><div class="list m4-rows"></div><div class="m4-morebox"></div>'; }
+function m4pagedWire(sh, P) {
+  var st = { q: '', n: M4_PAGE }, qi = $('.m4-q', sh), box = $('.m4-rows', sh), more = $('.m4-morebox', sh); if (!box) return;
+  var draw = function () {
+    var q = st.q.trim(), list = q ? P.items.filter(function (r) { return P.match(r, q); }) : P.items, shown = list.slice(0, st.n);
+    box.innerHTML = shown.length ? shown.map(P.html).join('') : '<div class="empty">Nothing matches this search.</div>';
+    var left = list.length - shown.length;
+    more.innerHTML = left > 0 ? '<button type="button" class="btn ghost m4-more">Show ' + Math.min(M4_PAGE, left) + ' more <span class="muted">(' + left + ' left)</span></button>' : (q ? '<p class="small muted m4-note">' + list.length + ' of ' + P.items.length + ' match</p>' : '');
+    var mb = $('.m4-more', more); if (mb) mb.onclick = function () { st.n += M4_PAGE; draw(); };
+    $$('a[href^="#"]', box).forEach(function (a) { a.addEventListener('click', function () { closeAllSheets(); }); });
+  };
+  var tm = null; if (qi) qi.oninput = function () { clearTimeout(tm); tm = setTimeout(function () { st.q = qi.value; st.n = M4_PAGE; draw(); }, 180); };
+  draw();
 }
 
 /* ---------- Bank in cash ---------- */
@@ -327,17 +352,18 @@ VIEWS.cash = function () {
   var ch = cashHeld(), my = ch[S.me] || { held: 0, count: 0, oldest: null };
   var myBi = (S.bankIns || []).filter(function (x) { return x.staff === S.me; }).sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
   var html = topbar('Cash and bank-ins', { back: '#more' }) + '<main class="m4-main">' +
-    '<div class="card m4-hero m4-cash"><div class="m4-hero-k">Cash I hold</div><div class="m4-hero-v money' + (my.held < 0 ? ' neg' : '') + '">' + rm(my.held) + '</div>' +
+    '<div class="card m4-hero m4-cash"><div class="m4-hero-k">' + (my.held < -0.009 ? 'Company owes you' : 'Cash I hold') + '</div><div class="m4-hero-v money">' + rm(Math.abs(my.held)) + '</div>' +
     '<div class="m4-hero-note">' + (my.held > 0 && my.oldest ? 'Oldest cash from ' + esc(dFull(my.oldest)) + (my.count ? ' · ' + my.count + ' cash payment' + (my.count === 1 ? '' : 's') : '') : my.held < 0 ? 'You paid out, banked in or handed back more than you took in cash.' : 'You hold no company cash right now.') + '</div>' +
-    (mine ? '<button type="button" class="btn big m4-bibtn" id="cashBi">' + I('bank') + 'Bank in cash</button>' : '') + '</div>';
+    (mine && my.held > 0.009 ? '<button type="button" class="btn big m4-bibtn" id="cashBi">' + I('bank') + 'Bank in cash</button>' : '') + '</div>';
   if (all) {
     var people = Object.keys(ch).map(function (k) { return ch[k]; }).filter(function (g) { return Math.abs(g.held) > 0.009; }).sort(function (a, b) { return b.held - a.held; });
     var tot = m4sum(people.filter(function (g) { return g.held > 0; }), function (g) { return g.held; });
     html += '<div class="sec"><h2>Cash held by staff</h2><span class="small muted money">' + rm(tot) + '</span></div><div class="list">' + (people.length ? people.map(function (g) {
       var nm = who(g.id), old = g.oldest ? Math.floor((Date.now() - new Date(g.oldest)) / DAY) : 0;
-      return '<div class="card2 m4-person">' + m4av(nm) + '<div class="c2-main"><div class="c2-t1">' + esc(nm) + (g.id === S.me ? ' <span class="muted">(me)</span>' : '') + '</div><div class="c2-t2">' + (g.held > 0 ? (g.count ? g.count + ' payment' + (g.count === 1 ? '' : 's') + ' · ' : '') + 'since ' + esc(dShort(g.oldest)) : 'Paid out more than held') + '</div>' +
+      var open = BankIn.office() || g.id === S.me;
+      return '<div class="card2 m4-person' + (open ? ' m4-a" role="button" tabindex="0" data-person="' + g.id + '" aria-label="Open the cash ledger of ' + esc(nm) + '"' : '"') + '>' + m4av(nm) + '<div class="c2-main"><div class="c2-t1">' + esc(nm) + (g.id === S.me ? ' <span class="muted">(me)</span>' : '') + '</div><div class="c2-t2">' + (g.held > 0 ? (g.count ? g.count + ' payment' + (g.count === 1 ? '' : 's') + ' · ' : '') + 'since ' + esc(dShort(g.oldest)) : 'Paid out more than held') + '</div>' +
         (g.held > 0 && old >= 7 ? '<div class="dep-chips">' + chip('Held ' + old + ' days', old >= 14 ? 'red' : 'amber') + '</div>' : '') + '</div>' +
-        '<div class="m4-pend"><b class="money' + (g.held < 0 ? ' neg' : '') + '">' + rm(g.held) + '</b>' + (BankIn.office() || g.id === S.me ? '<button type="button" class="btn sm ghost" data-bifor="' + g.id + '">Bank in</button>' : '') + '</div></div>';
+        '<div class="m4-pend"><b class="money' + (g.held < 0 ? ' neg' : '') + '">' + rm(g.held) + '</b>' + ((BankIn.office() || g.id === S.me) && g.held > 0.009 ? '<button type="button" class="btn sm ghost" data-bifor="' + g.id + '">Bank in</button>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No cash is being held</div>') + '</div>';
   }
   var list = all ? (S.bankIns || []).slice() : myBi;
@@ -349,7 +375,8 @@ VIEWS.cash = function () {
     '<p class="small muted m4-note">Cash held = cash taken from customers and money from the company, less expenses and handover fees paid from it, deposits handed back in cash and bank-ins. It is the same as the balance at hand on ' + (can('expenses.staff_reports_all') ? 'Staff money' : 'My money') + '. A bank-in is never an expense or income.</p></main>';
   return { html: html, keepScroll: true, after: function () {
     var b = $('#cashBi'); if (b) b.onclick = function () { BankIn.open({ staff: S.me }); };
-    $$('[data-bifor]').forEach(function (el) { el.onclick = function () { BankIn.open({ staff: el.dataset.bifor }); }; });
+    $$('[data-bifor]').forEach(function (el) { el.onclick = function (e) { e.stopPropagation(); BankIn.open({ staff: el.dataset.bifor }); }; });
+    $$('[data-person]').forEach(function (el) { var go = function () { location.hash = el.dataset.person === S.me && !can('expenses.staff_reports_all') ? '#mymoney' : hashWith('mymoney', { p: el.dataset.person }); }; el.onclick = go; el.onkeydown = function (e) { if (e.key === 'Enter') go(); }; });
     var v = $('#cashVoided'); if (v) v.onclick = function () { moneyV.cash.voided = !moneyV.cash.voided; render(false, true); };
     m4wireBankIns();
   } };
@@ -382,7 +409,7 @@ VIEWS.mymoney = function (r) {
   var tabs = [['bal', 'Balance', R.ledger.length], ['inc', isMe ? 'My income' : 'Income', null], ['exp', isMe ? 'My expenses' : 'Expenses', null], ['bi', 'Bank-ins', null]];
   html += '<div class="card m4-hero"><div class="m4-hero-k">Balance at hand</div><div class="m4-hero-v money' + (R.closing < 0 ? ' neg' : '') + '">' + rm(R.closing) + '</div>' +
     '<div class="m4-hero-note">' + (R.closing > 0.009 ? (isMe ? 'You hold ' : fn + ' holds ') + rm(R.closing) + ' of the company’s money.' : R.closing < -0.009 ? 'The company owes ' + (isMe ? 'you ' : fn + ' ') + rm(-R.closing) + '.' : 'All square.') + ' Brought forward ' + rm(R.opening) + '.</div>' +
-    ((isMe && can('expenses.add')) || BankIn.office() ? '<button type="button" class="btn big m4-bibtn" id="mmBi">' + I('bank') + 'Bank in cash</button>' : '') + '</div>' +
+    (((isMe && can('expenses.add')) || BankIn.office()) && R.closing > 0.009 ? '<button type="button" class="btn big m4-bibtn" id="mmBi">' + I('bank') + 'Bank in cash</button>' : '') + '</div>' +
     '<div class="tiles m4-tiles">' +
     '<button type="button" class="tile m4-tile" data-mtab="inc"><div class="k">' + I('star') + 'Income</div><div class="v">' + rm(f.income) + '</div><div class="m4-sub">Handover fees</div></button>' +
     '<button type="button" class="tile m4-tile" data-mtab="exp"><div class="k">' + I('receipt') + 'Expenses paid</div><div class="v">' + rm(f.expenses) + '</div><div class="m4-sub">Everyday costs</div></button>' +
@@ -397,7 +424,8 @@ VIEWS.mymoney = function (r) {
       var tag = e.link ? 'a href="' + e.link + '"' : e.bankIn ? 'button type="button" data-bi="' + e.bankIn + '"' : 'div';
       return '<' + tag + ' class="card2 m4-led m4-a"><div class="c2-main"><div class="c2-t1">' + esc(e.desc) + '</div><div class="c2-t2">' + inside + '</div></div><div class="c2-end"><span class="' + (e.side === 'in' ? 'm4-in' : 'm4-out') + '">' + (e.side === 'in' ? '+' : '-') + rm(e.amt).replace('RM ', 'RM ') + '</span><small>Balance ' + rm(e.balance) + '</small></div></' + tag.split(' ')[0] + '>';
     }).join('') : '') + '<div class="card2 m4-led m4-bf"><div class="c2-main"><div class="c2-t1">Balance brought forward</div><div class="c2-t2">' + esc(dFull(per.from)) + '</div></div><div class="c2-end">' + rm(R.opening) + '</div></div></div>' +
-      (led.length ? '' : '<p class="small muted m4-note">Nothing moved in this period.</p>');
+      (led.length ? '' : '<p class="small muted m4-note">Nothing moved in this period.</p>') +
+      (R.ledger.some(function (e) { return e.part === 'income'; }) ? '<p class="small muted m4-note">Fees ' + (isMe ? 'you keep' : fn + ' keeps') + ' come off the cash ' + (isMe ? 'you hold' : 'held') + ', so they show with a minus here and as income above.</p>' : '');
   } else if (tab === 'inc') {
     var inc = R.ledger.filter(function (e) { return e.part === 'income'; }), by = {};
     inc.forEach(function (e) { var g = by[e.desc] = by[e.desc] || { n: 0, t: 0 }; g.n++; g.t += e.amt; });

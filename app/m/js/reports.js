@@ -74,13 +74,13 @@ function rpInOut(r) {
   var M = rpPayments(r), days = {}, now = Date.now(), hide = rpHideHP();
   var day = function (at) { var k = toLocalInput(at); return days[k] = days[k] || { k: k, at: sod(at), inn: 0, out: 0, n: 0 }; };
   M.list.forEach(function (x) { var d = day(x.at); d.inn += x.amt; d.n++; });
-  var ex = (S.expenses || []).filter(function (e) { var at = new Date(e.at); return !e.voided && !e.toStaff && at >= r.from && at < r.end && at.getTime() <= now && !(hide && e.kind === 'Hire purchase'); });
-  var rf = (S.refunds || []).filter(function (f) { var at = new Date(f.at); return !f.voided && at >= r.from && at < r.end; });
-  ex.forEach(function (e) { var d = day(e.at); d.out += +e.amt || 0; d.n++; });
-  rf.forEach(function (f) { var d = day(f.at); d.out += +f.amt || 0; d.n++; });
+  /* money out is the Money screen's definition (m4outRows), so both screens show the same month the same way */
+  var outR = m4outRows({ from: r.from, to: new Date(r.end.getTime() - 1) }, { hideHP: hide });
+  outR.forEach(function (x) { var d = day(x.at); d.out += x.amt; d.n++; });
   var list = Object.keys(days).map(function (k) { var d = days[k]; d.net = d.inn - d.out; return d; }).sort(function (a, b) { return b.at - a.at; });
-  var exT = rpSum(ex, function (e) { return +e.amt || 0; }), rfT = rpSum(rf, function (f) { return +f.amt || 0; });
-  return { list: list, inn: M.total, out: rpSum([exT, rfT]), ex: exT, rf: rfT, nPay: M.list.length, nEx: ex.length, nRf: rf.length, hide: hide };
+  var part = function (ks) { return rpSum(outR.filter(function (x) { return ks.indexOf(x.kind) >= 0; }), function (x) { return x.amt; }); };
+  var exT = part(['exp', 'fee', 'job', 'paper']), rfT = part(['ref']), ccT = part(['card']);
+  return { list: list, inn: M.total, out: rpSum([exT, rfT, ccT]), ex: exT, rf: rfT, cc: ccT, nPay: M.list.length, nEx: outR.filter(function (x) { return x.kind !== 'ref' && x.kind !== 'card'; }).length, nRf: outR.filter(function (x) { return x.kind === 'ref'; }).length, hide: hide };
 }
 function rpProfit(r) {
   var BI = rpIncome(r), rows = Expenses.rows(r.from, r.end, { all: true });
@@ -109,23 +109,23 @@ function rpModels(r) {
   var out = [];
   var I1 = rpIncome(r), t = I1.tot;
   out.push({ id: 'income', title: 'Bookings and income', icon: 'list', desc: 'Income from bookings, spread over the days of each rental.',
-    kpis: [{ l: 'Total income', v: t.total, t: 'money', hero: true, note: t.n + ' booking' + (t.n === 1 ? '' : 's'), split: [['Rental', t.rental], ['Delivery fee', t.deliv], ['Return fee', t.ret], ['Damage coverage', t.dmg]].concat(t.other ? [['Other charges', t.other]] : []) },
+    kpis: [{ l: 'Earned from bookings', v: t.total, t: 'money', hero: true, note: t.n + ' booking' + (t.n === 1 ? '' : 's'), split: [['Rental', t.rental], ['Delivery fee', t.deliv], ['Return fee', t.ret], ['Damage coverage', t.dmg]].concat(t.other ? [['Other charges', t.other]] : []) },
       { l: 'Days booked', v: t.days, t: 'int', note: 'Utilisation ' + rpPct(t.util) }, { l: 'Average per booking', v: t.n ? t.total / t.n : 0, t: 'money' }, { l: 'Deposits held', v: t.dep, t: 'money', note: 'Not income' }, { l: 'Cars', v: I1.cars.length, t: 'int', note: 'In the fleet' }],
     rowsTitle: 'Income by car', rows: I1.byCar.filter(function (x) { return x.n; }).sort(function (a, b) { return b.total - a.total; }).map(function (x) { return { t1: rpCarName(x.car), t2: x.n + ' booking' + (x.n === 1 ? '' : 's') + ' · ' + x.days + ' day' + (x.days === 1 ? '' : 's') + ' · ' + rpPct(x.days / r.days) + ' used', v: x.total, link: '#car/' + x.car.id }; }),
-    totalRow: { l: 'Total income', v: t.total },
+    totalRow: { l: 'Earned from bookings', v: t.total },
     notes: ['Rental income = rent minus any discount, spread evenly over the 24-hour blocks of the booking (the first block starts at pick-up). Damage coverage is spread the same way.', 'The delivery fee and other charges count in the period of the first block, the return fee in the period of the last block.', 'The security deposit is never income: it is held and given back, so it is shown apart as Deposits held.', 'Pending and cancelled bookings are never counted as income.'] });
   var M = rpPayments(r);
   out.push({ id: 'money', title: 'Money in', icon: 'cash', desc: 'Every payment received in the period, newest first.',
-    kpis: [{ l: 'Money in', v: M.total, t: 'money', hero: true, note: M.list.length + ' payment' + (M.list.length === 1 ? '' : 's'), split: [['Income', M.total - M.dep], ['Deposits received', M.dep], ['Taken in cash', M.cash]] }, { l: 'Income', v: M.total - M.dep, t: 'money', note: 'Rental and charges' }, { l: 'Deposits received', v: M.dep, t: 'money', note: 'Held, not income' }, { l: 'Void payments', v: M.voided, t: 'int', note: 'Left out' }],
+    kpis: [{ l: 'Money in', v: M.total, t: 'money', hero: true, note: M.list.length + ' payment' + (M.list.length === 1 ? '' : 's'), split: [['Rent and charges received', M.total - M.dep], ['Deposits received', M.dep], ['Taken in cash', M.cash]] }, { l: 'Rent and charges received', v: M.total - M.dep, t: 'money', note: 'Paid in this period' }, { l: 'Deposits received', v: M.dep, t: 'money', note: 'Held, not income' }, { l: 'Void payments', v: M.voided, t: 'int', note: 'Left out' }],
     rowsTitle: 'Payments', rows: M.list.map(function (x) { return { t1: x.b.code + ' · ' + cust(x.b.cust).name, t2: dShort(x.at) + ', ' + hm(x.at) + ' · ' + (x.p.items || []).map(function (i) { return m4kindShort(i.kind); }).join(', ') + ' · ' + methodText(x.p.method), v: x.amt, link: '#booking/' + x.b.id }; }),
     totalRow: { l: 'Total money in', v: M.total },
     notes: ['Void payments are left out' + (M.voided ? ' (' + M.voided + ' in this period)' : '') + '. Payments made from a deposit already held are left out too' + (M.fromDep ? ' (' + M.fromDep + ')' : '') + ': no money came in.', 'Payments on Pending or Cancelled bookings are listed, because the money came in. Deposit refunds are not listed here.'] });
   var IO = rpInOut(r);
   out.push({ id: 'inout', title: 'Money in and out', icon: 'activity', desc: 'What came in and what went out, day by day.',
-    kpis: [{ l: 'Net', v: IO.inn - IO.out, t: 'money', hero: true, signed: true, note: 'Money in minus money out', split: [['Money in', IO.inn], ['Expenses', IO.ex], ['Deposits returned', IO.rf]] }, { l: 'Money in', v: IO.inn, t: 'money', note: IO.nPay + ' payment' + (IO.nPay === 1 ? '' : 's') }, { l: 'Money out', v: IO.out, t: 'money', note: IO.nEx + ' expense' + (IO.nEx === 1 ? '' : 's') + ', ' + IO.nRf + ' refund' + (IO.nRf === 1 ? '' : 's') }],
+    kpis: [{ l: 'Net', v: IO.inn - IO.out, t: 'money', hero: true, signed: true, note: 'Money in minus money out', split: [['Money in', IO.inn], ['Expenses and service', IO.ex], ['Deposits returned', IO.rf]].concat(IO.cc ? [['Card charges', IO.cc]] : []) }, { l: 'Money in', v: IO.inn, t: 'money', note: IO.nPay + ' payment' + (IO.nPay === 1 ? '' : 's') }, { l: 'Money out', v: IO.out, t: 'money', note: IO.nEx + ' expense' + (IO.nEx === 1 ? '' : 's') + ', ' + IO.nRf + ' refund' + (IO.nRf === 1 ? '' : 's') }],
     rowsTitle: 'By day', rows: IO.list.map(function (d) { return { t1: dLong(d.at), t2: 'In ' + rm(d.inn) + ' · Out ' + rm(d.out), t2money: true, v: d.net, signed: true }; }),
     totalRow: { l: 'Net', v: IO.inn - IO.out, signed: true },
-    notes: ['Money in = every payment received (void ones and payments from a deposit left out). Money out = every expense and every deposit given back.', 'Cash banked in and money handed to staff are left out: no money left or entered the company.'].concat(IO.hide ? ['Car instalments are hidden for your role.'] : []) });
+    notes: ['Money in = every payment received (void ones and payments from a deposit left out). Money out = every expense and handover fee, finished service jobs and car papers, every deposit given back, and the charges the card company keeps. Money uses the same figures.', 'Cash banked in and money handed to staff are left out: no money left or entered the company.'].concat(IO.hide ? ['Car instalments are hidden for your role.'] : []) });
   var P = rpProfit(r);
   out.push({ id: 'profit', title: 'Profit by car', icon: 'chart', desc: 'Income from bookings against what each car cost.',
     kpis: [{ l: 'Profit from the cars', v: P.t.profit, t: 'money', hero: true, signed: true, note: P.t.inc && can('reports.see_amounts') ? Math.round(P.t.profit / P.t.inc * 100) + '% of income' : '', split: [['Income from bookings', P.t.inc], ['What the cars cost', P.t.cost]] }, { l: 'Company costs', v: P.t.company, t: 'money', note: 'Not tied to a car' }, { l: 'Profit after all costs', v: P.t.after, t: 'money', signed: true }],
@@ -146,7 +146,7 @@ function rpMoney(v, signed) { if (!can('reports.see_amounts')) return '<span cla
 function rpVal(k) { return k.t === 'money' ? rpMoney(k.v, k.signed) : k.t === 'pct' ? rpPct(k.v) : '<span class="num">' + Math.round(k.v).toLocaleString('en-MY') + '</span>'; }
 function rpCard(m, r) {
   var hero = m.kpis.filter(function (k) { return k.hero; })[0], rest = m.kpis.filter(function (k) { return !k.hero; });
-  var n = m.rows.length, top = m.rows.slice(0, RP_TOP), see = can('reports.see_amounts');
+  var n = m.rows.length, all = !!(RPV.open && RPV.open[m.id]), top = all ? m.rows : m.rows.slice(0, RP_TOP), see = can('reports.see_amounts');
   return '<section class="card rp-card" id="rp-' + m.id + '"><div class="rp-head"><span class="rp-ic">' + I(m.icon) + '</span><div class="grow"><h3>' + esc(m.title) + '</h3><p>' + esc(m.desc) + '</p></div></div>' +
     (hero ? '<div class="rp-hero"><div class="rp-hero-k">' + esc(hero.l) + '</div><div class="rp-hero-v">' + rpVal(hero) + '</div>' + (hero.note ? '<div class="rp-hero-n">' + esc(hero.note) + '</div>' : '') +
       (hero.split && see ? '<div class="rp-split">' + hero.split.map(function (s) { return '<div><small>' + esc(s[0]) + '</small>' + rpMoney(s[1]) + '</div>'; }).join('') + '</div>' : '') + '</div>' : '') +
@@ -156,7 +156,7 @@ function rpCard(m, r) {
       var tag = x.link ? 'a' : 'div';
       return '<' + tag + ' class="card2 rp-row"' + (x.link ? ' href="' + x.link + '"' : '') + '><div class="c2-main"><div class="c2-t1">' + esc(x.t1) + '</div><div class="c2-t2">' + (x.t2money && !see ? esc(x.t2.replace(/RM [\d,.]+/g, 'Hidden')) : esc(x.t2)) + '</div>' + (x.bar != null ? '<i class="rp-bar" style="width:' + Math.max(2, Math.round(x.bar * 100)) + '%"></i>' : '') + '</div><div class="c2-end">' + rpMoney(x.v, x.signed) + '</div></' + tag + '>';
     }).join('') + '<div class="rp-total"><span>' + esc(m.totalRow.l) + '</span>' + rpMoney(m.totalRow.v, m.totalRow.signed) + '</div></div>' +
-      (n > RP_TOP ? '<p class="rp-first">First ' + RP_TOP + ' of ' + n + ' rows; the total is for all ' + n + '.</p>' : '') : '<div class="empty small">Nothing in this period.</div>') +
+      (n > RP_TOP ? (all ? '' : '<p class="rp-first">First ' + RP_TOP + ' of ' + n + ' rows; the total is for all ' + n + '.</p>') + '<button type="button" class="btn ghost rp-all" data-rpall="' + m.id + '">' + (all ? 'Show fewer' : 'Show all ' + n) + '</button>' : '') : '<div class="empty small">Nothing in this period.</div>') +
     '<details class="rp-notes"><summary>How it is worked out</summary><ul>' + m.notes.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></details>' +
     (can('reports.export_excel') ? '<button type="button" class="btn ghost rp-pdf" data-pdf="' + m.id + '">' + I('share') + 'Share PDF</button>' : '') +
     '</section>';
@@ -182,6 +182,10 @@ VIEWS.reports = function () {
     if (t) t.onchange = function () { RPV.to = t.value; render(); };
     $$('[data-jump]').forEach(function (b) { b.onclick = function () { var el = $('#rp-' + b.dataset.jump); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }; });
     $$('[data-pdf]').forEach(function (b) { b.onclick = function () { rpPdf(b.dataset.pdf); }; });
+    $$('[data-rpall]').forEach(function (b) { b.onclick = function () {
+      var id = b.dataset.rpall, was = !!RPV.open[id]; RPV.open[id] = !was; render(false, true);
+      if (was) { var el = $('#rp-' + id); if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start' }); }
+    }; });
   } };
 };
 function rpPdf(id) {

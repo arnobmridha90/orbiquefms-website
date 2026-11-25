@@ -101,34 +101,47 @@ PAGES['tracking'] = {
       el.innerHTML = '<div class="tr-now"><div class="card tr-mapc"><div class="tr-maph"><b>Map</b><span class="faint" id="tr-upd"></span>' + UI.btn('Refresh', { kind: 't', size: 'sm', icon: 'refresh', attrs: { 'data-tr': 'tick' } }) + '</div><div id="tr-map"></div>' +
         '<div class="tr-leg"><span><i class="moving"></i>Moving</span><span><i class="parked"></i>Parked</span><span><i class="offline"></i>Offline</span><span><i class="over"></i>Over-speed</span></div></div>' +
         '<div class="card tr-listc"><div id="tr-f"></div><div id="tr-t"></div></div></div><p class="tr-note">' + i('info-circle') + 'Updates every 30 seconds. A car is Offline when nothing was heard from its tracker for a while. Over-speed is flagged at ' + trOver() + ' km/h.</p>';
-      var counts = function () { var c = { all: d.trackers.length, Moving: 0, Parked: 0, Offline: 0 }; d.trackers.forEach(function (t) { c[t.state]++; }); return c; };
-      var rows = function () {
-        var q = (st.f.q || '').toLowerCase();
-        return d.trackers.filter(function (t) { if (st.f.state !== 'all' && t.state !== st.f.state) return false; if (!q) return true; var c = carById(t.car); return [t.name, t.imei, c ? c.plate + ' ' + carName(c) : 'not linked'].join(' ').toLowerCase().indexOf(q) >= 0; });
+      /* the list is the cars (not the trackers): each car with its tracker, cars with no tracker as "No tracker", and
+         trackers on no car (spares) left off the list and the map, only counted in a note */
+      var items = function () {
+        var out = d.trackers.filter(function (t) { return t.car && carById(t.car); }).map(function (t) { return { id: t.id, t: t, c: carById(t.car), state: t.state }; });
+        d.cars.forEach(function (c) { if (c.fleet !== 'Sold' && !d.trackers.some(function (t) { return t.car === c.id; })) out.push({ id: 'car:' + c.id, t: null, c: c, state: 'None' }); });
+        return out;
       };
+      var spares = function () { return d.trackers.filter(function (t) { return !t.car || !carById(t.car); }); };
+      var counts = function () { var c = { all: 0, Moving: 0, Parked: 0, Offline: 0, None: 0 }; items().forEach(function (r) { c.all++; c[r.state]++; }); return c; };
+      var rows = function () {
+        var q = (st.f.q || '').toLowerCase(), nq = normPlate(st.f.q || '').toLowerCase();
+        return items().filter(function (r) { if (st.f.state !== 'all' && r.state !== st.f.state) return false; if (!q) return true; var txt = [r.t ? r.t.name + ' ' + r.t.imei : 'no tracker', r.c.plate + ' ' + normPlate(r.c.plate) + ' ' + carName(r.c)].join(' ').toLowerCase(); return txt.indexOf(q) >= 0 || (nq.length >= 3 && txt.indexOf(nq) >= 0); });
+      };
+      var noTr = function (r) { return '<span class="tr-none">' + UI.chip('No tracker', 'grey') + (ctx.can('tracking.manage_accounts') ? ' <button type="button" class="inv-link" data-tr-link="' + r.c.id + '" data-stop>Link one in Accounts</button>' : ctx.can('cars.edit') ? ' <button type="button" class="inv-link" data-tr-car="' + r.c.id + '" data-stop>Add the IMEI on the car</button>' : '') + '</span>'; };
       var tbl = UI.table(el.querySelector('#tr-t'), {
         columns: [
-          { key: 'car', label: 'Car', sort: function (t) { var c = carById(t.car); return c ? c.plate : 'zz'; }, render: function (t) { var c = carById(t.car); return c ? mtCarCell(c) : '<span class="faint">Not linked to a car</span>'; } },
-          { key: 'name', label: 'Tracker', sort: true, render: function (t) { return esc(t.name); } },
-          { key: 'state', label: 'State', sort: true, render: trStateChip },
-          { key: 'speed', label: 'Speed', align: 'right', sort: true, render: function (t) { return t.state === 'Offline' ? '-' : '<span class="num' + (t.speed > trOver() ? ' tr-fast' : '') + '">' + t.speed + ' km/h</span>'; } },
-          { key: 'ign', label: 'Ignition', render: function (t) { return t.ign ? 'On' : 'Off'; } },
-          { key: 'at', label: 'Last update', sort: true, render: function (t) { return t.at ? UI.fmt.ago(t.at) : '<span class="faint">No report yet</span>'; } },
-          { key: 'pos', label: 'Position', render: function (t) { return trPos(t.lat, t.lng); } }
+          { key: 'car', label: 'Car', sort: function (r) { return r.c.plate; }, render: function (r) { return mtCarCell(r.c); } },
+          { key: 'name', label: 'Tracker', sort: function (r) { return r.t ? r.t.name : 'zz'; }, render: function (r) { return r.t ? esc(r.t.name) : '<span class="faint">None</span>'; } },
+          { key: 'state', label: 'State', sort: function (r) { return r.state; }, render: function (r) { return r.t ? trStateChip(r.t) : noTr(r); } },
+          { key: 'speed', label: 'Speed', align: 'right', sort: function (r) { return r.t ? r.t.speed : -1; }, render: function (r) { var t = r.t; return !t || t.state === 'Offline' ? '-' : '<span class="num' + (t.speed > trOver() ? ' tr-fast' : '') + '">' + t.speed + ' km/h</span>'; } },
+          { key: 'ign', label: 'Ignition', render: function (r) { return r.t ? (r.t.ign ? 'On' : 'Off') : '-'; } },
+          { key: 'at', label: 'Last update', sort: function (r) { return r.t && r.t.at ? +r.t.at : 0; }, render: function (r) { return r.t && r.t.at ? UI.fmt.ago(r.t.at) : '<span class="faint">' + (r.t ? 'No report yet' : '-') + '</span>'; } },
+          { key: 'pos', label: 'Position', render: function (r) { return r.t ? trPos(r.t.lat, r.t.lng) : '<span class="faint">Not tracked</span>'; } }
         ],
-        rows: rows(), density: 'compact', pageSize: false, minWidth: 880, rowClass: function (t) { return st.sel === t.id ? 'tr-selrow' : ''; },
-        onRowClick: function (t) { st.sel = st.sel === t.id ? null : t.id; drawMap(); tbl.setRows(rows()); },
-        card: function (t) { var c = carById(t.car); return '<div class="tr-mc"><div class="row between">' + (c ? '<b>' + esc(c.plate) + '</b>' : '<span class="faint">Not linked to a car</span>') + '<span>' + trStateChip(t) + '</span></div><div class="b2">' + esc(t.name) + (c ? ' · ' + esc(carName(c)) : '') + '</div><div class="b2">' + (t.state === 'Offline' ? '' : t.speed + ' km/h · ') + 'Ignition ' + (t.ign ? 'On' : 'Off') + ' · ' + (t.at ? UI.fmt.ago(t.at) : 'No report yet') + '</div>' + trPos(t.lat, t.lng) + '</div>'; },
-        empty: { icon: 'map-pin-off', title: d.trackers.length ? 'No car matches.' : 'No trackers to show', text: d.trackers.length ? 'Clear the search or pick another state.' : 'Press Sync now on an account to read its tracker list.' }
+        rows: rows(), density: 'compact', pageSize: false, minWidth: 880, rowClass: function (r) { return st.sel === r.id ? 'tr-selrow' : ''; },
+        onRowClick: function (r) { if (!r.t) return; st.sel = st.sel === r.id ? null : r.id; drawMap(); tbl.setRows(rows()); },
+        card: function (r) { var t = r.t, c = r.c; if (!t) return '<div class="tr-mc"><div class="row between"><b>' + esc(c.plate) + '</b></div><div class="b2">' + esc(carName(c)) + '</div><div class="b2">' + noTr(r) + '</div></div>'; return '<div class="tr-mc"><div class="row between">' + (c ? '<b>' + esc(c.plate) + '</b>' : '<span class="faint">Not linked to a car</span>') + '<span>' + trStateChip(t) + '</span></div><div class="b2">' + esc(t.name) + (c ? ' · ' + esc(carName(c)) : '') + '</div><div class="b2">' + (t.state === 'Offline' ? '' : t.speed + ' km/h · ') + 'Ignition ' + (t.ign ? 'On' : 'Off') + ' · ' + (t.at ? UI.fmt.ago(t.at) : 'No report yet') + '</div>' + trPos(t.lat, t.lng) + '</div>'; },
+        empty: { icon: 'map-pin-off', title: items().length ? 'No car matches.' : 'No cars to show', text: items().length ? 'Clear the search or pick another state.' : 'Add cars on the Cars page.' }
       });
+      var sp = spares();
+      if (sp.length) el.querySelector('.tr-note').insertAdjacentHTML('beforeend', ' ' + plural(sp.length, 'spare tracker') + ' (' + sp.map(function (t) { return esc(t.name); }).join(', ') + ') ' + (sp.length === 1 ? 'is' : 'are') + ' on no car, so ' + (sp.length === 1 ? 'it is' : 'they are') + ' not on the map.');
+      UI.on(el, 'click', '[data-tr-link]', function () { st.tab = 'accounts'; ctx.setParams({ tab: 'accounts' }); ctx.refresh(); });
+      UI.on(el, 'click', '[data-tr-car]', function (ev, b) { ctx.api.editCar(b.getAttribute('data-tr-car')); });
       var filt = function () {
         var c = counts();
-        UI.filters(el.querySelector('#tr-f'), { values: st.f, fields: [{ type: 'chips', key: 'state', options: [['all', 'All', c.all], ['Moving', 'Moving', c.Moving, 'ok'], ['Parked', 'Parked', c.Parked, 'info'], ['Offline', 'Offline', c.Offline, 'grey']] }, { type: 'search', key: 'q', placeholder: 'Search plate, car or tracker' }],
+        UI.filters(el.querySelector('#tr-f'), { values: st.f, fields: [{ type: 'chips', key: 'state', options: [['all', 'All cars', c.all], ['Moving', 'Moving', c.Moving, 'ok'], ['Parked', 'Parked', c.Parked, 'info'], ['Offline', 'Offline', c.Offline, 'grey']].concat(c.None ? [['None', 'No tracker', c.None, 'grey']] : []) }, { type: 'search', key: 'q', placeholder: 'Search plate, car or tracker' }],
           onChange: function () { tbl.setRows(rows()); drawMap(); } });
       };
       function drawMap() {
-        var vis = rows();
-        el.querySelector('#tr-map').innerHTML = trMap({ points: vis.map(function (t) { var c = carById(t.car); return { id: t.id, lat: t.lat, lng: t.lng, cls: t.state.toLowerCase(), state: t.state, over: t.speed > trOver(), sel: st.sel === t.id, label: c ? c.plate : t.name }; }) });
+        var vis = rows().filter(function (r) { return r.t; });
+        el.querySelector('#tr-map').innerHTML = trMap({ points: vis.map(function (r) { var t = r.t; return { id: t.id, lat: t.lat, lng: t.lng, cls: t.state.toLowerCase(), state: t.state, over: t.speed > trOver(), sel: st.sel === t.id, label: r.c.plate }; }) });
         el.querySelector('#tr-upd').textContent = 'Updated ' + UI.fmt.ago(st.lastTick || NOW());
       }
       filt(); drawMap();

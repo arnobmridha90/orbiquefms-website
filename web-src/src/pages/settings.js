@@ -48,12 +48,23 @@ function setGuide(b, d) {
   list.forEach(function (x) { x.done = x.ok || !!done[x.id]; x.byHand = !x.ok && !!done[x.id]; });
   return list;
 }
-function setGoSec(ctx, id) { ctx.state.sec = id; ctx.setParams({ section: id }); ctx.refresh(); window.scrollTo(0, 0); }
+/* moving to another section: unsaved changes on the open one ask "Leave without saving?" first; leaving throws the draft
+   away, so the form is built again from the saved settings next time (a stale value never looks saved) */
+function setGoSec(ctx, id) {
+  var st = ctx.state;
+  if (id === st.sec) return;
+  var go2 = function () { setDropDrafts(st); st.sec = id; var nv = document.querySelector('.set-nav'); st.navX = nv ? nv.scrollLeft : 0; ctx.setParams({ section: id }); ctx.refresh(); window.scrollTo(0, 0); };
+  if (st.secDirty && st.secDirty()) { UI.confirm({ title: 'Leave without saving?', text: 'The changes on this section are not saved yet. If you leave now, they are lost.', ok: 'Discard', cancel: 'Keep editing', danger: true }).then(function (y) { if (y) go2(); }); return; }
+  go2();
+}
+function setDropDrafts(st) { st.rDraft = null; st.drafts = {}; st.secDirty = null; }
 
 PAGES['settings'] = {
   title: 'Settings',
   render: function (root, ctx) {
     var st = ctx.state, b = ctx.brand, d = ctx.data, u = ctx.me;
+    /* a fresh visit (not a redraw): drafts left from an earlier visit are thrown away */
+    if (st.visit !== (S.visit || 0)) { setDropDrafts(st); st.visit = S.visit || 0; }
     var secs = SET_SECTIONS.filter(function (s) { return !s.need || ctx.can(s.need); });
     var want = ctx.params.section || (S.set && S.set !== 'company' ? { locations: 'locations', start: 'startpage', brand: 'brand', rules: 'rules' }[S.set] : null) || st.sec;
     if (S.set && S.set !== 'company') S.set = 'company';
@@ -63,9 +74,18 @@ PAGES['settings'] = {
     root.innerHTML = '<div class="pg-h"><div><h1>Settings</h1><p>Your own choices are listed first. Other people keep their own. The cards under "For everyone" change the dashboard for every team member.</p></div></div>' +
       '<div class="set-wrap"><nav class="set-nav" aria-label="Settings sections">' + nav + '</nav><div class="set-main" id="set-main"></div></div>';
     UI.on(root, 'click', '[data-set]', function (ev, el) { setGoSec(ctx, el.getAttribute('data-set')); });
+    /* the section strip (a sideways row on phones) keeps its place and brings the open section into view */
+    var navEl = root.querySelector('.set-nav'), curEl = navEl.querySelector('[aria-current]');
+    if (navEl.scrollWidth > navEl.clientWidth + 1) {
+      navEl.scrollLeft = st.navX || 0;
+      var cl = curEl ? curEl.getBoundingClientRect().left - navEl.getBoundingClientRect().left + navEl.scrollLeft : 0;
+      if (curEl && (cl < navEl.scrollLeft || cl + curEl.offsetWidth > navEl.scrollLeft + navEl.clientWidth)) navEl.scrollLeft = Math.max(0, cl - (navEl.clientWidth - curEl.offsetWidth) / 2);
+    }
     var main = root.querySelector('#set-main');
-    var draw = function () { var fresh = main.cloneNode(false); main.replaceWith(fresh); main = fresh; (SET_DRAW[st.sec] || SET_DRAW.startpage)(main, ctx, draw); };
+    var draw = function () { st.secDirty = null; var fresh = main.cloneNode(false); main.replaceWith(fresh); main = fresh; (SET_DRAW[st.sec] || SET_DRAW.startpage)(main, ctx, draw); };
     draw();
+    /* other pages, the address and closing the tab ask too; leaving Settings throws the drafts away */
+    UI.pageDirty = function () { if (!root.isConnected || S.page !== 'settings') return false; return !!(st.secDirty && st.secDirty()); };
   },
   onData: function (root, ctx) { if (ctx.state.sec === 'start') ctx.refresh(); },
   search: [
@@ -177,6 +197,7 @@ SET_DRAW.rules = function (el, ctx, redraw) {
   var cur = {}; SET_RULES.forEach(function (r) { cur[r[0]] = val(r[0]); });
   st.rDraft = st.rDraft && st.rBrand === b.id ? st.rDraft : Object.assign({}, cur); st.rBrand = b.id;
   var dirty = !setSame(st.rDraft, cur);
+  st.secDirty = function () { return !!st.rDraft && !setSame(st.rDraft, cur); };
   el.innerHTML = setCard('Rules and amounts', 'The must know rules, the 22 rental terms and the agreement read these. Change a number and the booking form shows it straight away.',
     '<div class="grid g2 set-form">' + SET_RULES.map(function (r) { return UI.input({ key: r[0], label: r[1], type: 'number', min: 0, value: st.rDraft[r[0]], prefix: r[2] === 'RM' ? 'RM' : '', help: r[2] === 'RM' ? '' : r[2] }); }).join('') + '</div>' +
     (d.settings.rulesChecked ? '<p class="b2 mt16">' + i('circle-check') + ' Checked and saved ' + UI.fmt.ago(d.settings.rulesChecked) + '.</p>' : ''),
@@ -319,7 +340,8 @@ function setFormCard(el, ctx, redraw, key, cur, o) {
   var st = ctx.state; st.drafts = st.drafts || {};
   var dk = key + '|' + ctx.brand.id;
   if (!st.drafts[dk]) st.drafts[dk] = JSON.parse(JSON.stringify(cur));
-  var draft = st.drafts[dk], dirty = function () { return !setSame(draft, cur); };
+  var draft = st.drafts[dk], dirty = function () { return !!st.drafts[dk] && !setSame(draft, cur); };
+  st.secDirty = dirty;
   el.innerHTML = setCard(o.title, o.desc, o.body(draft) + '<p class="ui-err set-err" hidden></p>',
     (o.footNote ? '<span class="b2 grow">' + o.footNote + '</span>' : '<span class="b2 grow set-st">' + (dirty() ? 'You have changes that are not saved yet.' : 'Saved.') + '</span>') + UI.btn('Discard', { kind: 'o', disabled: !dirty(), attrs: { 'data-fc-disc': '1' } }) + UI.btn('Save', { icon: 'device-floppy', disabled: !dirty(), attrs: { 'data-fc-save': '1' } }));
   var sync = function () { o.read(UI.form(el.querySelector('.card-b')), draft); var dd = dirty(); el.querySelector('[data-fc-save]').disabled = !dd; el.querySelector('[data-fc-disc]').disabled = !dd; var s = el.querySelector('.set-st'); if (s) s.textContent = dd ? 'You have changes that are not saved yet.' : 'Saved.'; };

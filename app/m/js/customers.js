@@ -240,6 +240,13 @@ var Cust = (function () {
 
   /* ---------- actions ---------- */
   function refresh() { if (route().name === 'customer') render(false, true); }
+  function keyOfId(v) { return normPlate(v || '').replace(/[^A-Z0-9]/g, ''); }
+  /* another customer (a different person today) who already has this IC or passport number */
+  function sameIdOther(c, next) {
+    var ids = [next.ic, next.passport].map(keyOfId).filter(function (x) { return x.length >= 6; }), mine = keyOf(c);
+    if (!ids.length) return null;
+    return S.customers.filter(function (x) { return x.id !== c.id && keyOf(x) !== mine && ids.some(function (k) { return keyOfId(x.ic) === k || keyOfId(x.passport) === k; }); })[0] || null;
+  }
   function editSheet(id) {
     var c = byId(S.customers, id); if (!c || !can('customers.edit')) return;
     var em = c.emergency || {};
@@ -270,9 +277,17 @@ var Cust = (function () {
           var ne = { name: v('ename'), phone: v('ephone') ? fmtPhone(v('ephone')) : '', relation: v('erel') };
           if (JSON.stringify(ne) !== JSON.stringify({ name: em.name || '', phone: em.phone || '', relation: em.relation || '' })) changes['Emergency contact'] = [em.name || '', ne.name];
           if (!Object.keys(changes).length) { closeSheet(); say('Nothing changed'); return; }
-          Object.assign(c, next); c.emergency = ne;
-          audit('Changed the details of ' + c.name, { cust: c.id, changes: changes, link: '#customer/' + c.id });
-          save(); closeSheet(); refresh(); say('Details saved');
+          var go = function () {
+            Object.assign(c, next); c.emergency = ne;
+            audit('Changed the details of ' + c.name, { cust: c.id, changes: changes, link: '#customer/' + c.id });
+            save(); closeSheet(); refresh(); say('Details saved');
+          };
+          /* an IC or passport that belongs to someone else would join two people into one: ask first */
+          var other = sameIdOther(c, next);
+          if (!other) { go(); return; }
+          var on = S.bookings.filter(function (b) { return b.cust === other.id; }).length;
+          confirm({ icon: 'warn', title: 'This ' + (next.ic && keyOfId(next.ic) === keyOfId(next.ic || next.passport) ? 'IC' : 'number') + ' is already used by ' + other.name, text: other.name + ' has ' + on + ' booking' + (on === 1 ? '' : 's') + '. If you save, ' + c.name + ' and ' + other.name + ' show as one customer with all their bookings and money together. Same person?', ok: 'Yes, same person', cancel: 'Fix the number', primary: 'cancel' })
+            .then(function (y) { if (y) setTimeout(go, 40); else setTimeout(function () { var i = $('#ce_' + (next.ic ? 'ic' : 'passport')); if (i) { i.classList.add('bad'); i.focus(); } }, 60); });
         };
       });
   }
@@ -386,7 +401,9 @@ var Cust = (function () {
     var c = byId(S.customers, id); if (!c) return;
     if (typeof IdCheck === 'undefined' || !IdCheck.open) { comingSoon('IC check'); return; }
     IdCheck.open({ custId: c.id, name: c.name, ic: c.ic, docs: c.docs,
-      onFill: function (p) { if (!p || !can('customers.edit')) return; var ch = {}; ['name', 'ic', 'passport', 'nationality', 'licenceNo', 'licenceExp'].forEach(function (k) { if (p[k] && p[k] !== c[k]) { ch[k] = [c[k] || '', p[k]]; c[k] = p[k]; } }); if (Object.keys(ch).length) { audit('Filled details of ' + c.name + ' from the IC check', { cust: c.id, changes: ch }); save(); } },
+      onFill: function (p) { if (!p || !can('customers.edit')) return; var ch = {};
+        var other = sameIdOther(c, { ic: p.ic || c.ic, passport: p.passport || c.passport });
+        if (other && (p.ic || p.passport)) { say('Not filled in: this number is already used by ' + other.name + '. Check it on the customer page.'); delete p.ic; delete p.passport; } ['name', 'ic', 'passport', 'nationality', 'licenceNo', 'licenceExp'].forEach(function (k) { if (p[k] && p[k] !== c[k]) { ch[k] = [c[k] || '', p[k]]; c[k] = p[k]; } }); if (Object.keys(ch).length) { audit('Filled details of ' + c.name + ' from the IC check', { cust: c.id, changes: ch }); save(); } },
       onDocs: function (docs) { if (docs) { c.docs = Object.assign({}, c.docs || {}, docs); save(); } },
       onClose: function () { refresh(); } });
   }

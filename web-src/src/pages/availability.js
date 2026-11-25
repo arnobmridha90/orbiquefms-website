@@ -71,10 +71,18 @@ PAGES['availability'] = {
         '<button type="button" class="av-chip" data-av="half" aria-pressed="' + !!st.half + '">' + i('plus') + '12 hours</button></div>' +
         (bad ? '' : '<div class="av-sum">' + i('calendar') + '<span>' + avWhen(st.from) + ' to ' + avWhen(st.to) + ' (' + avLenText(st.to - st.from) + ')</span></div>');
     }
+    /* the daily rate and the rent for the picked period, worked out like the booking form (bkCalc), to quote at once */
+    var seeAmt = ctx.can('bookings.see_amounts') || ctx.can('bookings.edit_amounts');
+    function price(c) {
+      if (!seeAmt || !c.rate) return '';
+      var k = bkCalc({ start: st.from, end: st.to, rate: c.rate, hourly: c.hourly });
+      return '<div class="av-price"><b class="num">' + UI.fmt.money(c.rate) + '/day</b><span class="num">' + UI.fmt.money(k.rent) + ' for ' + avLenText(st.to - st.from) + '</span></div>';
+    }
     function tile(x, kind) {
       var c = x.c, book = kind !== 'booked' && ctx.can('bookings.create');
       return '<div class="av-tile ' + kind + '" data-car="' + c.id + '"><div class="av-tile-t">' + esc(carName(c)) + (c.fleet && c.fleet !== 'Active' ? ' ' + UI.chip(c.fleet, 'grey') : '') + '</div>' +
         '<div class="av-tile-b"><div class="av-tile-id"><b>' + esc(c.plate) + '</b><span>' + esc(c.color) + '</span></div>' + carsThumb(c, 'av-ph') + '</div>' +
+        (kind !== 'booked' ? price(c) : '') +
         (x.notes.length ? '<ul class="av-notes">' + x.notes.map(function (nn) { return '<li>' + i(nn.icon) + '<span>' + esc(nn.text) + '</span>' + (nn.code ? '<button type="button" class="av-link" data-bk="' + nn.code + '">Open</button>' : '') + '</li>'; }).join('') + '</ul>' : '') +
         '<div class="av-tile-a">' + UI.btn('Car details', { kind: 't', size: 'sm', icon: 'car', attrs: { 'data-open': c.id } }) + (book ? UI.btn('Book this car', { kind: kind === 'check' ? 'o' : 'c', size: 'sm', icon: 'calendar-plus', attrs: { 'data-book': c.id } }) : '') + '</div></div>';
     }

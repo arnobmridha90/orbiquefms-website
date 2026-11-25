@@ -123,10 +123,23 @@ PAGES['cars'] = {
 /* ---------------- delete ---------------- */
 function carsDelete(id) {
   var c = carById(id); if (!c) return;
-  var n = D().bookings.filter(function (x) { return x.car === c; }).length;
-  UI.dialog({ title: 'Delete Car?', text: c.plate + ' · ' + carName(c), width: 'sm', alert: true, body: '<p class="ui-ctext">This action cannot be undone.</p><div class="cr-delerr"></div>',
-    buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Yes, Delete', kind: 'err', onClick: function (dl) {
-      if (n) { dl.body.querySelector('.cr-delerr').innerHTML = UI.alert('This car has ' + plural(n, 'booking') + ', so it cannot be deleted. Set its status to Sold or Not in use instead.', 'bad'); return false; }
+  var bks = D().bookings.filter(function (x) { return x.car === c; }), n = bks.length;
+  /* a car with bookings is never deleted (its history stays): say so first and offer the status change instead */
+  if (n) {
+    var ahead = bks.filter(function (x) { return x.end > NOW() && x.status !== 'Cancelled' && x.status !== 'Completed'; });
+    var setTo = function (fleet) {
+      if (!can('cars.edit')) { UI.toast('Changing a car needs the "Edit cars" access.', { tone: 'warn' }); return false; }
+      DB.update('cars', c, { fleet: fleet }, { text: DB.actor() + ' set ' + c.plate + ' to ' + fleet + ' (instead of deleting it)', where: 'Car' });
+      UI.toast(c.plate + ' is now ' + fleet + '. It cannot be booked, and its ' + plural(n, 'booking') + ' stay on record.');
+    };
+    UI.dialog({ title: 'This car cannot be deleted', text: c.plate + ' · ' + carName(c), width: 'sm', alert: true,
+      body: '<p class="ui-ctext">' + c.plate + ' has ' + plural(n, 'booking') + ', so it stays on record. Mark it as Not in use (back later) or Sold (gone for good) instead: it then cannot be booked.</p>' +
+        (ahead.length ? UI.alert(plural(ahead.length, 'booking') + ' still to come or out now (' + ahead.slice(0, 3).map(function (x) { return x.code; }).join(', ') + (ahead.length > 3 ? '...' : '') + '). Move ' + (ahead.length === 1 ? 'it' : 'them') + ' to another car first.', 'warn') : ''),
+      buttons: [{ label: 'Cancel', kind: 'g' }].concat(c.fleet === 'Not in use' ? [] : [{ label: 'Mark as Not in use', kind: 'o', onClick: function () { return setTo('Not in use'); } }]).concat(c.fleet === 'Sold' ? [] : [{ label: 'Mark as Sold', kind: 'c', onClick: function () { return setTo('Sold'); } }]) });
+    return;
+  }
+  UI.dialog({ title: 'Delete ' + c.plate + '?', text: c.plate + ' · ' + carName(c), width: 'sm', alert: true, body: '<p class="ui-ctext">It has no bookings. This cannot be undone.</p>',
+    buttons: [{ label: 'Cancel', kind: 'g' }, { label: 'Delete', kind: 'err', onClick: function () {
       DB.remove('cars', c, { text: DB.actor() + ' deleted car ' + c.plate, where: 'Car' });
       D().trackers.forEach(function (t) { if (t.car === c.id) t.car = null; });
       UI.toast('Car deleted');

@@ -185,8 +185,13 @@ function schedRefresh() {
 }
 function schedWa(ev) {
   var b = ev.b, c = cust(b.cust), k = car(b.car) || {}, out = ev.type === 'out';
-  var txt = 'Hi ' + callName(c.name) + ', this is ' + B().short + '. ' + (out ? 'Your car ' + (k.make || '') + ' ' + (k.model || '') + ' (' + (k.plate || '') + ') is ready for ' : 'A reminder that the car ' + (k.plate || '') + ' is due back ') +
-    dayWord(ev.at).toLowerCase().replace(/^(mon|tue|wed|thu|fri|sat|sun)/, function (m) { return m.charAt(0).toUpperCase() + m.slice(1); }) + ' at ' + hm(ev.at) + ', ' + placeText(b, out ? 'pick' : 'ret') + '. See you!';
+  /* 'today' / 'tomorrow' / 'yesterday' in a sentence, otherwise the day with its capitals ('Sat 28 Nov') */
+  var dw = dayWord(ev.at), day = /^(Today|Tomorrow|Yesterday)$/.test(dw) ? dw.toLowerCase() : dLong(ev.at), place = placeText(b, out ? 'pick' : 'ret'), carName = ((k.make || '') + ' ' + (k.model || '')).trim() + (k.plate ? ' (' + k.plate + ')' : '');
+  var hi = 'Hi ' + callName(c.name) + ', this is ' + B().short + '. ', txt;
+  if (ev.overdue && !out) txt = hi + 'Your car ' + (k.plate || carName) + ' was due back ' + day + ' at ' + hm(ev.at) + '. Please call us or tell us when you can return it.';
+  else if (ev.overdue && out) txt = hi + 'Your car ' + carName + ' was ready for you ' + day + ' at ' + hm(ev.at) + ', ' + place + '. Please tell us when you would like to pick it up.';
+  else if (out) txt = hi + 'Your car ' + carName + ' is ready for ' + day + ' at ' + hm(ev.at) + ', ' + place + '. See you!';
+  else txt = hi + 'A reminder that the car ' + (k.plate || '') + ' is due back ' + day + ' at ' + hm(ev.at) + ', ' + place + '. See you!';
   Share.wa(c.phone, txt);
 }
 function schedMore(ev) {

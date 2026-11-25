@@ -55,7 +55,7 @@ pickKind / retKind: 'our' | 'client' | 'place';  pickLoc / retLoc: location id (
 method ('Cash'/'Card'/'Online Transfer'), submitted, submittedAt, formId, agentToken
 inspection { agent: {photos{handover[], id, licence, odometer}, km, fuel, note, at, gps{lat,lng}, by} | null, customer: {photos[], at} | null }
 returnKm, returnFuel, docs {icFront, icBack, passport, licence, poa, other[]}, assigned [staffIds], log [{at, by, text, changes}], summonsIds [],
-payments [Payment], note, cancelReason, leadId, refundPendingAt
+payments [Payment], note, cancelReason, leadId, refundPendingAt, actualEnd (real return time, set by take back; busy() frees the car from it via bkHoldEnd(b)), cancelMoney ('refund'/'credit'/'fee')
 ```
 Make a new one with `blankBooking({...})`. Stored names say 'Agreement'; `EXPORT_STATUS` maps to the old 'Aggreement' spelling for exports only. Use the names Car Delivered / Car Returned everywhere.
 

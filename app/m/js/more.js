@@ -66,6 +66,6 @@ function resetDemo() {
 function doResetDemo() {
   /* the New booking drafts (one per person) and the handover drafts point at the old data: start clean */
   try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('fms.nbdraft.' + CO + '.') === 0 || k === 'fms.hodraft.' + CO) localStorage.removeItem(k); }); } catch (e) {}
-  var keepMe = S.me; resetViewState(); S = seed(CO); runSeeders(S); if (keepMe && staff(keepMe)) S.me = keepMe; usePrefs(); save(); closeAllSheets(); applyTheme();
+  var keepMe = S.me, keepSigned = S.signedIn; resetViewState(); S = seed(CO); runSeeders(S); if (keepMe && staff(keepMe)) { S.me = keepMe; S.signedIn = keepSigned; } usePrefs(); save(); closeAllSheets(); applyTheme();
   history.replaceState(null, '', location.pathname + location.search + '#home'); render(true); say('Fresh demo data loaded');
 }

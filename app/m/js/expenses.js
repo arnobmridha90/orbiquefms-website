@@ -191,7 +191,7 @@ VIEWS.expenses = function (r) {
     '<div class="ex-tools"><label class="search ex-search">' + I('search') + '<input id="exq" type="search" placeholder="Kind, plate, booking or note" value="' + esc(EXV.q) + '" autocomplete="off"></label><button type="button" class="ex-fbtn" id="exFilt">' + I('filter') + 'Filters' + (exFilterCount() ? '<span class="ex-badge">' + exFilterCount() + '</span>' : '') + '</button></div>' +
     chipsOn + (nf ? '<div class="ex-match">' + shown.length + ' shown · <span class="money">' + rm(shownTot) + '</span></div>' : '') +
     '<div id="exBody">' + body + '</div></main>' +
-    (can('expenses.add') ? '<button type="button" class="fab" id="exFab" aria-label="Add expense">' + I('plus', 2.4) + '</button>' : '');
+    (can('expenses.add') ? '<button type="button" class="fab fab-x" id="exFab" aria-label="Add expense">' + I('receipt', 2.2) + '<span>Expense</span></button>' : '');
   return { html: html, keepScroll: true, after: function () {
     $('#exPrev').onclick = function () { EXV.limit = 40; EXV.month = exStepMonth(EXV.month, -1); render(); };
     $('#exNext').onclick = function () { if (EXV.month < thisMonth) { EXV.limit = 40; EXV.month = exStepMonth(EXV.month, 1); render(); } };

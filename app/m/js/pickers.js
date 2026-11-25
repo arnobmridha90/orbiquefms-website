@@ -155,13 +155,14 @@ var Pickers = (function () {
   /* ---------- staff ---------- */
   function staffPick(o) {
     o = o || {};
-    var chosen = (o.selected || []).slice(), prefer = o.preferIds || [];
+    var chosen = (o.selected || []).slice(), prefer = o.preferIds || [], up = prefer.concat(o.upIds || []); /* preferIds get 'works at this place'; upIds only move up the list */
     var sh = sheet(shell(o.title || (o.multi ? 'Choose staff' : 'Choose a person'), o.multi ? 'Tick everyone who should get it' : '') + (o.multi ? '<div class="sheet-foot"><button type="button" class="btn" id="pkdone">Done</button></div>' : ''), null, { full: true, stack: true, cls: 'picker' });
     var q;
     var draw = function () {
       var term = q.value.trim();
       var list = S.staff.filter(function (p) { return (o.includeOff || p.active !== false) && (!term || (tidySearch(term) ? phoneMatch(term, p.phone) : wordsMatch(term, p.name + ' ' + p.username + ' ' + roleName(p.role)))); });
-      list.sort(function (a, b) { var pa = prefer.indexOf(a.id) >= 0 ? 0 : 1, pb = prefer.indexOf(b.id) >= 0 ? 0 : 1; return pa - pb || a.name.localeCompare(b.name); });
+      var rank = function (p) { return prefer.indexOf(p.id) >= 0 ? 0 : up.indexOf(p.id) >= 0 ? 1 : 2; };
+      list.sort(function (a, b) { return rank(a) - rank(b) || a.name.localeCompare(b.name); });
       $('#pklist', sh).innerHTML = list.map(function (p) {
         var on = chosen.indexOf(p.id) >= 0, n = openTasksOf(p.id);
         return '<button type="button" class="pk-row' + (on ? ' on' : '') + '" data-pick="' + p.id + '"><span class="av sm" style="background:' + avColor(p.name) + '">' + initials(p.name) + '</span><span class="grow"><span class="pk-l1">' + esc(p.name) + (p.id === S.me ? ' (me)' : '') + '</span><span class="pk-sub">' + esc(roleName(p.role)) + (prefer.indexOf(p.id) >= 0 ? ' · works at this place' : '') + ' · ' + n + ' open task' + (n === 1 ? '' : 's') + '</span></span>' + (o.multi ? '<span class="pk-tick">' + (on ? I('check', 2.6) : '') + '</span>' : '') + '</button>';

@@ -207,10 +207,12 @@ function cuNotesMount(el, p, o) {
 
 /* ---------------- IC number reading ---------------- */
 var CU_STATES = { '01': 'Johor', '02': 'Kedah', '03': 'Kelantan', '04': 'Melaka', '05': 'Negeri Sembilan', '06': 'Pahang', '07': 'Pulau Pinang', '08': 'Perak', '09': 'Perlis', '10': 'Selangor', '11': 'Terengganu', '12': 'Sabah', '13': 'Sarawak', '14': 'Kuala Lumpur', '15': 'Labuan', '16': 'Putrajaya', '21': 'Johor', '22': 'Johor', '24': 'Johor', '25': 'Kedah', '30': 'Melaka', '31': 'Negeri Sembilan', '38': 'Pulau Pinang', '41': 'Selangor', '43': 'Selangor', '47': 'Sabah', '49': 'Sabah', '50': 'Sarawak', '54': 'Kuala Lumpur', '59': 'Putrajaya', '71': 'Born outside Malaysia', '82': 'State not known' };
-function cuIcParse(ic) {
+/* nat: the customer's nationality. Anyone not Malaysian carries a passport, so the 12-digit IC rules never apply to them */
+function cuIsForeign(nat) { return !!nat && !/^malaysia/i.test(String(nat)); }
+function cuIcParse(ic, nat) {
   var s = String(ic || '').replace(/[\s-]/g, '');
   if (!s) return { empty: true };
-  if (!/^\d+$/.test(s)) return { passport: true, ok: /^[A-Z0-9]{6,12}$/i.test(s) };
+  if (!/^\d+$/.test(s) || cuIsForeign(nat)) return { passport: true, ok: /^[A-Z0-9]{6,12}$/i.test(s) };
   if (s.length !== 12) return { ok: false, why: 'An IC number has 12 digits.' };
   var yy = +s.slice(0, 2), mm = +s.slice(2, 4), dd = +s.slice(4, 6), pb = s.slice(6, 8), now = NOW(), yr = 2000 + yy;
   if (now.getFullYear() - yr < 15) yr -= 100;
@@ -227,8 +229,11 @@ function cuNameMatch(a, b) {
   var hit = x.filter(function (w) { return y.indexOf(w) >= 0; }).length;
   return hit / Math.max(x.length, y.length) >= .5 ? 'close' : 'differs';
 }
-function cuIcChips(ic, cardName, bookingName) {
-  var r = cuIcParse(ic); if (r.empty) return '';
+function cuIcChips(ic, cardName, bookingName, o) {
+  o = o || {};
+  var r = cuIcParse(ic, o.nat); if (r.empty) return '';
+  /* before anyone reads a card or re-checks, only a good result shows: no error for a number nobody has touched yet */
+  if (o.quiet && !r.ok) return '';
   var out = '<div class="cu-icres">';
   if (r.passport) out += UI.chip(r.ok ? 'Passport number looks right' : 'This is not a valid passport number.', r.ok ? 'ok' : 'bad', { icon: r.ok ? 'circle-check' : 'alert-circle' });
   else if (!r.ok) out += UI.chip('This is not a valid IC number.', 'bad', { icon: 'alert-circle' }) + '<span class="b2">' + esc(r.why) + '</span>';
@@ -267,26 +272,27 @@ function cuFakeRead(seed, passport) {
 function cuIcMount(el, p, o) {
   o = o || {};
   if (!can('customers.check_ic')) { el.innerHTML = ''; return; }
-  var st = { pic: null, ic: p.ic, card: (p.icCheck && p.icCheck.cardName) || '', read: (p.icCheck && p.icCheck.cardName) || '' };
+  var st = { pic: null, ic: p.ic, card: (p.icCheck && p.icCheck.cardName) || '', read: (p.icCheck && p.icCheck.cardName) || '', touched: false };
+  var foreign = cuIsForeign(p.nat), noLabel = foreign ? 'Passport number' : 'IC number';
   var bname = function () { return o.bookingName ? o.bookingName() : p.name; };
   function draw() {
     el.innerHTML = '<div class="cu-ic"><div class="row wrap gap8"><label class="btn c sm">' + i('upload') + 'Upload IC photo<input type="file" accept="image/*" hidden data-cu-icfile></label>' +
       (p.docs && p.docs.icFront ? UI.btn('Use the saved IC picture', { kind: 'tonal', size: 'sm', icon: 'id', attrs: { 'data-cu-icsaved': 1 } }) : '') + '<span class="b2">The picture is read on our own server and kept private.</span></div>' +
       (st.pic ? '<div class="cu-icpic">' + (st.pic === 'saved' ? cuDocSvg('icFront', p.name) : '<img src="' + st.pic + '" alt="IC picture">') + '</div>' : '') +
-      '<div class="cu-g2">' + UI.input({ key: 'cu-icno', label: 'IC number', value: st.ic }) + UI.input({ key: 'cu-iccard', label: 'Name on the card', value: st.card, help: st.read ? 'Read from the card: ' + st.read.toUpperCase() : '' }) + '</div>' +
+      '<div class="cu-g2">' + UI.input({ key: 'cu-icno', label: noLabel, value: st.ic }) + UI.input({ key: 'cu-iccard', label: 'Name on the card', value: st.card, help: st.read ? 'Read from the card: ' + st.read.toUpperCase() : '' }) + '</div>' +
       '<div class="row wrap gap8">' + UI.btn('Save correction and re-check', { kind: 'tonal', size: 'sm', icon: 'refresh', attrs: { 'data-cu-icsave': 1 } }) + '<span class="b2">The reader can make mistakes. Compare with the picture, fix anything wrong, then save.</span></div>' +
-      cuIcChips(st.ic, st.card, bname()) +
+      cuIcChips(st.ic, st.card, bname(), { nat: p.nat, quiet: !st.touched }) +
       '<div>' + UI.btn('Check online', { kind: 'o', size: 'sm', icon: 'world-search', attrs: { 'data-cu-iconline': 1 } }) + '</div>' + cuOnlineTable(p.icCheck) + '</div>';
   }
-  var readIt = function (pic) { st.pic = pic; st.ic = p.ic; st.card = p.name.toUpperCase(); st.read = p.name; draw(); UI.toast('IC read: ' + UI.fmt.ic(p.ic) + ', ' + p.name.toUpperCase()); };
+  var readIt = function (pic) { st.touched = true; st.pic = pic; st.ic = p.ic; st.card = p.name.toUpperCase(); st.read = p.name; draw(); UI.toast('IC read: ' + UI.fmt.ic(p.ic) + ', ' + p.name.toUpperCase()); };
   el.addEventListener('click', function (ev) {
     var t = ev.target;
     if (t.closest('[data-cu-icsaved]')) readIt('saved');
-    else if (t.closest('[data-cu-icsave]')) { st.ic = el.querySelector('[data-key="cu-icno"]').value.trim(); st.card = el.querySelector('[data-key="cu-iccard"]').value.trim(); if (st.ic && st.ic !== p.ic && can('customers.edit')) DB.update('people', p, { ic: st.ic }, { where: 'Customer', text: DB.actor() + ' corrected the IC number of ' + p.name }); draw(); UI.toast('Saved and checked again'); }
+    else if (t.closest('[data-cu-icsave]')) { st.touched = true; st.ic = el.querySelector('[data-key="cu-icno"]').value.trim(); st.card = el.querySelector('[data-key="cu-iccard"]').value.trim(); if (st.ic && st.ic !== p.ic && can('customers.edit')) DB.update('people', p, { ic: st.ic }, { where: 'Customer', text: DB.actor() + ' corrected the IC number of ' + p.name }); draw(); UI.toast('Saved and checked again'); }
     else if (t.closest('[data-cu-iconline]')) {
       var b = t.closest('button'); b.disabled = true; b.innerHTML = i('loader-2') + 'Checking...';
       setTimeout(function () {
-        var c = { at: NOW(), by: DB.actor(), valid: !!cuIcParse(st.ic).ok, cardName: st.card, results: cuOnlineCheck(st.ic, p.name) };
+        var c = { at: NOW(), by: DB.actor(), valid: !!cuIcParse(st.ic, p.nat).ok, cardName: st.card, results: cuOnlineCheck(st.ic, p.name) };
         DB.update('people', p, { icCheck: c }, { action: 'Other', where: 'Customer', text: DB.actor() + ' checked the IC of ' + p.name + ' online' });
         draw(); UI.toast(c.results.some(function (r) { return r[1] === 'Flagged'; }) ? 'A site has flagged this person. This is a warning for you to weigh up.' : 'Checked online: nothing found', { tone: c.results.some(function (r) { return r[1] === 'Flagged'; }) ? 'warn' : 'ok' });
       }, 700);
@@ -351,7 +357,8 @@ PAGES['customers'] = {
       return people.filter(function (p) {
         if (!test[st.show](flagsOf[p.id])) return false;
         if (!q) return true;
-        if ((p.name + ' ' + p.ic + ' ' + p.email + ' ' + p.phone).toLowerCase().indexOf(q) >= 0) return true;
+        /* the IC as the card shows it (middle hidden, 53XXX499) finds it too */
+        if ((p.name + ' ' + p.ic + ' ' + UI.fmt.ic(p.ic) + ' ' + p.email + ' ' + p.phone).toLowerCase().indexOf(q) >= 0) return true;
         if (!digitsOnly || qd.length < 3) return false;
         /* each number on its own: the phone (0, 60 and +60 at the start count as the same) and the IC */
         return phoneHas(p.phone, qd) || String(p.ic || '').replace(/\D/g, '').indexOf(qd) >= 0;
@@ -368,8 +375,9 @@ PAGES['customers'] = {
           '<div class="cu-card-a">' + UI.btn('View', { kind: 'o', size: 'sm', icon: 'eye', attrs: { 'data-cu-view': p.id } }) + (ctx.can('bookings.create') && (!f.black || ctx.can('customers.blacklist_edit')) ? UI.btn('New Booking', { kind: 'tonal', size: 'sm', icon: 'calendar-plus', attrs: { 'data-cu-new': p.id } }) : '') + '</div></div>';
       }
     });
-    UI.filters(root.querySelector('#cu-f'), { values: st.f, fields: [{ type: 'search', key: 'q', placeholder: 'Search customers: name, IC / passport, phone, email' }], onChange: function () { t.setRows(rowsFor()); },
-      extra: '<span class="grow"></span><span class="b2">' + plural(rowsFor().length, 'customer') + '</span>' });
+    UI.filters(root.querySelector('#cu-f'), { values: st.f, fields: [{ type: 'search', key: 'q', placeholder: 'Search customers: name, IC / passport, phone, email' }], onChange: function () { var r = rowsFor(); t.setRows(r); var n = root.querySelector('[data-cu-count]'); if (n) n.textContent = cuCountText(r.length); },
+      extra: '<span class="grow"></span><span class="b2" data-cu-count aria-live="polite">' + cuCountText(rowsFor().length) + '</span>' });
+    function cuCountText(n) { var all = people.filter(function (p) { return test[st.show](flagsOf[p.id]); }).length; return plural(n, 'customer') + (n !== all ? ' of ' + all : ''); }
 
     UI.on(root, 'click', '[data-show]', function (ev, el) { st.show = el.getAttribute('data-show'); ctx.setParams({ show: st.show === 'all' ? '' : st.show }); ctx.refresh(); });
     UI.on(root, 'click', '[data-cu-view]', function (ev, el) { cuOpen(el.getAttribute('data-cu-view')); });
@@ -433,7 +441,7 @@ function cuOpen(id) {
       (can('customers.check_ic') ? '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('id-badge-2') + 'Check IC</h3></div><div id="cu-ic"></div></section>' : '') +
       '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('calendar-event') + 'Bookings (' + bks.length + ')</h3>' + (can('bookings.create') && (!f.black || can('customers.blacklist_edit')) ? UI.btn('New Booking', { kind: 'tonal', size: 'sm', icon: 'plus', attrs: { 'data-cu-nb': 1 } }) : '') + '</div><div class="cu-bks">' +
       (bks.length ? bks.map(function (x) {
-        return '<div class="cu-bk"><div class="grow"><b>' + x.code + ' - ' + esc(x.cust.name) + '</b><div class="b2">' + esc(x.car.plate) + ' (' + esc(carName(x.car)) + ')</div><div class="b2">' + UI.fmt.dmy(x.start) + ' to ' + UI.fmt.dmy(x.end) + '</div><div class="row gap6 wrap" style="margin-top:4px"><span class="b2">Status:</span>' + UI.status('booking', x.status, null, { sm: true }) + UI.status('payment', x.pay || 'None', null, { sm: true }) + '</div></div>' + UI.btn('View Details', { kind: 'tonal', size: 'sm', icon: 'eye', attrs: { 'data-cu-bk': x.code } }) + '</div>';
+        return '<div class="cu-bk"><div class="grow"><b>' + x.code + ' - ' + esc(x.cust.name) + '</b><div class="b2">' + esc(x.car.plate) + ' (' + esc(carName(x.car)) + ')</div><div class="b2">' + UI.fmt.date(x.start) + ' to ' + UI.fmt.date(x.end) + '</div><div class="row gap6 wrap" style="margin-top:4px"><span class="b2">Status:</span>' + UI.status('booking', x.status, null, { sm: true }) + UI.status('payment', x.pay || 'None', null, { sm: true }) + '</div></div>' + UI.btn('View Details', { kind: 'tonal', size: 'sm', icon: 'eye', attrs: { 'data-cu-bk': x.code } }) + '</div>';
       }).join('') : '<div class="b2">No bookings yet.</div>') + '</div></section>' +
       (can('customers.view_documents') ? '<section class="cu-sec"><div class="cu-sec-h"><h3>' + i('files') + 'Documents</h3></div><div id="cu-docs"></div></section>' : '');
   }

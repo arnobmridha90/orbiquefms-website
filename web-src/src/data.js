@@ -564,7 +564,9 @@ function extendData(B, d, seed) {
   /* nobody may hand back more cash than they hold: such cash refunds become bank transfers */
   d.users.forEach(function (u) {
     var cashRef = d.deposits.filter(function (z) { return z.refund && z.refund.method === 'Cash' && z.refund.by === u.name; });
-    while (cashRef.length && cashHeldBy(u.id, d) < 0) { var z = cashRef.pop(); z.refund.method = 'Bank transfer'; z.refund.ref = 'FT' + ri(10000000, 99999999) + ri(1000, 9999); }
+    /* the customer cash they took less what they banked in and handed back (seed rule only) */
+    var custCash = function () { var f = cashParts(cashEntries(u.id, null, null, d)); return f.cash_received - f.handed_in - f.refunds_given; };
+    while (cashRef.length && custCash() < 0) { var z = cashRef.pop(); z.refund.method = 'Bank transfer'; z.refund.ref = 'FT' + ri(10000000, 99999999) + ri(1000, 9999); }
   });
 
   /* ---------- inspections ---------- */
@@ -1120,15 +1122,51 @@ function busy(car, start, end, except, d) {
   return res;
 }
 
-/* ---------- cash a staff member holds ----------
-   cashHeldBy(userId) = cash payments given to them - their bank-ins (not voided) - cash refunds they handed back. */
-function cashHeldBy(userId, d) {
-  d = d || D(); var u = byId(d.users, userId); if (!u) return 0;
-  var inn = sum(d.payments.filter(function (p) { return !p.void && p.method === 'Cash' && (p.heldBy || p.by) === u.name; }).map(function (p) { return p.amount; }));
-  var bank = sum((d.bankIns || []).filter(function (x) { return !x.voided && x.staff === userId; }).map(function (x) { return x.amount; }));
-  var refunds = sum(d.deposits.filter(function (z) { return z.refund && z.refund.method === 'Cash' && z.refund.by === u.name; }).map(function (z) { return z.refund.amount; }));
-  return Math.round((inn - bank - refunds) * 100) / 100;
+/* ---------- cash a staff member holds (one figure everywhere: Bank in cash, Cash held by staff, Deposit refunds and
+   Staff income and expenses all use it) ----------
+   cashEntries(userId, from, to) -> every movement of company money through the person between two moments (from
+   inclusive, to exclusive; null = open):
+     + cash_received  cash payments from customers they took
+     + from_owners    payments from the company to them (the "Payment to staff" kind)
+     - expenses       what they paid for the company in cash or with their own money (e.own); a company card or
+                      company transfer does not touch their cash
+     - refunds_given  deposits they handed back in cash
+     - handed_in      their bank-ins (not voided)
+     - income         their handover fees (they keep their fee out of the cash they hold)
+   cashBalance(cashParts(list)): positive = company money they hold, negative = the company owes them.
+   cashHeldBy(userId) = that balance over all time. */
+var CASH_PARTS = ['income', 'expenses', 'from_owners', 'cash_received', 'refunds_given', 'handed_in'];
+function expenseFromCash(e) { return e.method === 'Cash' || !!e.own; }
+function cashEntries(uid, from, to, d) {
+  d = d || D(); var u = byId(d.users, uid); if (!u) return [];
+  var inR = function (t) { return (!from || t >= from) && (!to || t < to); }, out = [];
+  (d.expenses || []).forEach(function (e) {
+    if (e.source && e.source !== 'recorded') return;
+    var c = byId(d.expenseCats || [], e.cat); if (!c || !inR(e.day)) return;
+    var car = carById(e.car, d), base = { date: e.day, at: new Date(e.day.getFullYear(), e.day.getMonth(), e.day.getDate(), 12), booking: e.booking || '', plate: car ? car.plate : '', note: e.note || '', ref: e.id, amount: e.amount, method: e.method || '' };
+    if (c.agentFee && e.by === uid) out.push(Object.assign({ part: 'income', kind: c.name, way: 'out', desc: c.name }, base));
+    else if (!c.agentFee && !c.paysStaff && c.group !== 'Office and admin' && e.by === uid && expenseFromCash(e)) out.push(Object.assign({ part: 'expenses', kind: c.name, way: 'out', desc: 'Expense paid: ' + c.name + ' (' + (e.method === 'Cash' ? 'cash' : String(e.method || 'other').toLowerCase() + ', own money') + ')' }, base));
+    if (c.paysStaff && e.staff === uid) out.push(Object.assign({ part: 'from_owners', kind: c.name, way: 'in', desc: 'From the company: ' + c.name }, base));
+  });
+  (d.payments || []).forEach(function (p) {
+    if (p.void || p.method !== 'Cash' || (p.heldBy || p.by) !== u.name || !inR(p.at)) return;
+    var x = findBooking(p.booking, d);
+    out.push({ part: 'cash_received', kind: p.kind, way: 'in', desc: 'Cash from customer: ' + p.kind, date: p.at, at: p.at, booking: p.booking || '', plate: x ? x.car.plate : '', note: x ? x.cust.name : '', amount: p.amount, ref: p.id });
+  });
+  (d.deposits || []).forEach(function (z) {
+    var f = z.refund; if (!f || f.method !== 'Cash' || f.by !== u.name || !(f.amount > 0) || !inR(f.at)) return;
+    var x = findBooking(z.booking, d);
+    out.push({ part: 'refunds_given', kind: 'Deposit refund', way: 'out', desc: 'Deposit handed back', date: f.at, at: f.at, booking: z.booking, plate: x ? x.car.plate : '', note: x ? x.cust.name : '', amount: f.amount, ref: z.id });
+  });
+  (d.bankIns || []).forEach(function (b) {
+    if (b.voided || b.staff !== uid || !inR(b.at)) return;
+    out.push({ part: 'handed_in', kind: 'Cash banked in', way: 'out', desc: 'Cash banked in', date: b.at, at: b.at, booking: '', plate: '', note: b.note || (b.ref ? 'Ref ' + b.ref : ''), amount: b.amount, ref: b.id });
+  });
+  return out;
 }
+function cashParts(list) { var f = {}; CASH_PARTS.forEach(function (k) { f[k] = 0; }); list.forEach(function (e) { f[e.part] += e.amount; }); return f; }
+function cashBalance(f) { return Math.round((f.cash_received + f.from_owners - f.expenses - f.refunds_given - f.handed_in - f.income) * 100) / 100; }
+function cashHeldBy(userId, d) { return cashBalance(cashParts(cashEntries(userId, null, null, d))); }
 
 /* ===================================================================
    Event bus and changes. Every change goes through DB so every page and the

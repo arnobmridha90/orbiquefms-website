@@ -1,7 +1,7 @@
 /* ---------------- AVAILABILITY (M1 builder owns this file) ----------------
    #availability?from=YYYY-MM-DDTHH:MM&to=...&len=2&h12=1&booked=1
    Which cars are free for a period, which need a check (a booking ends or starts within 3 hours), and which are booked. */
-var AV_LENS = [['1', '1d'], ['2', '2d'], ['3', '3d'], ['4', '4d'], ['5', '5d'], ['7', '1 week']];
+var AV_LENS = [['1', '1d'], ['2', '2d'], ['3', '3d'], ['4', '4d'], ['5', '5d'], ['7', '7d']];
 var avQ = '';
 VIEW_STATE.push(function () { avQ = ''; });
 function avLocal(d) { d = new Date(d); return toLocalInput(d) + 'T' + toTimeInput(d); }
@@ -15,19 +15,18 @@ function avState(q) {
   return { from: from, to: to, len: len, h12: h12, booked: q.booked === '1' };
 }
 function avHash(st) { return hashWith('availability', { from: avLocal(st.from), to: st.len ? '' : avLocal(st.to), len: st.len, h12: st.h12 && st.len ? '1' : '', booked: st.booked ? '1' : '' }); }
-function avSummary(st) {
-  return '<b class="nowrap">' + dLong(st.from) + ' ' + hm(st.from) + '</b> to <b class="nowrap">' + dLong(st.to) + ' ' + hm(st.to) + '</b>, ' + esc(durationText(st.from, st.to));
-}
+/* the end of the period, shown once: 'to Sat 28 Nov, 10:00 AM · 2 days' */
+function avToLine(st) { return '<span class="grow">to <b class="nowrap">' + dLong(st.to) + ', ' + hm(st.to) + '</b> · ' + esc(durationText(st.from, st.to)) + '</span>'; }
 VIEWS.availability = function (r) {
   var st = avState(r.q);
   var html = topbar('Check availability', { back: '#bookings', sub: 'Which cars are free' }) + '<main class="avpage">' +
     '<div class="card av-form">' +
-    '<div class="av-lbl">From</div><div class="two"><input class="inp" type="date" id="av_fd" value="' + toLocalInput(st.from) + '" aria-label="From date"><input class="inp" type="time" step="900" id="av_ft" value="' + toTimeInput(st.from) + '" aria-label="From time"></div>' +
-    '<div class="av-lbl">How long</div><div class="av-lens" id="av_lens">' + AV_LENS.map(function (l) { return '<button type="button" class="fchip' + (st.len === l[0] ? ' on' : '') + '" data-len="' + l[0] + '">' + l[1] + '</button>'; }).join('') + '</div>' +
-    '<label class="av-h12"><span>+12 hours</span><span class="sw"><input type="checkbox" id="av_h12"' + (st.h12 ? ' checked' : '') + '><i></i></span></label>' +
-    '<div class="av-lbl">To</div><div class="two"><input class="inp" type="date" id="av_td" value="' + toLocalInput(st.to) + '" aria-label="To date"><input class="inp" type="time" step="900" id="av_tt" value="' + toTimeInput(st.to) + '" aria-label="To time"></div>' +
+    '<div class="av-row"><span class="av-lbl">From</span><input class="inp" type="date" id="av_fd" value="' + toLocalInput(st.from) + '" aria-label="From date"><input class="inp" type="time" step="900" id="av_ft" value="' + toTimeInput(st.from) + '" aria-label="From time"></div>' +
+    '<div class="av-lens" id="av_lens" role="group" aria-label="How long">' + AV_LENS.map(function (l) { return '<button type="button" class="fchip' + (st.len === l[0] ? ' on' : '') + '" data-len="' + l[0] + '" aria-label="' + l[0] + (l[0] === '1' ? ' day' : ' days') + '">' + l[1] + '</button>'; }).join('') +
+    '<button type="button" class="fchip av-h12' + (st.h12 ? ' on' : '') + '" id="av_h12" aria-pressed="' + (st.h12 ? 'true' : 'false') + '" aria-label="Add 12 hours">+12h</button></div>' +
+    '<button type="button" class="av-toline" id="av_tobtn" aria-expanded="' + (st.len ? 'false' : 'true') + '"></button>' +
+    '<div class="av-row av-torow" id="av_torow"' + (st.len ? ' hidden' : '') + '><span class="av-lbl">To</span><input class="inp" type="date" id="av_td" value="' + toLocalInput(st.to) + '" aria-label="To date"><input class="inp" type="time" step="900" id="av_tt" value="' + toTimeInput(st.to) + '" aria-label="To time"></div>' +
     '<div id="av_err"></div></div>' +
-    '<div class="av-sum" id="av_sum"></div>' +
     '<label class="search av-search">' + I('search') + '<input id="avq" type="search" placeholder="Search by plate or model" value="' + esc(avQ) + '" autocomplete="off" autocapitalize="characters"><button type="button" class="bk-clear" id="avclear" aria-label="Clear search"' + (avQ ? '' : ' hidden') + '>' + I('x', 2.2) + '</button></label>' +
     '<div id="avlist"></div></main>';
   return { html: html, after: function () {
@@ -39,7 +38,9 @@ VIEWS.availability = function (r) {
       var bad = !(cur.to > cur.from);
       $('#av_err').innerHTML = bad ? '<div class="err-text">End must be after start</div>' : '';
       $('#av_td').classList.toggle('bad', bad); $('#av_tt').classList.toggle('bad', bad);
-      $('#av_sum').innerHTML = bad ? '' : avSummary(cur);
+      $('#av_tobtn').innerHTML = bad ? '<span class="grow">Pick an end after the start</span>' : avToLine(cur) + I('edit');
+      var h = $('#av_h12'); h.classList.toggle('on', cur.h12); h.setAttribute('aria-pressed', cur.h12 ? 'true' : 'false');
+      if (bad) $('#av_torow').hidden = false;
       $('#avlist').innerHTML = bad ? '<div class="empty">Pick an end after the start.</div>' : avList(cur);
     };
     var fromChanged = function () {
@@ -53,12 +54,13 @@ VIEWS.availability = function (r) {
     var toChanged = function (e) {
       var t = fromInputs($('#av_td').value || toLocalInput(cur.to), $('#av_tt').value || toTimeInput(cur.from));
       if (e && e.target.id === 'av_td') t.setHours(cur.from.getHours(), cur.from.getMinutes(), 0, 0);
-      cur.to = t; cur.len = ''; cur.h12 = false; $('#av_h12').checked = false; push(); draw();
+      cur.to = t; cur.len = ''; cur.h12 = false; push(); draw();
     };
     $('#av_td').addEventListener('change', toChanged); $('#av_tt').addEventListener('change', toChanged);
     $$('#av_lens button').forEach(function (b) { b.onclick = function () { cur.len = b.dataset.len; cur.to = new Date(cur.from.getTime() + (+cur.len) * DAY + (cur.h12 ? 12 * HOUR : 0)); push(); draw(); }; });
-    $('#av_h12').addEventListener('change', function () {
-      cur.h12 = this.checked;
+    $('#av_tobtn').onclick = function () { var row = $('#av_torow'); row.hidden = !row.hidden; this.setAttribute('aria-expanded', row.hidden ? 'false' : 'true'); if (!row.hidden) $('#av_td').focus(); };
+    $('#av_h12').addEventListener('click', function () {
+      cur.h12 = !cur.h12;
       if (!cur.len) { cur.len = String(Math.max(1, Math.min(7, Math.round((cur.to - cur.from) / DAY) || 1))); }
       cur.to = new Date(cur.from.getTime() + (+cur.len) * DAY + (cur.h12 ? 12 * HOUR : 0)); push(); draw();
     });

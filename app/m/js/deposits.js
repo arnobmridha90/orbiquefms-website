@@ -145,6 +145,7 @@ var Deposit = (function () {
       h += '</div>';
       /* adjustments */
       if (opts.afterReturn && !x.refund) h += '<div class="banner green dep-back">' + I('car') + '<div><b>The car is back.</b> Add anything you keep from the deposit, then return the rest.</div></div>';
+      var tp = !x.refund && b.inspection && b.inspection.ret && b.inspection.ret.toPrice; if (tp && tp.length) h += '<div class="banner amber">' + I('warn') + '<div><b>Found at take back, amount not set yet:</b> ' + esc(tp.join(', ')) + '. Add an adjustment for each one you charge.</div></div>';
       h += '<div class="sec" id="depAdj"><h2>Adjustments from deposit</h2>' + (canEdit ? '<button type="button" id="depAdd">' + I('plus', 2.4) + ' Add</button>' : '') + '</div><div class="list">';
       var lines = x.adj.concat(x.used).sort(function (a, c2) { return new Date(a.at) - new Date(c2.at); });
       if (lines.length) h += lines.map(function (d) {
@@ -165,7 +166,7 @@ var Deposit = (function () {
       } else {
         h += '<div class="card dep-net' + (x.over ? ' over' : '') + '"><div class="dep-net-row"><span>Amount to return</span><b class="money" id="depNet">' + rm(x.net) + '</b></div>' +
           '<div class="dep-calc small muted">' + rm(x.basis) + ' received' + (x.takenOff ? ' minus ' + rm(x.takenOff) + ' taken off' : '') + '</div>' +
-          (x.over ? '<div class="banner amber dep-over">' + I('warn') + '<div><b>The customer still owes ' + rm(sen(x.takenOff - x.basis)) + '.</b> The adjustments are more than the deposit, so nothing is returned and the extra is on the bill.' + (can('payments.add') && typeof Pay !== 'undefined' && calcBooking(b).due > 0.99 ? '<div><button type="button" class="btn sm" id="depOverPay">' + I('cash') + 'Record payment</button></div>' : '') + '</div></div>' : '') + '</div>';
+          (x.over ? '<div class="banner amber dep-over">' + I('warn') + '<div><b>The customer still owes ' + rm(sen(x.takenOff - x.basis)) + '.</b> The adjustments are more than the deposit, so nothing is returned and the extra is on the bill.' + (can('billing.record_payment') && typeof Pay !== 'undefined' && calcBooking(b).due > 0.99 ? '<div><button type="button" class="btn sm" id="depOverPay">' + I('cash') + 'Record payment</button></div>' : '') + '</div></div>' : '') + '</div>';
         if (x.state === 'hand') h += '<div class="banner blue">' + I('info') + '<div>This booking is marked Deposit Refunded, but no refund was recorded here. You can still record how it went back.</div></div>';
         if (x.state === 'used') h += '<div class="banner blue">' + I('info') + '<div>The whole deposit was used for payments, so nothing goes back.</div></div>';
       }
@@ -251,13 +252,13 @@ var Deposit = (function () {
         S.deductions.push({ id: uid(), booking: b.id, kind: st.kind, amt: amt, note: note, photo: st.photo, by: S.me, at: new Date().toISOString(), paymentId: null });
         bLog(b, 'Deposit adjustment added: ' + st.kind + ' ' + rm(amt) + (note ? ' (' + note + ')' : ''));
       }
-      syncOver(b); save(); closeSheet(); say(d ? 'Adjustment saved' : 'Adjustment added'); done();
+      syncOver(b); save(); closeSheet(); say(d ? 'Adjustment saved' : 'Adjustment added'); done(); payRerender();
     };
     var del = $('#dlDel', sh);
     if (del) del.onclick = function () {
       var i = S.deductions.indexOf(d); if (i < 0) return;
-      S.deductions.splice(i, 1); bLog(b, 'Deposit adjustment removed: ' + d.kind + ' ' + rm(d.amt)); syncOver(b); save(); closeSheet(); done();
-      undoSnack('Adjustment removed', function () { S.deductions.splice(Math.min(i, S.deductions.length), 0, d); bLog(b, 'Deposit adjustment put back: ' + d.kind + ' ' + rm(d.amt)); syncOver(b); save(); done(); });
+      S.deductions.splice(i, 1); bLog(b, 'Deposit adjustment removed: ' + d.kind + ' ' + rm(d.amt)); syncOver(b); save(); closeSheet(); done(); payRerender();
+      undoSnack('Adjustment removed', function () { S.deductions.splice(Math.min(i, S.deductions.length), 0, d); bLog(b, 'Deposit adjustment put back: ' + d.kind + ' ' + rm(d.amt)); syncOver(b); save(); done(); payRerender(); });
     };
   }
 
@@ -379,7 +380,7 @@ var Deposit = (function () {
       b.refundPendingAt = b.refundPendingAt || new Date().toISOString();
       bLog(b, 'Deposit refund reopened (' + rm(r.amt) + ' by ' + (r.method || 'none').toLowerCase() + '): ' + why);
       setPaymentStatus(b, 'Refund Pending', 'deposit refund reopened: ' + why);
-      save(); closeSheet(); say('Refund reopened'); done();
+      save(); closeSheet(); say('Refund reopened'); done(); payRerender();
     };
   }
 

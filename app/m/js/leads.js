@@ -139,7 +139,6 @@ var Leads = (function () {
   function reopen(id) { var w = wa(id); if (!w || !can('leads.manage')) return; var l = w.lead; l.state = l.takenBy ? 'taken' : 'waiting'; l.closedAt = null; w.status = 'Lead'; OPEN[id] = true; audit('Opened the WhatsApp lead from ' + (w.name || w.phone) + ' again', { link: '#chat/wa/' + id }); done('Lead open again'); }
   function book(id) {
     var w = wa(id); if (!w) return; var l = w.lead || {};
-    if (can('leads.manage') && !l.takenBy && l.state !== 'booked') { l.takenBy = S.me; l.takenAt = new Date().toISOString(); if (l.state !== 'closed') l.state = 'taken'; w.handled = 'staff'; save(); }
     location.hash = hashWith('new', { lead: id });
   }
   /* swap the held car for one that is free on the lead's dates */
@@ -154,9 +153,18 @@ var Leads = (function () {
   function toggle(id) { var el = $('#ldcard'); if (!el) return; var open = !el.classList.contains('open'); OPEN[id] = open; el.classList.toggle('open', open); var t = $('.ld-top', el); if (t) t.setAttribute('aria-expanded', open); }
   function setAssistant(on) {
     if (!can('leads.settings')) { say('Ask the owner for Assistant settings access'); return; }
-    S.assistant = { on: !!on, by: S.me, at: new Date().toISOString() };
-    audit(on ? 'Switched the booking assistant on' : 'Switched the booking assistant off');
-    done(on ? 'Booking assistant switched on' : 'Booking assistant switched off');
+    var apply = function () {
+      var prev = S.assistant ? Object.assign({}, S.assistant) : { on: true };
+      S.assistant = { on: !!on, by: S.me, at: new Date().toISOString() };
+      audit(on ? 'Switched the booking assistant on' : 'Switched the booking assistant off');
+      save(); render(false, true);
+      if (on) say('Booking assistant switched on');
+      else undoSnack('Booking assistant switched off for everyone', function () { S.assistant = prev; audit('Switched the booking assistant back on (undo)'); save(); render(false, true); say('Booking assistant is on again'); }, 8000);
+    };
+    if (on) { apply(); return; }
+    /* turning it off affects every new WhatsApp customer: ask first */
+    confirm({ icon: 'warn', title: 'Turn off the assistant for everyone?', text: 'New WhatsApp customers will get no answer until a staff member replies.', ok: 'Turn it off', cancel: 'Keep it on', primary: 'cancel' })
+      .then(function (y) { if (y) apply(); else render(false, true); });
   }
 
   /* ---------- demo: a new customer writes on WhatsApp ---------- */

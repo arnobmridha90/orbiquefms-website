@@ -155,6 +155,8 @@ function mountPage() {
   var host = document.getElementById('page-host'); if (!host) return;
   if (CUR) CUR.offs.forEach(function (f) { f(); });
   var id = S.page, p = PAGES[id];
+  /* S.visit counts arrivals on a page (another page or company), not redraws: pages use it to drop old drafts */
+  var vk = B().id + ':' + id; if (S.lastMount !== vk) { S.visit = (S.visit || 0) + 1; S.lastMount = vk; }
   var root = document.createElement('div'); root.className = 'pg pg-' + id;
   host.innerHTML = ''; host.appendChild(root);
   CUR = { id: id, root: root, offs: [], ctx: null };

@@ -9,7 +9,8 @@ VIEW_STATE.push(function () { SIGNIN = { user: '', pass: '', show: false, rememb
 function signIn(id, opts) {
   opts = opts || {};
   var p = staff(id); if (!p) return;
-  S.me = id; p.lastSeen = new Date().toISOString(); p.devices = Math.max(1, +p.devices || 0);
+  S.me = id; S.signedIn = id; /* a real sign-in on this phone (switching company only keeps a session made this way) */
+  p.lastSeen = new Date().toISOString(); p.devices = Math.max(1, +p.devices || 0);
   S.tempSession = opts.remember === false ? id : null; /* not remembered: ends when the browser is closed */
   try { sessionStorage.setItem('fms.live.' + CO, id); sessionStorage.setItem('fms.unlocked.' + CO, id); } catch (e) {}
   usePrefs(); audit('Signed in', { link: '#person/' + id }); save(); applyTheme();
@@ -21,7 +22,7 @@ function signIn(id, opts) {
 }
 function signOut() {
   if (S.me) audit('Signed out', { link: '#person/' + S.me });
-  S.me = null; S.tempSession = null; usePrefs(); save(); closeAllSheets();
+  S.me = null; S.signedIn = null; S.tempSession = null; usePrefs(); save(); closeAllSheets();
   try { sessionStorage.removeItem('fms.unlocked.' + CO); } catch (e) {}
   history.replaceState(null, '', location.pathname + location.search + '#signin'); render(true);
 }

@@ -207,7 +207,7 @@ PAGES['maintenance'] = {
       UI.stat({ label: 'Due now', value: k.due, note: k.over + ' overdue', icon: 'alert-triangle', tone: k.over ? 'bad' : 'warn', attrs: { 'data-tab': 'due' } }) +
       UI.stat({ label: 'In the workshop', value: k.shop, note: 'cars cannot be booked', icon: 'tool', tone: 'warn', attrs: { 'data-tab': 'workshop' } }) +
       UI.stat({ label: 'Documents expiring', value: k.docs, note: 'within 30 days, or already expired', icon: 'file-alert', tone: 'info', attrs: { 'data-tab': 'docs' } }) +
-      (mtCostsOk() ? UI.stat({ label: 'Spent this month', value: UI.fmt.money(k.spent), note: plural(k.spentN, 'finished job'), icon: 'report-money', tone: 'pri', attrs: { 'data-tab': 'costs' } }) : '') +
+      (mtCostsOk() ? UI.stat({ label: 'Spent this month', value: UI.fmt.money(k.spent), note: plural(k.spentN, 'finished job'), icon: 'report-money', tone: 'grey', attrs: { 'data-tab': 'costs' } }) : '') +
       '</div><div id="mt-tabs" class="mt-tabs"></div><div id="mt-body" class="mt-body"></div>';
     UI.tabs(root.querySelector('#mt-tabs'), { items: MT_TABS.map(function (t) { return Object.assign({}, t, { hidden: t.id === 'costs' && !mtCostsOk() }); }), value: st.tab, onChange: function (id) { st.tab = id; ctx.setParams({ tab: id }); drawTab(); } });
     UI.on(root, 'click', '[data-tab]', function (ev, el) { st.tab = el.getAttribute('data-tab'); ctx.setParams({ tab: st.tab }); ctx.refresh(); });
