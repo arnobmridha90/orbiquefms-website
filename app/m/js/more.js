@@ -21,6 +21,7 @@ var MORE_GROUPS = function (bd) {
       ['#deposits', 'shield', 'Deposits', can('deposits.view'), bd.dep, 'amber'],
       ['#cash', 'bank', 'Cash and bank-ins', cashOk],
       ['#mymoney', 'cash', can('expenses.staff_reports_all') ? 'Staff money' : 'My money', can('expenses.view') || can('expenses.add')],
+      ['#quotes', 'file', 'Quotations', can('bookings.view') && (can('bookings.create') || can('bookings.see_amounts'))],
       ['#invoices', 'receipt', 'Invoices and receipts', can('billing.view')],
       ['#instalments', 'cal', 'Instalments', can('cars.see_instalment')],
       ['#expenses', 'tag', 'Expenses', can('expenses.view') || can('expenses.add')],

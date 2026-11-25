@@ -823,7 +823,7 @@ function extendData(B, d, seed) {
 
 /* ---------------- the default menu (reference sidebar, section 0) ---------------- */
 var DEFAULT_MENU = [
-  { label: 'Bookings', items: ['bookings', 'customers', 'leads', 'signatures', 'damage-packages', 'reports', 'invoices', 'staff-reports', 'expenses', 'income', 'summons', 'deposits'] },
+  { label: 'Bookings', items: ['bookings', 'customers', 'leads', 'signatures', 'damage-packages', 'reports', 'quotes', 'invoices', 'staff-reports', 'expenses', 'income', 'summons', 'deposits'] },
   { label: 'Operations', items: ['tasks', 'calendar'] },
   { label: 'Fleet Management', items: ['cars', 'availability', 'maintenance', 'schedules', 'instalments'] },
   { label: 'System Settings', items: ['faqs', 'reviews', 'home-settings'] },

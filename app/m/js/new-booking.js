@@ -91,6 +91,7 @@ function nbFromQuery(q) {
       if (L.question) n.note = 'Customer asked: ' + L.question;
     }
   }
+  if (q.quote && typeof Quotes !== 'undefined') Quotes.fillBooking(n, q.quote);
   NB = prev;
   return n;
 }
@@ -724,6 +725,7 @@ function nbCommit(n) {
   audit('Made booking ' + b.code, { booking: b.id, cust: cid, car: b.car });
   /* saving the booking is what claims the lead (opening New booking from it changes nothing) */
   if (n.leadId) { var w = byId(S.wa, n.leadId); if (w) { w.status = 'Booked'; w.bookingId = b.id; w.handled = 'staff'; if (w.lead) { w.lead.state = 'booked'; w.lead.bookingId = b.id; if (!w.lead.takenBy) { w.lead.takenBy = S.me; w.lead.takenAt = nowIso; } } } }
+  if (n.quoteId && typeof Quotes !== 'undefined') Quotes.markBooked(n.quoteId, b);
   S.recentBookings = [b.id].concat((S.recentBookings || []).filter(function (x) { return x !== b.id; })).slice(0, 5);
   save();
   return b;

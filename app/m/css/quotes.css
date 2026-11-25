@@ -1,0 +1,42 @@
+/* Quotations */
+.qt-main { padding-bottom: 110px; }
+.qt-main .chiprow { margin: 10px 0 12px; }
+.qt-head { display: flex; align-items: flex-start; gap: 10px; }
+.qt-kv { padding: 4px 0; margin-top: 10px; }
+.qt-kv .kvr { display: flex; justify-content: space-between; gap: 12px; padding: 9px 14px; border-top: 1px solid var(--line); }
+.qt-kv .kvr:first-child { border-top: 0; }
+.qt-kv .kvr span { color: var(--muted); }
+.qt-kv .kvr b { text-align: right; font-weight: 650; }
+.qt-sum { padding: 0; margin-top: 10px; overflow: hidden; }
+.qt-sum .money { text-align: right; }
+.qt-total { background: var(--tint); font-weight: 750; font-size: 16px; }
+.qt-meta { margin: 10px 4px 14px; line-height: 1.5; }
+.qt-acts { margin-bottom: 8px; }
+.qt-acts .act { cursor: pointer; }
+
+/* form */
+.qt-form { display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
+.qt-form .sec { margin: 8px 0 -2px; }
+.qt-form .sec h2 { margin: 0; }
+.qt-linked { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.qt-days { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.qt-days .grow { min-width: 0; }
+.qt-step { display: flex; gap: 6px; }
+.qt-step .iconbtn { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 10px; font-size: 20px; font-weight: 700; }
+.qt-cover { flex-wrap: wrap; }
+.qt-cover small { font-weight: 500; opacity: .75; }
+.qt-extra { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.qt-extra2 { display: grid; grid-template-columns: 72px 1fr 44px; gap: 8px; align-items: end; }
+.qt-extra2 .iconbtn { height: 44px; }
+#qtExtras { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+#qtExtras .qt-extra { align-self: stretch; }
+.qt-foothint { margin: 0 2px 8px; min-height: 1.2em; }
+
+/* preview: the A4 page fits the width; a tap zooms in and the page scrolls inside the box */
+.qt-paper { background: #E9EBEF; border-radius: 10px; padding: 8px; overflow: auto; -webkit-overflow-scrolling: touch; max-height: 64vh; cursor: zoom-in; }
+.qt-paper .qd-page { display: block; width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .18); margin: 0 auto 8px; }
+.qt-paper .qd-page:last-child { margin-bottom: 0; }
+.qt-paper.zoom { cursor: zoom-out; }
+.qt-paper.zoom .qd-page { width: 230%; max-width: none; }
+.qt-hint { text-align: center; margin: 6px 0 0; }
+.qt-walink { width: 100%; margin-top: 6px; }

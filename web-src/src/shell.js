@@ -13,6 +13,7 @@ var PAGE_META = {
   'signatures': ['Signatures', 'signature', 'signatures.view'],
   'damage-packages': ['Damage Packages', 'shield-check', 'damage_packages.view'],
   'reports': ['Reports', 'report-analytics', 'reports.view'],
+  'quotes': ['Quotations', 'file-dollar', 'bookings.view'],
   'invoices': ['Invoices', 'file-invoice', 'billing.view'],
   'staff-reports': ['Staff income and expenses', 'user-dollar', 'expenses.view'],
   'expenses': ['Expenses', 'receipt-2', 'expenses.view'],
