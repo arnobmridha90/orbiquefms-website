@@ -341,5 +341,9 @@ do $$ begin
     execute 'drop policy if exists company_files_insert on storage.objects';
     execute $p$create policy company_files_insert on storage.objects for insert to authenticated
       with check (bucket_id = 'company-files' and coalesce(public.can_write(public.path_org(name)), false))$p$;
+    execute 'drop policy if exists company_files_update on storage.objects';
+    execute $p$create policy company_files_update on storage.objects for update to authenticated
+      using (bucket_id = 'company-files' and coalesce(public.can_write(public.path_org(name)), false))
+      with check (bucket_id = 'company-files' and coalesce(public.can_write(public.path_org(name)), false))$p$;
   end if;
 end $$;
