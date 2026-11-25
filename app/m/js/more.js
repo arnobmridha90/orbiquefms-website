@@ -51,10 +51,11 @@ VIEWS.more = function () {
     row('#notifs', 'bell', 'Notifications', PUSH.sub ? 'Phone notifications on' : 'Choose what you get') +
     (can('users.view_audit') ? row('#activity', 'activity', 'Activity', 'Who did what, and when') : '') +
     row('#install', 'install', 'Install app', standalone() ? 'Installed' : 'Add to Home Screen') +
-    row('#company', 'paint', 'Switch company', 'Demo: try another company and brand') +
+    (window.FMS_CLOUD ? '' : row('#company', 'paint', 'Switch company', 'Demo: try another company and brand')) +
     '<button class="row" type="button" onclick="moreSignOut()">' + I('signout') + '<div class="grow"><div class="t1">Sign out</div><div class="t2">Sign in as someone else to try their role</div></div></button>' +
+    (window.FMS_CLOUD ? '</div><p class="demo-note">Orbique FMS</p></main>' :
     '<button class="row" type="button" onclick="resetDemo()">' + I('reset') + '<div class="grow"><div class="t1">Reset demo data</div><div class="t2">Start again with fresh made-up bookings</div></div></button></div>' +
-    '<p class="demo-note">Orbique FMS · staff app demo<br>All names, numbers and amounts are made up.</p></main>';
+    '<p class="demo-note">Orbique FMS · staff app demo<br>All names, numbers and amounts are made up.</p></main>');
   return { html: html };
 };
 function moreSignOut() {

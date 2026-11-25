@@ -1,5 +1,5 @@
-/* ---------------- start (loads last: every module has registered its views and seeders) ---------------- */
-S = load(); save();
+/* ---------------- start (loads last: every module has registered its views and seeders) ----------------
+   The demo starts at once. The real app (app/s/, js/cloud.js) signs in and loads the company's data first, then calls startApp(). */
 /* ---------------- handover reminders while the app is open: only my own jobs ---------------- */
 function myJob(b) {
   if ((b.assigned || []).indexOf(S.me) >= 0) return true;
@@ -18,6 +18,8 @@ function checkDue() {
 }
 
 /* ---------------- start ---------------- */
+function startApp() {
+S = load(); save();
 applyTheme();
 (function firstScreen() {
   var base = location.pathname + location.search.replace(/([?&])share=slip(&|$)/, '$1').replace(/[?&]$/, '');
@@ -29,3 +31,5 @@ applyTheme();
 render();
 setTimeout(checkDue, 2500); setInterval(checkDue, 60000);
 setInterval(function () { if (S && route().name === 'home' && !SHEETS.length) render(false, true); }, 60000);
+}
+if (window.FMS_CLOUD) FMS_CLOUD.boot(startApp); else startApp();
