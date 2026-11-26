@@ -3,11 +3,29 @@ android {
   namespace 'com.orbique.fms.staff'
   compileSdk 34
   defaultConfig {
-    applicationId 'com.orbique.fms.kilatstaff.demo'
     minSdk 24
     targetSdk 34
-    versionCode 3
-    versionName '0.2-demo'
+  }
+  // One app per company. Each opens its company's web app full screen, so the content
+  // (and every update to it) comes from the web address: no reinstall needed for updates.
+  flavorDimensions 'company'
+  productFlavors {
+    kilat {
+      dimension 'company'
+      applicationId 'com.orbique.fms.kilatstaff.demo'
+      versionCode 3
+      versionName '0.2-demo'
+      resValue 'string', 'app_name', 'Kilat Staff'
+      manifestPlaceholders = [startUrl: 'https://app.orbiquefms.com/m/?co=kilat']
+    }
+    ventura {
+      dimension 'company'
+      applicationId 'com.orbique.fms.ventura'
+      versionCode 1
+      versionName '1.0'
+      resValue 'string', 'app_name', 'Ventura Staff'
+      manifestPlaceholders = [startUrl: 'https://app.orbiquefms.com/s/?co=ventura']
+    }
   }
   signingConfigs {
     // Demo-only signing key, used so the web address can trust this app (no browser bar).
