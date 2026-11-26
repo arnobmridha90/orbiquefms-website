@@ -75,9 +75,7 @@
       ],
       "destination": "/m/",
       "permanent": false
-    }
-  ],
-  "rewrites": [
+    },
     {
       "source": "/",
       "has": [
@@ -86,7 +84,8 @@
           "value": "ventura.orbiquefms.com"
         }
       ],
-      "destination": "/w/"
+      "destination": "/w/",
+      "permanent": false
     }
   ]
 }
