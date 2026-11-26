@@ -106,12 +106,13 @@ function cuDocSvg(kind, name) {
 }
 /* open a file (uploaded picture, PDF or one of the sample files) in a dialog */
 function cuShowFile(f, title, kind, who) {
-  var body = f.dataUrl ? (/^data:image\//.test(f.dataUrl) ? '<img class="cu-fview" src="' + f.dataUrl + '" alt="' + esc(f.name) + '">' : '<div class="cu-fview cu-fpdf">' + i('file-type-pdf') + '<b>' + esc(f.name) + '</b><span class="b2">' + UI.fmt.size(f.size) + '</span></div>')
+  var body = f.dataUrl ? (isImgSrc(f.dataUrl) ? '<img class="cu-fview" src="' + f.dataUrl + '" alt="' + esc(f.name) + '">' : '<div class="cu-fview cu-fpdf">' + i('file-type-pdf') + '<b>' + esc(f.name) + '</b><span class="b2">' + UI.fmt.size(f.size) + '</span></div>')
     : '<div class="cu-fview cu-fsample">' + cuDocSvg(kind, who) + '</div><p class="b2">Sample file kept with the record. In the real system the picture the customer sent shows here.</p>';
   UI.dialog({ title: title, text: f.name + (f.size ? ' · ' + UI.fmt.size(f.size) : ''), width: 'md', body: body,
     buttons: [{ label: 'Close', kind: 'g' }].concat(f.dataUrl ? [{ label: 'Download', icon: 'download', onClick: function () { cuDownloadData(f); return false; } }] : []) });
 }
 function cuDownloadData(f) {
+  if (/^https?:/.test(f.dataUrl || '')) { window.open(f.dataUrl, '_blank', 'noopener'); return; }
   var m = /^data:([^;,]+)(;base64)?,(.*)$/.exec(f.dataUrl); if (!m) return;
   var raw = m[2] ? atob(m[3]) : decodeURIComponent(m[3]), bytes = new Uint8Array(raw.length);
   for (var k = 0; k < raw.length; k++) bytes[k] = raw.charCodeAt(k);
@@ -127,7 +128,7 @@ function cuDocsMount(el, files, o) {
     el.innerHTML = '<div class="cu-docs">' + CU_DOCS.map(function (dc) {
       var f = files[dc[0]], from = !f && o.fromCustomer && o.fromCustomer[dc[0]];
       return '<div class="cu-doc" data-doc="' + dc[0] + '"><div class="cu-doc-h">' + dc[1] + '</div>' +
-        (f ? '<button type="button" class="cu-thumb" data-cu-open title="Open ' + esc(f.name) + '">' + (f.dataUrl && /^data:image\//.test(f.dataUrl) ? '<img src="' + f.dataUrl + '" alt="">' : f.dataUrl ? i('file-type-pdf') : cuDocSvg(dc[0], o.person && o.person.name)) + '</button>' +
+        (f ? '<button type="button" class="cu-thumb" data-cu-open title="Open ' + esc(f.name) + '">' + (f.dataUrl && isImgSrc(f.dataUrl) ? '<img src="' + f.dataUrl + '" alt="">' : f.dataUrl ? i('file-type-pdf') : cuDocSvg(dc[0], o.person && o.person.name)) + '</button>' +
           '<div class="cu-doc-f"><button type="button" class="cu-link ellip" data-cu-open>' + esc(f.name) + '</button>' + (o.readonly ? '' : UI.iconBtn('trash', 'Remove ' + dc[1], { size: 'sm', cls: 'cu-del', attrs: { 'data-cu-del': 1 } })) + '</div>'
           : '<div class="cu-none">' + (from ? 'No file (will be copied from customer)' : o.readonly ? 'Not provided' : 'No file yet') + '</div>') +
         (o.readonly ? '' : '<label class="btn o sm cu-up">' + i('upload') + (f ? 'Replace' : 'Upload') + '<input type="file" accept="image/*,.pdf" hidden data-cu-file></label>') + '</div>';

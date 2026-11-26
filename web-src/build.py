@@ -44,3 +44,15 @@ if missing: print('Icons not found anywhere (they will not show):', missing[:40]
 body = head + '<style>\n' + css + '\n/* Tabler icons used by the template system */\n' + icons + '\n</style>\n<div id="app"></div>\n<script>\n' + js + '\n</script>\n'
 open(OUT, 'w').write(body)
 print('built', OUT, round(len(body.encode()) / 1024), 'KB')
+
+# ---- the real app (signed in, one company's real data): app/w/index.html, served at <company>.orbiquefms.com ----
+REAL = os.path.join(HERE, 'real')
+real_js = open(os.path.join(REAL, 'cloud-web.js')).read()
+real = (head + '<style>\n' + css + '\n' + icons + '\n</style>\n<div id="app"></div>\n'
+        '<script>window.FMS_REAL = 1;</script>\n<script src="/m/js/vendor/supabase-2.45.4.js"></script>\n<script src="/s/config.js"></script>\n'
+        '<script>\n' + js + '\n</script>\n<script>\n' + real_js + '\n</script>\n')
+for bad in ['ventura', 'xtrecy']:
+    if re.search(bad, real_js, re.I): print('FORBIDDEN word found in real app code:', bad)
+os.makedirs(os.path.join(HERE, '..', 'app', 'w'), exist_ok=True)
+open(os.path.join(HERE, '..', 'app', 'w', 'index.html'), 'w').write(real)
+print('built app/w/index.html', round(len(real.encode()) / 1024), 'KB')

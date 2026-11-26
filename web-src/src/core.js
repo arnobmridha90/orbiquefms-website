@@ -10,6 +10,8 @@ var S = {
   pf: { tab: 'companies', q: '', filter: 'all', nav: false, status: {}, plans: {}, extra: [], reqs: null }
 };
 function B() { return BRANDS[S.b]; }
+/* a picture we can show in an <img>: a data address of an image, or a stored file's link ending in a picture type */
+function isImgSrc(s) { return /^data:image\//.test(s || '') || /^(https?:|blob:)[^?#]*\.(jpe?g|png|gif|webp|bmp|heic|avif)([?#]|$)/i.test(s || ''); }
 function D() { return B().data; }
 
 /* ---------------- page registry ----------------
@@ -134,6 +136,7 @@ function addLogo(file) {
 
 /* ---------------- sample bar ---------------- */
 function sampleBar() {
+  if (window.FMS_REAL) { S.sec = 'dash'; return ''; }   /* the real app: one company, no sample controls */
   var secs = [['dash', 'Staff dashboard', 'layout-dashboard'], ['bf', 'Booking form', 'device-mobile'], ['web', 'Website templates', 'world'], ['pf', 'Platform admin', 'building-skyscraper']];
   var cur = S.sec === 'dash' && S.page === 'website' ? 'web' : S.sec;
   return '<div class="sx" role="region" aria-label="Sample controls"><div class="sx-in">' +

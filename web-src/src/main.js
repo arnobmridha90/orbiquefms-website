@@ -6,7 +6,8 @@ function measureBar() {
   var h = getComputedStyle(sx).position === 'sticky' ? sx.offsetHeight : 0;
   document.documentElement.style.setProperty('--sx-h', h + 'px');
 }
-(function () {
+/* the real app (web-src/real) starts this itself once the company's data has loaded */
+function fmsMain() {
   try { if (localStorage.getItem('fms.rail') === '1') S.rail = true; var m = localStorage.getItem('fms.mode'); if (m === 'light' || m === 'dark') document.documentElement.setAttribute('data-theme', m); } catch (e) { /* private window: defaults */ }
   runInits();
   /* this tab's place in the browser history (kept across a reload) */
@@ -49,4 +50,5 @@ function measureBar() {
   /* closing the tab or reloading with unsaved changes: the browser asks */
   window.addEventListener('beforeunload', function (ev) { if (UI.isDirty()) { ev.preventDefault(); ev.returnValue = ''; } });
   window.addEventListener('resize', function () { if (UI.placeToasts) UI.placeToasts(); });
-})();
+}
+if (!window.FMS_REAL) fmsMain();

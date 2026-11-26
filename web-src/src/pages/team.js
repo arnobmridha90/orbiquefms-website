@@ -378,7 +378,7 @@ function teamWireFacts(el, e) {
 function teamViewDoc(e, k) {
   var doc = e.docs[k], lbl = k === 'idCard' ? 'ID card' : 'Proof of address';
   DB.log('Viewed a document', 'Team member', e.id, me().name + ' opened the ' + lbl.toLowerCase() + ' of ' + e.name);
-  UI.dialog({ title: lbl + ' of ' + e.name, width: 'md', body: doc.dataUrl && /^data:image/.test(doc.dataUrl) ? '<img src="' + doc.dataUrl + '" alt="' + esc(lbl) + '" style="max-width:100%;border-radius:8px">' : '<div class="tm-docph">' + i('file-text') + '<b>' + esc(doc.name) + '</b><span class="b2">' + UI.fmt.size(doc.size) + ' · sample file, no real document is stored</span></div>', buttons: [{ label: 'Close' }] });
+  UI.dialog({ title: lbl + ' of ' + e.name, width: 'md', body: doc.dataUrl && isImgSrc(doc.dataUrl) ? '<img src="' + doc.dataUrl + '" alt="' + esc(lbl) + '" style="max-width:100%;border-radius:8px">' : '<div class="tm-docph">' + i('file-text') + '<b>' + esc(doc.name) + '</b><span class="b2">' + UI.fmt.size(doc.size) + ' · sample file, no real document is stored</span></div>', buttons: [{ label: 'Close' }] });
 }
 function teamToggleAgent(e, after) {
   var lu = e.login ? userById(e.login) : null;

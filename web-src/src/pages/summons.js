@@ -100,7 +100,7 @@ function smsHash(str) { var h = 7; String(str).split('').forEach(function (c) { 
 /* a picture of the notice for summons whose picture was added before this session */
 function smsPicture(s) {
   if (!s.picture) return null;
-  if (s.picture.dataUrl && /^data:image/.test(s.picture.dataUrl)) return s.picture.dataUrl;
+  if (s.picture.dataUrl && isImgSrc(s.picture.dataUrl)) return s.picture.dataUrl;
   var b = s.picture.blurry, rd = s.reading || {}, notice = rd.notice || s.notice || '', when = s.at ? UI.fmt.dateTime(s.at) : '', pl = s.plate || '';
   var line = function (y, label, val) { return '<text x="40" y="' + y + '" font-size="15" fill="#333">' + esc(label) + '</text><text x="210" y="' + y + '" font-size="17" font-weight="700" fill="#111"' + (b ? ' opacity=".25"' : '') + '>' + esc(val) + '</text>'; };
   var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800"><defs><filter id="f"><feGaussianBlur stdDeviation="' + (b ? 2.6 : 0.3) + '"/></filter></defs><rect width="600" height="800" fill="#f3efe4"/><g filter="url(#f)" font-family="sans-serif">' +
