@@ -21611,8 +21611,8 @@ if (!window.FMS_REAL) fmsMain();
   function load(ws, ctx) {
     Promise.all([
       sb.from('orgs').select('id,slug,name,identity,next_no,status').eq('id', ws.id).single(),
-      pageAll(function () { return sb.from('records').select('coll,id,data,deleted').eq('org_id', ws.id).eq('deleted', false); }),
-      pageAll(function () { return sb.from('blobs').select('key,data').eq('org_id', ws.id); })
+      pageAll(function () { return sb.from('records').select('coll,id,data,deleted').eq('org_id', ws.id).eq('deleted', false).order('coll').order('id'); }),
+      pageAll(function () { return sb.from('blobs').select('key,data').eq('org_id', ws.id).order('key'); })
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
       var org = res[0].data, colls = {}, blobs = {};
