@@ -65,7 +65,11 @@ var FMS_CLOUD = (function () {
       ev.preventDefault();
       var v = document.getElementById('clNew').value;
       if (v.length < 8) { alertIn('clPw', 'Use at least 8 characters.'); return; }
-      sb.auth.updateUser({ password: v }).then(function (r) { if (r.error) alertIn('clPw', r.error.message); else { history.replaceState(null, '', location.pathname); afterSignIn(start); } });
+      var btn = ev.target.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Saving…';
+      sb.auth.updateUser({ password: v }).then(function (r) {
+        if (r.error) { btn.disabled = false; btn.textContent = 'Save password'; alertIn('clPw', r.error.message); }
+        else { history.replaceState(null, '', location.pathname); afterSignIn(start); }
+      }, function (x) { btn.disabled = false; btn.textContent = 'Save password'; alertIn('clPw', 'Could not save. Check your internet and try again.'); });
     };
   }
   function alertIn(id, text) { var f = document.getElementById(id), b = f.querySelector('.banner'); if (b) b.outerHTML = ''; f.insertAdjacentHTML('afterbegin', '<div class="banner red" role="alert"><div>' + e(text) + '</div></div>'); }
