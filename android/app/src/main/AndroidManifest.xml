@@ -7,7 +7,7 @@
     <!-- Opens the staff web app full screen in Chrome's engine (Trusted Web Activity).
          The content comes from the web address, so every update arrives without reinstalling. -->
     <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true" android:label="@string/app_name">
-      <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://app.orbiquefms.com/m/?co=kilat" />
+      <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="${startUrl}" />
       <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR" android:resource="@color/bar" />
       <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR" android:resource="@color/nav" />
       <meta-data android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE" android:resource="@mipmap/ic_launcher" />

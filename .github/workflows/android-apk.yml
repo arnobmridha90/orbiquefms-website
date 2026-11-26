@@ -1,7 +1,7 @@
-name: Build staff app APK (demo)
+name: Build staff app APKs
 on:
   push:
-    branches: ['claude/project-thread-9mc8xa']
+    branches: ['claude/project-thread-9mc8xa', 'claude/project-thread-jitn89']
     paths: ['android/**', '.github/workflows/android-apk.yml']
   workflow_dispatch:
 permissions:
@@ -15,17 +15,18 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.7' }
-      - name: Build debug APK
+      - name: Build debug APKs (one per company)
         working-directory: android
-        run: gradle --no-daemon assembleDebug
-      - name: Put the APK next to the web app so it has a direct download link
+        run: gradle --no-daemon assembleKilatDebug assembleVenturaDebug
+      - name: Put each APK next to its web app so it has a direct download link
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk app/m/kilat-staff.apk
+          cp android/app/build/outputs/apk/kilat/debug/app-kilat-debug.apk app/m/kilat-staff.apk
+          cp android/app/build/outputs/apk/ventura/debug/app-ventura-debug.apk app/s/ventura-staff.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add app/m/kilat-staff.apk
-          git commit -m "Build Kilat Staff demo APK" || exit 0
+          git add app/m/kilat-staff.apk app/s/ventura-staff.apk
+          git commit -m "Build staff app APKs" || exit 0
           git pull --rebase origin ${GITHUB_REF_NAME}
           git push origin HEAD:${GITHUB_REF_NAME}
       - uses: actions/upload-artifact@v4
-        with: { name: kilat-staff-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
+        with: { name: staff-apks, path: android/app/build/outputs/apk/*/debug/*.apk }
