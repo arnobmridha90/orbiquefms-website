@@ -6,8 +6,9 @@ android {
     minSdk 24
     targetSdk 34
   }
-  // One app per company. Each opens its company's web app full screen, so the content
-  // (and every update to it) comes from the web address: no reinstall needed for updates.
+  // 'fms' is the one real app for every subscriber: staff sign in and their account decides the company.
+  // It opens the web app full screen, so every update comes from the web address: no reinstall needed.
+  // 'kilat' is the old made-up-data demo.
   flavorDimensions 'company'
   productFlavors {
     kilat {
@@ -18,13 +19,13 @@ android {
       resValue 'string', 'app_name', 'Kilat Staff'
       manifestPlaceholders = [startUrl: 'https://app.orbiquefms.com/m/?co=kilat']
     }
-    ventura {
+    fms {
       dimension 'company'
-      applicationId 'com.orbique.fms.ventura'
+      applicationId 'com.orbique.fms'
       versionCode 1
       versionName '1.0'
-      resValue 'string', 'app_name', 'Ventura Staff'
-      manifestPlaceholders = [startUrl: 'https://app.orbiquefms.com/s/?co=ventura']
+      resValue 'string', 'app_name', 'Orbique FMS'
+      manifestPlaceholders = [startUrl: 'https://app.orbiquefms.com/s/']
     }
   }
   signingConfigs {
