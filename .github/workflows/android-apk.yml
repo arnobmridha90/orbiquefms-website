@@ -17,14 +17,14 @@ jobs:
         with: { gradle-version: '8.7' }
       - name: Build debug APKs (one per company)
         working-directory: android
-        run: gradle --no-daemon assembleKilatDebug assembleVenturaDebug
+        run: gradle --no-daemon assembleKilatDebug assembleFmsDebug
       - name: Put each APK next to its web app so it has a direct download link
         run: |
           cp android/app/build/outputs/apk/kilat/debug/app-kilat-debug.apk app/m/kilat-staff.apk
-          cp android/app/build/outputs/apk/ventura/debug/app-ventura-debug.apk app/s/ventura-staff.apk
+          cp android/app/build/outputs/apk/fms/debug/app-fms-debug.apk app/s/orbique-fms.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add app/m/kilat-staff.apk app/s/ventura-staff.apk
+          git add app/m/kilat-staff.apk app/s/orbique-fms.apk
           git commit -m "Build staff app APKs" || exit 0
           git pull --rebase origin ${GITHUB_REF_NAME}
           git push origin HEAD:${GITHUB_REF_NAME}
